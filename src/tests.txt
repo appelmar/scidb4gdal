@@ -1,0 +1,3 @@
+# This file is just for some local testing
+./gdalinfo "SCIDB:array=chicago2"
+./gdal_translate -of GTiff "SCIDB:array=chicagoC" /tmp/test.tif 

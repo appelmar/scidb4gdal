@@ -1,0 +1,15 @@
+
+OBJ	=	scidbdriver.o shimclient.o utils.o affinetransform.o
+
+EXTRAFLAGS = -I../../ogr
+
+GDAL_ROOT	=	..\..
+
+!INCLUDE $(GDAL_ROOT)\nmake.opt
+
+default:	$(OBJ)
+	xcopy /D  /Y *.obj ..\o
+
+clean:
+	-del *.obj
+

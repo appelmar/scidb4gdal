@@ -1,0 +1,78 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>scidb4gdal - A GDAL driver for scidb arrays</title>
+</head>
+
+<body>
+
+<h1>scidb4gdal - A GDAL driver for scidb arrays</h1>
+
+<p>This driver interfaces SciDB for accessing two-dimensional arrays.
+Detailed instructions can be found at <a href="https://github.com/mappl/scidb4gdal">https://github.com/mappl/scidb4gdal</a>.
+</p>
+
+
+<h2>Connection String</h2>
+<p>Syntax: 'SCIDB:array=%arrayname%[ host=%hostname%][ port=%portnumber%][ user=%username%][ password=%password%]</p>
+<p>where:</p>
+<ul>
+<li><i>array</i> is the name of a SciDB array</li>
+<li><i>host</i> is an URL to connect to shim (default http://localhost)</li>
+<li><i>port</i> is the port shims listens on (default 8080)</li>
+<li><i>user</i> is the user name for shim authentication (default scidb)</li>
+<li><i>password</i> is the password for shim authentication (default scidb)</li>
+
+</ul>
+
+<h2>Creation issues</h2>
+
+<p>Currently the driver is read only.</p>
+
+
+<h2>Overviews</h2>
+
+<p>The driver does not support building overviews.</p>
+
+
+
+
+<h2>Examples:</h2>
+
+<ul>
+<li>Accessing a rasterlite DB with a single raster table :
+<pre>
+$ gdalinfo "SCIDB:array=chicago"
+</pre>
+Output:
+<pre>
+Driver: SciDB/SciDB array driver
+Files: none associated
+Size is 699, 929
+Coordinate System is `'
+Origin = (444655.000000000000000,4631220.000000000000000)
+Pixel Size = (10.000000000000000,10.000000000000000)
+Corner Coordinates:
+Upper Left  (  444655.000, 4631220.000) 
+Lower Left  (  444655.000, 4640510.000) 
+Upper Right (  451645.000, 4631220.000) 
+Lower Right (  451645.000, 4640510.000) 
+Center      (  448150.000, 4635865.000) 
+Band 1 Block=699x929 Type=Int32, ColorInterp=Undefined
+</pre>
+</li>
+
+
+</ul>
+
+<p>See Also:</p>
+
+<ul>
+<li><a href="https://github.com/Paradigm4/shim">Shim web service for SciDB</a></li>
+<li><a href="http://scidb.org">Official SciDB website</a></li>
+
+</ul>
+
+</body>
+</html>
