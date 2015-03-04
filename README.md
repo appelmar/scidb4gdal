@@ -32,7 +32,7 @@ The following instructions show you how to compile GDAL with added SciDB driver 
 1. Download GDAL source
 2. Clone this repository `git clone https://github.com/mappl/scidb4gdal` 
 3. Move the content to GDAL_SRC_DIR/frmts/scidb `mv scidb4gdal GDAL_SRC_DIR/frmts/scidb`
-4. Add driver to GDAL source tree (see http://www.gdal.org/gdal_drivertut.html):
+4. Add driver to GDAL source tree (see http://www.gdal.org/gdal_drivertut.html#gdal_drivertut_addingdriver):
     1. Add `GDALRegister_SciDB()`to GDAL_SRC_DIR/gcore/gdal_frmts.h
     2. Add call to `GDALRegister_SciDB()? in GDAL_SRC_DIR/frmts/gdalallregister.cpp
     3. Add `SciDB` to GDAL_FORMATS in GDAL_SRC_DIR/GDALmake.opt.in
