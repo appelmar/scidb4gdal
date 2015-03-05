@@ -31,13 +31,26 @@ The following instructions show you how to compile GDAL with added SciDB driver 
 
 1. Download GDAL source
 2. Clone this repository `git clone https://github.com/mappl/scidb4gdal` 
-3. Move the content to `GDAL_SRC_DIR/frmts/scidb` by `mv scidb4gdal/src GDAL_SRC_DIR/frmts/scidb`
+3. Copy the source to `GDAL_SRC_DIR/frmts/scidb` by `cp scidb4gdal/src GDAL_SRC_DIR/frmts/scidb`
 4. Add driver to GDAL source tree (see http://www.gdal.org/gdal_drivertut.html#gdal_drivertut_addingdriver):
     1. Add `GDALRegister_SciDB()`to `GDAL_SRC_DIR/gcore/gdal_frmts.h`
-    2. Add call to `GDALRegister_SciDB()` in `GDAL_SRC_DIR/frmts/gdalallregister.cpp`
-    3. Add "SciDB" to `GDAL_FORMATS` in `GDAL_SRC_DIR/GDALmake.opt.in`
-    4. Add a corresponding entry to `EXTRAFLAGS` in `GDAL_SRC_DIR/frmts/makefile.vc`
-5. Build GDAL `./configure && make && make install`
+    2. Add call to `GDALRegister_SciDB()` in `GDAL_SRC_DIR/frmts/gdalallregister.cpp` within `#ifdef FRMT_scidb`
+    3. Add "scidb" to `GDAL_FORMATS` in `GDAL_SRC_DIR/GDALmake.opt.in`
+5. Build GDAL `./configure && make && make install`. 
+
+If you get some missing include file errors, you need to install Boost manually. Either use your distribution's package manager e.g. `sudo apt-get install libboost-dev` or simply copy Boost header files to a standard include directory like `/usr/include`.
 
 Windows build instructions will follow.
+<!--
 
+The following instructions demonstrate how to compile GDAL with added SciDB driver on Windows using Visual Studio.  Detailed information for tweaking windows builds can be found at http://trac.osgeo.org/gdal/wiki/BuildingOnWindows.
+
+We recommend the [OSGeo4W](http://trac.osgeo.org/osgeo4w/) network installer for managing and installing GIS libraries on Windows.
+Before you 
+
+1. Do steps 1 to 4 as above.
+2. Add a corresponding entry to `EXTRAFLAGS` in `GDAL_SRC_DIR/frmts/makefile.vc`
+3. Edit `GDAL_SRC_DIR/nmake.opt` to fit your needs and environment. In particular, you should uncomment references to curl.
+4. Open a command line. Depending on the location you want to install GDAL to, do that as administrator
+5. 
+-->
