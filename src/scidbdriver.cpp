@@ -141,7 +141,7 @@ namespace scidb4gdal
 
         *pdfMin = stats.min;
         *pdfMax = stats.max;
-        *pdfMean = stats.max;
+        *pdfMean = stats.mean;
         *pdfStdDev = stats.stdev;
 	
 	return CE_None;
