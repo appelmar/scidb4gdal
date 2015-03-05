@@ -30,6 +30,11 @@ SOFTWARE.
 #define SCIDB4GDAL_DEFAULT_ZDIMNAME "z" // not used by gdal
 #define SCIDB4GDAL_DEFAULT_TDIMNAME "t" // not used by gdal
 
+#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_X 256 
+#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y 256 
+
+//#define SCIDB4GDAL_ARRAY_PREFIX "GDAL_" // Names of created arrays get a prefix, not yet implemented
+
 #define SCIDB4GDAL_MAINMEM_HARD_LIMIT_MB 1024 // TODO: Calculate expected array size based on dimensions and attributes and stop if larger than this value
 
 #include <string>
@@ -64,6 +69,14 @@ namespace scidb4gdal
 	 * @return A GDALDataType item
 	 */
         GDALDataType scidbTypeIdToGDALType ( const string &typeId );
+	
+	
+	/**
+	 * Maps  GDAL data type to SciDB string type identifiers.
+	 * @param type value of GDALDataType enumeration 
+	 * @return SciDB type identifier string e.g. "int32"
+	 */
+        string gdalTypeToSciDBTypeId ( GDALDataType type );
 
 
 	/**
@@ -72,6 +85,14 @@ namespace scidb4gdal
 	 * @return Size in bytes
 	 */
         size_t scidbTypeIdBytes ( const string &typeId );
+	
+	
+	/**
+	 * Gets the size in bytes of given a GDAL type.
+	 * @param typeId SciDB type identifier string e.g. "int32"
+	 * @return Size in bytes
+	 */
+        size_t gdalTypeBytes ( GDALDataType type );
 
 
         /**

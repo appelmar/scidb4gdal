@@ -80,6 +80,22 @@ namespace scidb4gdal
             else if (typeId == "double")  return GDT_Float64;
             return GDT_Unknown; // No GDAL support for int64, uint64, string
         }
+        
+       
+        string gdalTypeToSciDBTypeId ( GDALDataType type ) 
+	{
+	  if (type == GDT_Byte) 	return "uint8";
+	  else if (type == GDT_UInt32) 	return "uint32";
+	  else if (type == GDT_Int32) 	return "int32";
+	  else if (type == GDT_Int16) 	return "int16";
+	  else if (type == GDT_UInt16) 	return "uint16";
+	  else if (type == GDT_Float32) return "float";
+	  else if (type == GDT_Float64) return "double";
+	  return 0;
+	}
+        
+        
+        
 
         size_t scidbTypeIdBytes(const string& typeId)
         {
@@ -93,6 +109,20 @@ namespace scidb4gdal
             else if (typeId == "double")  return 8;
             return 0;
         }
+        
+        
+        size_t gdalTypeBytes ( GDALDataType type )
+        {
+	  if (type == GDT_Byte) 	return 1;
+	  else if (type == GDT_UInt32) 	return 4;
+	  else if (type == GDT_Int32) 	return 4;
+	  else if (type == GDT_Int16) 	return 2;
+	  else if (type == GDT_UInt16) 	return 2;
+	  else if (type == GDT_Float32) return 4;
+	  else if (type == GDT_Float64) return 8;
+	  return 0;
+        }
+
         
 
         void sleep ( long int ms )

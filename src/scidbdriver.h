@@ -49,52 +49,60 @@ namespace scidb4gdal
 
     public:
         /**
-	 * Default constructor for creating SciDBDataset instance for a given connectionstring
-	 * @param connstr string representation of a connection string, e.g. "SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"
-	 */
+        * Default constructor for creating SciDBDataset instance for a given connectionstring
+         * @param connstr string representation of a connection string, e.g. "SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"
+         */
         SciDBDataset ( const string &connstr );
-	
-	/**
-	 * Destructor for SciDBDatasets
-	 */
+
+        /**
+         * Destructor for SciDBDatasets
+         */
         ~SciDBDataset();
 
-	/**
-	 * Function called by GDAL once a SciDB dataset is requested
-	 * @see GDALDataset::Open
-	 */
+        /**
+         * Function called by GDAL once a SciDB dataset is requested
+         * @see GDALDataset::Open
+         */
         static GDALDataset *Open ( GDALOpenInfo *poOpenInfo );
-	
-	/**
-	 * Decides whether a dataset is a SciDB dataset or not, depends on the connection string prefix SCIDB:
-	 */
+
+        /**
+         * Decides whether a dataset is a SciDB dataset or not, depends on the connection string prefix SCIDB:
+         */
         static int Identify ( GDALOpenInfo *poOpenInfo );
 
-	/**
-	 * Returns a pointer to the shim client object
-	 */
+        /**
+         * Returns a pointer to the shim client object
+         */
         ShimClient *getClient() {
             return _client;
         }
 
         /**
-	 * Returns affine transformation parameters
-	 */
+        * Returns affine transformation parameters
+         */
         CPLErr GetGeoTransform ( double *padfTransform );
-	
-	/**
-	 * Returns WKT spatial reference string
-	 */
+
+        /**
+         * Returns WKT spatial reference string
+         */
         const char *GetProjectionRef();
+
+
+        /**
+         * Function for creating a new SciDB array based on a given GDALDataset
+         * @see GDALDriver::CreateCopy()
+         */
+        static GDALDataset *SciDBCreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions,
+                                              GDALProgressFunc pfnProgress, void *pProgressData );
     };
 
 
-    
-    
-    
-     /**
-     * GDALRasterBand subclass implementing core GDAL functionality for single bands
-     */
+
+
+
+    /**
+    * GDALRasterBand subclass implementing core GDAL functionality for single bands
+    */
     class SciDBRasterBand : public GDALPamRasterBand
     {
         friend class SciDBDataset;
@@ -103,21 +111,28 @@ namespace scidb4gdal
 
     public:
 
-	/**
-	 * Default constructor for SciDB attribute bands
-	 */
+        /**
+         * Default constructor for SciDB attribute bands
+         */
         SciDBRasterBand ( SciDBDataset *poDS, SciDBSpatialArray *array, int nBand );
-	
-	/**
-	 * Band destructor
-	 */
+
+        /**
+         * Band destructor
+         */
         ~SciDBRasterBand();
 
 
-	/**
-	 * GDAL function called as array attribtue data is requested, loads data from SciDB server and might take some time thus
-	 */
+        /**
+         * GDAL function called as array attribtue data is requested, loads data from SciDB server and might take some time thus
+         */
         virtual CPLErr IReadBlock ( int nBlockXOff, int nBlockYOff, void *pImage );
+
+	/**
+	 * GDAL function for computing min,max,mean,and stdev of an array attribute
+	 */
+        virtual CPLErr GetStatistics ( int bApproxOK, int bForce,double *pdfMin,double *pdfMax,double *pdfMean, double *pdfStdDev);
+	
+	
     };
 
 

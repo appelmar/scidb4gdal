@@ -4,5 +4,4 @@
 * Check performance
 * Implement write operations: create for creating a new array, insert for insertion into an existing array
 * Add trimming, slicing and maybe other queries, trimming changes offset of spatial reference!
-* Add Boost header dependencies to gdal or in documentation as ./configure CPPFLAGS argument
-* Add connection retries option for handling connection errors
+

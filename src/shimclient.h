@@ -66,6 +66,10 @@ namespace scidb4gdal
         bool nullable;
     };
 
+    struct SciDBAttributeStats {
+     double min,max,mean,stdev; 
+    };
+    
      /**
      * A structure for storing metadata of a SciDB array dimension
      */
@@ -92,6 +96,18 @@ namespace scidb4gdal
             for ( uint32_t i = 0; i < dims.size(); ++i ) s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high << "," << dims[i].typeId << ">";
             for ( uint32_t i = 0; i < attrs.size(); ++i ) s << "['" << attrs[i].name << "'," << attrs[i].typeId << "," << attrs[i].nullable << "]";
             s << "\n";
+            return s.str();
+        }
+        
+        string getFormatString() {
+            stringstream s;
+            s << "(";
+	    for (uint32_t i=0; i<attrs.size()-1; ++i) 
+	    {
+	      s << attrs[i].typeId << ","; // TODO: Add nullable
+	    }
+	    s << attrs[attrs.size()-1].typeId; // TODO: Add nullable
+            s << ")";
             return s.str();
         }
     };
@@ -237,7 +253,7 @@ namespace scidb4gdal
         /**
 	 * Retreives single attribute data from shim for a given bounding box
 	 * @param array metadata of an existing array
-	 * @param index of the requested attribute (starting with 0).
+	 * @param nband index of the requested attribute (starting with 0).
 	 * @param outchunk pointer to a chunk of memory that gets result data, must be allocated before(!) calling this function, which is usually done by GDAL
 	 * @param xmin left boundary, we assume x to be "easting" which is different from GDAL!
 	 * @param ymin lower boundary, we assume y to be "northing" which is different from GDAL!
@@ -245,6 +261,9 @@ namespace scidb4gdal
 	 * @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
 	 */
         void getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
+	
+	
+	SciDBAttributeStats getAttributeStats ( SciDBSpatialArray &array, uint8_t nband);
 
 	/**
 	 * Established a connection to SciDB's web service shim
@@ -260,6 +279,24 @@ namespace scidb4gdal
 	 * Tests a shim connection by requesting version information
 	 */
         void testConnection();
+	
+	
+	/**
+	 * Creates a new SciDB array
+	 * @param array metadata of the new array
+	 */
+	void createArray(SciDBSpatialArray &array);
+	
+	/**
+	 * Inserts a chunk of data to an existing array
+	 * @param array metadata of an existing array
+	 * @param inchunk pointer to a chunk of memory that holds data in scidb binary format
+	 * @param xmin left boundary, we assume x to be "easting" which is different from GDAL!
+	 * @param ymin lower boundary, we assume y to be "northing" which is different from GDAL!
+	 * @param xmax right boundary, we assume x to be "easting" which is different from GDAL!
+	 * @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
+	 */
+	void insertData(SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max);
 
 
     protected:
@@ -299,6 +336,10 @@ namespace scidb4gdal
 	 * @param sessionID integer session ID
 	 */
         void releaseSession ( int sessionID );
+	
+	
+	
+	
 	
 	
 	
