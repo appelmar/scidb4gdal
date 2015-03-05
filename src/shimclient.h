@@ -47,7 +47,7 @@ SOFTWARE.
 #define SHIMENDPOINT_LOGOUT         	"/logout"
 #define SHIMENDPOINT_VERSION        	"/version"
 
-
+#define CURL_RETRIES 3
 // #define CURL_VERBOSE  // Uncomment this line if you want to debug CURL requests and responses
 
 
@@ -299,6 +299,10 @@ namespace scidb4gdal
 	 * @param sessionID integer session ID
 	 */
         void releaseSession ( int sessionID );
+	
+	
+	
+	// TODO: Add general executeQuery(), readBytes() functions to make code less redundant
 
 
 

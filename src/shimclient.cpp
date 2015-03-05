@@ -91,8 +91,11 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
 
         CURLcode res = curl_easy_perform ( _curl_handle );
-
-        /* check for errors */
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
+        
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -136,8 +139,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
 
         CURLcode res = curl_easy_perform ( _curl_handle );
-
-        /* check for errors */
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -165,6 +170,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         CURLcode res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -205,6 +214,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         CURLcode res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -224,6 +237,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -298,6 +315,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         CURLcode res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -317,6 +338,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -404,6 +429,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         CURLcode res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -423,6 +452,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -598,7 +631,7 @@ namespace scidb4gdal
 
         stringstream afl;
         if ( x_idx > y_idx ) // TODO: need to check performance of differend ordering
-            afl << "transpose(project(subarray(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << "))";
+            afl << "transpose(project(subarray(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
         else
             afl << "project(subarray(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
         ss << "&query=" << afl.str();
@@ -614,6 +647,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
         CURLcode res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
@@ -635,6 +672,10 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, responseBinaryCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, ( void * ) &data );
         res = curl_easy_perform ( _curl_handle );
+	for (int i=1; i<CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
+	  Utils::sleep(i*100);
+	  res = curl_easy_perform ( _curl_handle );
+	}
         if ( res != CURLE_OK ) {
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }

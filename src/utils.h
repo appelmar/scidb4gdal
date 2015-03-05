@@ -39,11 +39,17 @@ SOFTWARE.
 #include <exception>
 
 
-// TODO: Make this "gdal.h" when merging into gdal frmts/scidb
 #include "gdal.h"
 #include "gdal_pam.h"
 #include "gdal_priv.h"
-/////////////////////////////7
+
+// Sleep function
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 
 
 namespace scidb4gdal
@@ -83,8 +89,10 @@ namespace scidb4gdal
 	 */
         void debug ( const string &msg ) ;
 
-
-
+	/** 
+	 * Utility function for sleeping after connection retries
+	 */
+	void sleep(long ms);
 
     }
 

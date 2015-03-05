@@ -93,5 +93,22 @@ namespace scidb4gdal
             else if (typeId == "double")  return 8;
             return 0;
         }
+        
+
+        void sleep ( long int ms )
+        {
+	    #ifdef WIN32
+	    Sleep(ms);
+	    #else
+	    usleep(ms * 1000);
+	    #endif 
+	}
+        
+
+        
+        
+        
+        
+        
     }
 }
