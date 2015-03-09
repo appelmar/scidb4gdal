@@ -30,27 +30,27 @@ SOFTWARE.
 namespace scidb4gdal
 {
 
-    ShimClient::ShimClient() : _host ( "http://localhost" ), _port ( 8080 ), _user ( "scidb" ), _passwd ( "scidb" ), _curl_handle ( 0 )
+    ShimClient::ShimClient() : _host ( "http://localhost" ), _port ( 8080 ), _user ( "scidb" ), _passwd ( "scidb" ), _curl_handle ( 0 ), _curl_initialized ( false )
     {
-
+        curl_global_init ( CURL_GLOBAL_ALL );
     }
-    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd ) : _host ( host ), _port ( port ), _user ( user ), _passwd ( passwd ), _curl_handle ( 0 )
+    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd ) : _host ( host ), _port ( port ), _user ( user ), _passwd ( passwd ), _curl_handle ( 0 ), _curl_initialized ( false )
     {
-
+        curl_global_init ( CURL_GLOBAL_ALL );
     }
     ShimClient::~ShimClient()
     {
-        disconnect();
-
+        curl_global_cleanup();
+        _curl_handle = 0;
     }
 
-    void ShimClient::connect()
+    void ShimClient::curlBegin()
     {
-        if ( _curl_handle ) disconnect();
+        if ( _curl_initialized ) curlEnd();
 
-        curl_global_init ( CURL_GLOBAL_ALL );
         _curl_handle = curl_easy_init();
-        curl_easy_setopt ( _curl_handle, CURLOPT_URL, _host.c_str() );
+        _curl_initialized = true;
+        //curl_easy_setopt ( _curl_handle, CURLOPT_URL, _host.c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_PORT, _port );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST );
         curl_easy_setopt ( _curl_handle, CURLOPT_USERNAME, _user.c_str() );
@@ -60,6 +60,38 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_VERBOSE, 1L );
 #endif
     }
+
+
+
+
+    void ShimClient::curlEnd()
+    {
+        if ( _curl_initialized ) {
+            curl_easy_cleanup ( _curl_handle );
+            _curl_initialized = false;
+        }
+
+    }
+
+
+    CURLcode ShimClient::curlPerform()
+    {
+        CURLcode res = curl_easy_perform ( _curl_handle );
+        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
+            stringstream s;
+            s << "Connection error, retrying ... " << "(#" << i << ")";
+            Utils::warn ( s.str() );
+            Utils::sleep ( i * 100 );
+            res = curl_easy_perform ( _curl_handle );
+        }
+        if ( res != CURLE_OK ) {
+            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
+        }
+        return res;
+    }
+
+
+
 
 
 
@@ -78,7 +110,8 @@ namespace scidb4gdal
 
     void ShimClient::testConnection()
     {
-        if ( !_curl_handle ) connect();
+
+        curlBegin();
 
         stringstream ss;
         ss << _host << SHIMENDPOINT_VERSION;
@@ -90,27 +123,12 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
 
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
+        curlPerform();
+        curlEnd();
+        Utils::debug ( "SHIM Version: " + response );
 
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
-        else {
-            Utils::debug ( "SHIM Version: " + response );
-        }
-    }
 
-    void ShimClient::disconnect()
-    {
-        if ( _curl_handle ) {
-            curl_easy_cleanup ( _curl_handle );
-            curl_global_cleanup();
-            _curl_handle = 0;
-        }
+
     }
 
 
@@ -122,7 +140,7 @@ namespace scidb4gdal
     int ShimClient::newSession()
     {
 
-        if ( !_curl_handle ) connect();
+        curlBegin();
 
         stringstream ss;
         string response;
@@ -138,19 +156,16 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
 
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
 
+        curlEnd();
 
         //int sessionID = boost::lexical_cast<int>(response.data());
         int sessionID = atoi ( response.c_str() );
-        if ( sessionID > 0 ) return sessionID;
+        if ( sessionID > 0 )
+            return sessionID;
+
+
         Utils::error ( ( string ) ( "Invalid session ID" ) );
         return -1;
 
@@ -159,7 +174,7 @@ namespace scidb4gdal
 
     void ShimClient::releaseSession ( int sessionID )
     {
-        if ( !_curl_handle ) connect();
+        curlBegin();
         stringstream ss;
         ss << _host << SHIMENDPOINT_RELEASE_SESSION;
         ss << "?" << "id=" << sessionID;
@@ -169,14 +184,8 @@ namespace scidb4gdal
         string response;
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
     }
 
@@ -188,7 +197,6 @@ namespace scidb4gdal
     vector< SciDBAttribute > ShimClient::getAttributeDesc ( const string &inArrayName )
     {
 
-        if ( !_curl_handle ) connect();
 
         vector<SciDBAttribute> out;
 
@@ -199,6 +207,8 @@ namespace scidb4gdal
 
 
         // EXECUTE QUERY  //////////////////////////// http://localhost:8080/execute_query?id=${s}&query=project(attributes(inArrayName),name,type_id,nullable);&save=dcsv
+        curlBegin();
+
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_EXECUTEQUERY;
         ss << "?"
@@ -213,17 +223,12 @@ namespace scidb4gdal
         response = "";
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+
+        curlPerform();
+        curlEnd();
 
 
-
+        curlBegin();
 
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
@@ -236,14 +241,8 @@ namespace scidb4gdal
         response = "";
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
 
         // Parse CSV
@@ -291,7 +290,7 @@ namespace scidb4gdal
 
     vector< SciDBDimension> ShimClient::getDimensionDesc ( const string &inArrayName )
     {
-        if ( !_curl_handle ) connect();
+
 
         vector<SciDBDimension> out;
 
@@ -300,12 +299,13 @@ namespace scidb4gdal
         string response;
 
 
+        curlBegin();
         // EXECUTE QUERY  //////////////////////////// http://localhost:8080/execute_query?id=${s}&query=project(attributes(inArrayName),name,type_id,nullable);&save=dcsv
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_EXECUTEQUERY;
         ss << "?"
            << "id=" << sessionID
-           << "&query=" << "project(dimensions(" << inArrayName << "),name,low,high,type,chunk_interval)" // project(dimensions(chicago2),name,low,high,type)
+           << "&query=" << "project(dimensions(" << inArrayName << "),name,low,high,type,chunk_interval,start,length)" // project(dimensions(chicago2),name,low,high,type)
            << "&save=" << "csv";
         Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
@@ -314,18 +314,12 @@ namespace scidb4gdal
         response = "";
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
 
 
-
+        curlBegin();
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_READ_BYTES;
@@ -337,14 +331,8 @@ namespace scidb4gdal
         response = "";
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
 
         // Parse CSV
@@ -354,20 +342,31 @@ namespace scidb4gdal
         for ( vector<string>::iterator it = ++ ( rows.begin() ); it != rows.end(); ++it ) { // ignore first row
             vector<string> cols;
             boost::split ( cols, *it, boost::is_any_of ( "," ) );
-            if ( cols.size() != 5 ) {
+            if ( cols.size() != 7 ) {
 
                 continue;// TODO: Error handling, expected 4 cols
             }
-            if ( cols[0].length() < 2 || cols[1].length() < 1 || cols[2].length() < 1 || cols[3].length() < 1 || cols[4].length() < 1 ) {
+            if ( cols[0].length() < 2 || cols[1].length() < 1 || cols[2].length() < 1 || cols[3].length() < 1 || cols[4].length() < 1 || cols[5].length() < 1 || cols[6].length() < 1 ) {
                 continue;
             }
 
             SciDBDimension dim;
             dim.name = cols[0].substr ( 1, cols[0].length() - 2 );
-            dim.low = atoi ( cols[1].c_str() );
-            dim.high = atoi ( cols[2].c_str() );
+            dim.low = boost::lexical_cast<int64_t> ( cols[1].c_str() );
+            dim.high = boost::lexical_cast<int64_t> ( cols[2].c_str() );
             dim.typeId = cols[3].substr ( 1, cols[3].length() - 2 ); // Remove quotes
-            dim.chunksize = atoi ( cols[4].c_str() );
+            dim.chunksize = boost::lexical_cast<uint32_t> ( cols[4].c_str() );
+
+            if ( dim.high == SCIDB_MAX_DIM_INDEX || dim.low == SCIDB_MAX_DIM_INDEX  || dim.high == -SCIDB_MAX_DIM_INDEX || dim.low == -SCIDB_MAX_DIM_INDEX ) { // yet unspecified e.g. for newly created arrays
+                dim.low = boost::lexical_cast<int64_t> ( cols[5].c_str() );
+                dim.high = dim.low + boost::lexical_cast<int64_t> ( cols[6].c_str() ) - 1;
+            }
+
+            stringstream sdebug;
+            sdebug << "DIMENSION(" << dim.name << "," << dim.low << "," << dim.high << ")";
+            Utils::debug ( sdebug.str() );
+
+
 
             // Assert  dim.typeId is integer
             if ( ! ( dim.typeId == "int32" || dim.typeId == "int64" || dim.typeId == "int16" || dim.typeId == "int8" ||
@@ -402,7 +401,6 @@ namespace scidb4gdal
 
     SciDBSpatialReference  ShimClient::getSRSDesc ( const string &inArrayName )
     {
-        if ( !_curl_handle ) connect();
 
 
         SciDBSpatialReference out;
@@ -415,7 +413,7 @@ namespace scidb4gdal
 
 
         // EXECUTE QUERY  ////////////////////////////
-
+        curlBegin();
         ss << _host << SHIMENDPOINT_EXECUTEQUERY;
         ss << "?"
            << "id=" << sessionID
@@ -428,18 +426,11 @@ namespace scidb4gdal
         response = "";
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
 
-
-
+        curlBegin();
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_READ_BYTES;
@@ -451,14 +442,8 @@ namespace scidb4gdal
         response = "";
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
 
         // Parse CSV
@@ -467,7 +452,7 @@ namespace scidb4gdal
         boost::split ( rows, response, boost::is_any_of ( "\n" ) );
 
         if ( rows.size() < 2 || rows.size() > 3 ) { // Header + 1 data row
-            Utils::error ( ( string ) ( "Cannot extract SRS information from response: " ) + response );
+            Utils::debug ( ( string ) ( "Cannot extract SRS information from response: " ) + response );
         }
 
         string row = rows[1];
@@ -486,7 +471,7 @@ namespace scidb4gdal
 
 
         if ( cols.size() != 6 ) {
-            Utils::warn ( ( string ) ( "Cannot extract SRS information from response: " ) + response );
+            Utils::debug ( ( string ) ( "Cannot extract SRS information from response: " ) + response );
             out.affineTransform = * ( new AffineTransform() );
             out.ydim  =  out.xdim  = out.proj4text  = out.srtext = "";
 
@@ -592,14 +577,12 @@ namespace scidb4gdal
 
     void ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max )
     {
-        if ( !_curl_handle ) connect();
-
 
 
         if ( x_min < array.getXDim().low || x_min > array.getXDim().high ||
                 x_max < array.getXDim().low || x_max > array.getXDim().high ||
-                y_min < array.getXDim().low || y_min > array.getXDim().high ||
-                y_max < array.getXDim().low || y_max > array.getXDim().high ) {
+                y_min < array.getYDim().low || y_min > array.getYDim().high ||
+                y_max < array.getYDim().low || y_max > array.getYDim().high ) {
             Utils::error ( "Requested array subset is outside array boundaries" );
         }
 
@@ -624,6 +607,7 @@ namespace scidb4gdal
          * to move fastest, an array must be transposed if dimension order is (lat, lon). */
 
 
+        curlBegin();
         // EXECUTE QUERY  ////////////////////////////
         ss.str();
         ss << _host << SHIMENDPOINT_EXECUTEQUERY;
@@ -646,16 +630,10 @@ namespace scidb4gdal
         response = "";
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
-
+        curlBegin();
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_READ_BYTES;
@@ -671,14 +649,8 @@ namespace scidb4gdal
 
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, responseBinaryCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, ( void * ) &data );
-        res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
         ss.str ( "" );
         size_t nValues = data.size / Utils::scidbTypeIdBytes ( array.attrs[nband].typeId );
@@ -689,15 +661,17 @@ namespace scidb4gdal
         releaseSession ( sessionID );
 
 
-        size_t nx = 1 + x_max - x_min;
-        size_t ny = 1 + y_max - y_min;
-
-        // Assert nValues equals product of dimensions
-        if ( ny * nx != nValues ) {
-            ss.str ( "" );
-            ss << "Number of returned values does not match subset size: " << nValues  << "<>" << ny *nx;
-            Utils::error ( ss.str() );
-        }
+//         uint32_t nx = 1 + x_max - x_min;
+//         uint32_t ny = 1 + y_max - y_min;
+//
+//         // Assert nValues equals product of dimensions
+//         // TODO: Why is this called when creating a new dataset???
+//         if (ny * nx != nValues)
+//         {
+//             ss.str("");
+//             ss << "Number of returned values does not match subset size: " << nValues  << "<>" << ny* nx;
+//             Utils::error(ss.str());
+//         }
 
         outchunk = ( void * ) data.memory;
     }
@@ -706,7 +680,6 @@ namespace scidb4gdal
 
     void scidb4gdal::ShimClient::createArray ( SciDBSpatialArray &array )
     {
-        if ( !_curl_handle ) connect();
 
         if ( array.name == "" ) {
             Utils::error ( "Cannot create unnamed arrays" );
@@ -725,7 +698,9 @@ namespace scidb4gdal
 
         int sessionID = newSession();
 
-
+        stringstream s;
+        s << "Got session ID " << sessionID;
+        Utils::debug ( s.str() );
 
         // Build afl query, e.g. CREATE ARRAY A <x: double, err: double> [i=0:99,10,0, j=0:99,10,0];
         stringstream afl;
@@ -734,42 +709,28 @@ namespace scidb4gdal
         for ( uint32_t i = 0; i < array.attrs.size() - 1; ++i ) {
             afl << array.attrs[i].name << ": " << array.attrs[i].typeId << ",";
         }
-        afl << array.attrs[array.attrs.size() - 1].name << ": " << array.attrs[array.attrs.size() - 1].typeId << " >";
+        afl << array.attrs[array.attrs.size() - 1].name << ": " << array.attrs[array.attrs.size() - 1].typeId << ">";
         afl << " [";
         for ( uint32_t i = 0; i < array.dims.size() - 1; ++i ) {
             afl << array.dims[i].name << "=" << array.dims[i].low << ":" << array.dims[i].high << "," << array.dims[i].chunksize << "," << 0  << ", "; // TODO: Overlap
         }
-        afl << array.dims[array.dims.size() - 1].name << "=" << array.dims[array.dims.size() - 1].low << ":" << array.dims[array.dims.size() - 1].high << "," << array.dims[array.dims.size() - 1].chunksize << "," << 0  << ", "; // TODO: Overlap
+        afl << array.dims[array.dims.size() - 1].name << "=" << array.dims[array.dims.size() - 1].low << ":" << array.dims[array.dims.size() - 1].high << "," << array.dims[array.dims.size() - 1].chunksize << "," << 0 ; // TODO: Overlap
         afl << "]";
         //afl << ";";
+        string aflquery = afl.str();
+        //Utils::debug("AFL QUERY: " + afl.str());
 
-
-
-
+        curlBegin();
         // EXECUTE QUERY  ////////////////////////////
-        ss.str();
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY;
-        ss << "?" << "id=" << sessionID;
-        ss << "&query=" << afl.str();
-        ss << ")";
+        ss.str ( "" );
+        // ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << aflquery;
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, aflquery.c_str(), 0 );
 
         Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
-
-
-        // TODO: Add spatial reference system information
-
-
-
+        curlPerform();
+        curlEnd();
 
 
 
@@ -778,9 +739,16 @@ namespace scidb4gdal
     }
 
 
+    // This is probably incomplete but should be enough for shim generated filenames on the server
+    bool isIllegalFilenameCharacter ( char c )
+    {
+        return ! ( std::isalnum ( c ) || c == '/' || c == '_' || c == '-' || c == '.' );
+    }
+
     void scidb4gdal::ShimClient::insertData ( SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max )
     {
-        // Do some checks
+        // TODO: Do some checks
+
 
 
         // Shim create session
@@ -790,10 +758,144 @@ namespace scidb4gdal
         // Shim upload file from binary stream
         string format = array.getFormatString();
 
+        // Get total size in bytes of one pixel, i.e. sum of attribute sizes
+        size_t pixelSize = 0;
+        uint32_t nx = ( 1 + x_max - x_min );
+        uint32_t ny = ( 1 + y_max - y_min );
+        for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
+        size_t totalSize = pixelSize *  nx * ny;
+        Utils::debug ( "TOTAL SIZE TO UPLOAD: " + boost::lexical_cast<string> ( totalSize ) );
 
 
 
-        // Shim execute query insert(redimension(load(), <schema>)),array.name);
+
+        // UPLOAD FILE ////////////////////////////
+        stringstream ss;
+        ss.str ( "" );
+        ss << _host << ":" << _port <<  SHIMENDPOINT_UPLOAD_FILE; // neccessary to put port in URL due to  HTTP 100-continue
+        ss << "?" << "id=" << sessionID;
+
+
+        struct curl_httppost *formpost = NULL;
+        struct curl_httppost *lastptr = NULL;
+
+        // Load file from buffer instead of file!
+        curl_formadd ( &formpost, &lastptr, CURLFORM_COPYNAME, "file", CURLFORM_BUFFER, SCIDB4GDAL_DEFAULT_UPLOAD_FILENAME, CURLFORM_BUFFERPTR, inChunk, CURLFORM_BUFFERLENGTH, totalSize,  CURLFORM_CONTENTTYPE, "application/octet-stream", CURLFORM_END );
+
+        curlBegin();
+        string remoteFilename = "";
+        //curl_easy_setopt(_curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
+
+        curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+        curl_easy_setopt ( _curl_handle, CURLOPT_HTTPPOST, formpost );
+        curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+        curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &remoteFilename );
+
+        Utils::debug ( ( string ) "HTTP POST " + ss.str().c_str() );
+
+        curlPerform();
+        curlEnd();
+        curl_formfree ( formpost );
+
+
+        remoteFilename.erase ( std::remove_if ( remoteFilename.begin(), remoteFilename.end(), isIllegalFilenameCharacter ), remoteFilename.end() );
+
+
+        Utils::debug ( ( string ) "SciDB binary file uploaded to " + remoteFilename );
+
+        string tempArray = array.name + "_tempload"; // SciDB 14.12 marks nested load operations as deprecated, so we create a temporary array first
+
+
+
+        //Utils::sleep(3000);
+
+        {
+            /*
+             * CREATE ARRAY tempArray < ... > [i=0:*,SCIDB4GDAL_DEFAULT_BLOCKSIZE_X*SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y,0];
+             */
+
+            stringstream afl;
+            afl << "CREATE ARRAY " << tempArray;
+            afl << " <";
+            for ( uint32_t i = 0; i < array.attrs.size() - 1; ++i ) {
+                afl << array.attrs[i].name << ": " << array.attrs[i].typeId << ",";
+            }
+            afl << array.attrs[array.attrs.size() - 1].name << ": " << array.attrs[array.attrs.size() - 1].typeId << ">";
+            afl << " [" << "i=0:*," << SCIDB4GDAL_DEFAULT_BLOCKSIZE_X *SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y << ",0]";
+            curlBegin();
+            ss.str ( "" );
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            curlPerform();
+            curlEnd();
+        }
+
+
+
+        {
+            /*
+             * load(tempArray,'remoteFilename', -2, 'format');
+             */
+            stringstream afl;
+            afl << "load(" << tempArray << ",'" << remoteFilename.c_str() << "', -2, '" << format << "')"; // TODO: Add error checking, max errors, and shadow array
+            curlBegin();
+            ss.str ( "" );
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            curlPerform();
+            curlEnd();
+        }
+
+
+        {
+            /*
+             * insert(
+             *     redimension(
+             *         apply(TEMP_ARRAY, array.dims[xidx].name,  (int64)xmin +  ((int64)i % (int64)nx),          array.dims[yidx].name,  (int64)ymin +  (int64)((int64)i / (int64)ny))
+             *         ,array.name)
+             *     ,a)
+            */
+            stringstream afl;
+            afl << "insert(redimension(apply(" << tempArray << ","; // TODO: Check dimension indices + ordering...
+            afl << array.dims[array.getYDimIdx()].name << "," << "int64(" << y_min  << ") + int64(i) % int64(" << ny << ")";
+            afl << ",";
+            afl << array.dims[array.getXDimIdx()].name << "," << "int64(" << x_min  << ") + int64(int64(i) / int64(" << ny << "))";
+            afl << "), " << array.name << "), " << array.name << ")";
+
+            Utils::debug ( "AFL%" + afl.str() );
+
+            curlBegin();
+            ss.str ( "" );
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            curlPerform();
+            curlEnd();
+        }
+
+
+
+        {
+            /*
+             * remove (tempArray);
+             */
+            stringstream afl;
+            afl << "remove(" << tempArray << ")";
+            curlBegin();
+            ss.str ( "" );
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            curlPerform();
+            curlEnd();
+        }
+
 
 
         // Release session
@@ -804,7 +906,6 @@ namespace scidb4gdal
 
     SciDBAttributeStats ShimClient::getAttributeStats ( SciDBSpatialArray &array, uint8_t nband )
     {
-        if ( !_curl_handle ) connect();
 
 
         if ( nband >= array.attrs.size() ) {
@@ -822,21 +923,16 @@ namespace scidb4gdal
         afl << "aggregate(" << array.name << ",min(" << aname << "),max(" << aname << "),avg(" << aname << "),stdev(" << aname << "))";
         ss << "&query=" << afl.str() << "&save=" << "(double,double,double,double)";
 
+        curlBegin();
         Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
-        CURLcode res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
 
 
-
+        curlBegin();
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_READ_BYTES;
@@ -851,20 +947,14 @@ namespace scidb4gdal
 
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, responseBinaryCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, ( void * ) &data );
-        res = curl_easy_perform ( _curl_handle );
-        for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
-            Utils::sleep ( i * 100 );
-            res = curl_easy_perform ( _curl_handle );
-        }
-        if ( res != CURLE_OK ) {
-            Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
-        }
+        curlPerform();
+        curlEnd();
 
         SciDBAttributeStats stats;
-        stats.min = ((double*)data.memory)[0];
-        stats.max = ((double*)data.memory)[1];
-        stats.mean = ((double*)data.memory)[2];
-        stats.stdev = ((double*)data.memory)[3];
+        stats.min = ( ( double * ) data.memory ) [0];
+        stats.max = ( ( double * ) data.memory ) [1];
+        stats.mean = ( ( double * ) data.memory ) [2];
+        stats.stdev = ( ( double * ) data.memory ) [3];
 
         free ( data.memory );
 
@@ -874,6 +964,43 @@ namespace scidb4gdal
         return stats;
 
 
+    }
+
+
+
+    void ShimClient::updateSRS ( SciDBSpatialArray &array )
+    {
+        // Add spatial reference system information if available
+        if ( array.srtext != "" ) {
+
+            int sessionID = newSession();
+
+
+            /* In the following, we assume the SRS to be already known by scidb4geo.
+               This might only work for EPSG codes and in the future, this should be checked and
+               unknown SRS should be registered via st_regnewsrs() automatically */
+            curlBegin();
+            // EXECUTE QUERY  ////////////////////////////
+            stringstream afl;
+            afl << "st_setsrs(" << array.name << ",'" << array.getXDim().name << "','" << array.getYDim().name << "','" << array.auth_name << "'," << array.auth_srid << ",'" <<  array.affineTransform.toString() << "')";
+
+            stringstream ss;
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            Utils::debug ( ( string ) "HTTP GET " + ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            curlPerform();
+            curlEnd();
+
+
+
+            releaseSession ( sessionID );
+        }
+        else {
+            // TODO: How to remove SRS information? Is this neccessary at all?
+
+
+        }
     }
 
 

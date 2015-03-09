@@ -19,9 +19,9 @@ Notice that the string must start with `SCIDB:` in order to let GDAL identify th
 
 
 ## Dependencies
-- [Shim](https://github.com/Paradigm4/shim) must be running on SciDB databases you want to connect to
-- [cURL](http://curl.haxx.se/) We use cURL to interface with SciDB's web service shim
-- Some [Boost](http://www.boost.org) header-only libraries (no external libraries required for linking) 
+- At the moment we require [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers as in [SciDB-Py](https://github.com/Paradigm4/SciDB-Py)
+- We use [cURL](http://curl.haxx.se/) to interface with SciDB's web service shim
+- Some [Boost](http://www.boost.org) header-only libraries (no external libraries required for linking) for string functions
 
 
 

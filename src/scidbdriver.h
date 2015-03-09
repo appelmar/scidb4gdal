@@ -77,10 +77,12 @@ namespace scidb4gdal
             return _client;
         }
 
+
         /**
         * Returns affine transformation parameters
          */
         CPLErr GetGeoTransform ( double *padfTransform );
+
 
         /**
          * Returns WKT spatial reference string
@@ -89,11 +91,28 @@ namespace scidb4gdal
 
 
         /**
-         * Function for creating a new SciDB array based on a given GDALDataset
-         * @see GDALDriver::CreateCopy()
+         * Sets an array's affine transformation for converting image to world coordinates
          */
-        static GDALDataset *SciDBCreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions,
-                                              GDALProgressFunc pfnProgress, void *pProgressData );
+        CPLErr SetGeoTransform ( double   *padfTransform );
+
+        /**
+         * Sets an array's spatial reference system
+         * @param wkt WKT representation  of a spatial reference system
+         */
+        CPLErr SetProjection ( const char *wkt );
+
+
+
+        /**
+        * Function for creating a new SciDB array based on dimensions and band information. THIS FUNCTION WORKS ONLY FOR ARRAYS
+        * WITH ALL BANDS HAVING THE SAME DATATYPE
+        * @see GDALDriver::Create()
+        */
+        static GDALDataset *Create ( const char *pszFilename, int nXSize, int nYSize, int nBands, GDALDataType eType, char   **papszParmList );
+
+
+        // Not yet implemented, important for create, does nothing...
+        static CPLErr Delete ( const char *pszName );
     };
 
 
@@ -127,12 +146,18 @@ namespace scidb4gdal
          */
         virtual CPLErr IReadBlock ( int nBlockXOff, int nBlockYOff, void *pImage );
 
-	/**
-	 * GDAL function for computing min,max,mean,and stdev of an array attribute
-	 */
-        virtual CPLErr GetStatistics ( int bApproxOK, int bForce,double *pdfMin,double *pdfMax,double *pdfMean, double *pdfStdDev);
-	
-	
+        /**
+             * GDAL function called as array attribtue data shall be written, uploads data to SciDB and thus might take some time
+             */
+        virtual CPLErr IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage );
+
+        /**
+         * GDAL function for computing min,max,mean,and stdev of an array attribute
+         */
+        virtual CPLErr GetStatistics ( int bApproxOK, int bForce, double *pdfMin, double *pdfMax, double *pdfMean, double *pdfStdDev );
+
+
+
     };
 
 

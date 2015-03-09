@@ -30,27 +30,34 @@ SOFTWARE.
 #define SCIDB4GDAL_DEFAULT_ZDIMNAME "z" // not used by gdal
 #define SCIDB4GDAL_DEFAULT_TDIMNAME "t" // not used by gdal
 
-#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_X 256 
-#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y 256 
+#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_X 512
+#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y 512
+
+#define SCIDB4GDAL_DEFAULT_UPLOAD_FILENAME "scidb4gdal_temp.bin"
 
 //#define SCIDB4GDAL_ARRAY_PREFIX "GDAL_" // Names of created arrays get a prefix, not yet implemented
 
 #define SCIDB4GDAL_MAINMEM_HARD_LIMIT_MB 1024 // TODO: Calculate expected array size based on dimensions and attributes and stop if larger than this value
 
+#define SCIDB_MAX_DIM_INDEX 4611686018427387903
+
 #include <string>
 #include <iostream>
 #include <vector>
 #include <string>
+#include <inttypes.h>
 #include <exception>
 
 
 #include "gdal.h"
 #include "gdal_pam.h"
 #include "gdal_priv.h"
+#include "ogr_spatialref.h"
 
 // Sleep function
 #ifdef WIN32
-#include <windows.h>
+#include <windows.h> // TODO: Should be define WIN32_LEAN_AND_MEAN?
+#define WIN32_LEAN_AND_MEAN
 #else
 #include <unistd.h>
 #endif
@@ -63,57 +70,64 @@ namespace scidb4gdal
 
     namespace Utils
     {
-	/**
-	 * Maps SciDB string type identifiers to GDAL data type enumeration items.
-	 * @param typeId SciDB type identifier string e.g. "int32"
-	 * @return A GDALDataType item
-	 */
+        /**
+         * Maps SciDB string type identifiers to GDAL data type enumeration items.
+         * @param typeId SciDB type identifier string e.g. "int32"
+         * @return A GDALDataType item
+         */
         GDALDataType scidbTypeIdToGDALType ( const string &typeId );
-	
-	
-	/**
-	 * Maps  GDAL data type to SciDB string type identifiers.
-	 * @param type value of GDALDataType enumeration 
-	 * @return SciDB type identifier string e.g. "int32"
-	 */
+
+
+        /**
+         * Maps  GDAL data type to SciDB string type identifiers.
+         * @param type value of GDALDataType enumeration
+         * @return SciDB type identifier string e.g. "int32"
+         */
         string gdalTypeToSciDBTypeId ( GDALDataType type );
 
 
-	/**
-	 * Gets the size in bytes of given a SciDB type.
-	 * @param typeId SciDB type identifier string e.g. "int32"
-	 * @return Size in bytes
-	 */
+        /**
+         * Gets the size in bytes of given a SciDB type.
+         * @param typeId SciDB type identifier string e.g. "int32"
+         * @return Size in bytes
+         */
         size_t scidbTypeIdBytes ( const string &typeId );
-	
-	
-	/**
-	 * Gets the size in bytes of given a GDAL type.
-	 * @param typeId SciDB type identifier string e.g. "int32"
-	 * @return Size in bytes
-	 */
+
+
+        /**
+         * Gets the size in bytes of given a GDAL type.
+         * @param typeId SciDB type identifier string e.g. "int32"
+         * @return Size in bytes
+         */
         size_t gdalTypeBytes ( GDALDataType type );
 
 
         /**
-	 * Error handling function, should call CPLError() in the future
-	 */
+        * Error handling function, calls CPLError()
+         */
         void error ( const string &msg );
-	
-	/**
-	 * Error handling function, should call CPLError() in the future
-	 */
+
+        /**
+         * Error handling function, calls CPLError()
+         */
         void warn ( const string &msg ) ;
-	
-	/**
-	 * Error handling function, should call CPLDebug() in the future
-	 */
+
+        /**
+         * Error handling function, calls CPLDebug()
+         */
         void debug ( const string &msg ) ;
 
-	/** 
-	 * Utility function for sleeping after connection retries
-	 */
-	void sleep(long ms);
+        /**
+         * Utility function for sleeping after connection retries
+         */
+        void sleep ( long ms );
+
+
+        /**
+         * Rounds up to the next power of two
+         * @param x integer number
+         */
+        uint32_t nextPow2 ( uint32_t x );
 
     }
 

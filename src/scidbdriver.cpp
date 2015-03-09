@@ -23,11 +23,23 @@ SOFTWARE.
 -----------------------------------------------------------------------------*/
 
 
+// TODO:
+// * Add different modes for handling chunks as different images
+// * Add query params like trimming, projecting, ..
+// * Add minimum chunk size (e.g. 1 MB), min(1MB, image size)
+// * Test writing for image size < chunk size
+// * Add chunksize and overlap parameter in connection string for array creation
+// * Insert to existing array
+// * (!!!) Define and implement test cases!
+// * (!!!) Improved error handling, e.g. for writing to already existing arrays or including removal of temporary (load) arrays
+// * (!!!) Progressor for reading and writing large files
+
+
 #include "scidbdriver.h"
 #include "shimclient.h"
 
 #include "utils.h"
-
+#include <iomanip>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -50,7 +62,8 @@ void GDALRegister_SciDB()
         poDriver->SetMetadataItem ( GDAL_DMD_HELPTOPIC, "frmt_scidb.html" );
         poDriver->pfnOpen = scidb4gdal::SciDBDataset::Open;
         poDriver->pfnIdentify = scidb4gdal::SciDBDataset::Identify;
-        poDriver->pfnCreateCopy = scidb4gdal::SciDBDataset::SciDBCreateCopy;
+        poDriver->pfnCreate = scidb4gdal::SciDBDataset::Create;
+        poDriver->pfnDelete = scidb4gdal::SciDBDataset::Delete;
         GetGDALDriverManager()->RegisterDriver ( poDriver );
     }
 }
@@ -130,6 +143,7 @@ namespace scidb4gdal
 
     SciDBRasterBand::~SciDBRasterBand()
     {
+        FlushCache();
     }
 
 
@@ -143,14 +157,14 @@ namespace scidb4gdal
         *pdfMax = stats.max;
         *pdfMean = stats.mean;
         *pdfStdDev = stats.stdev;
-	
-	return CE_None;
+
+        return CE_None;
     }
 
 
     CPLErr SciDBRasterBand::IReadBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
     {
-
+        //TODO: Improve error handling
         SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
 
         /* GDAL interprets x dimension as image rows and y dimension as image cols whereas our
@@ -178,6 +192,7 @@ namespace scidb4gdal
             poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax ); // GDAL bands start with 1, scidb attribute indexes with 0
             for ( uint32_t i = 0; i < ( 1 + xmax - xmin ); ++i ) {
                 uint8_t *src  = & ( ( uint8_t * ) buf ) [i * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
+                // TODO: In the following call, check whether this->nBlockXSize must be replaced with this->nBlockYSize for unequally sized chunk dimensions
                 uint8_t *dest = & ( ( uint8_t * ) pImage ) [i * this->nBlockXSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
                 memcpy ( dest, src, ( 1 + ymax - ymin ) *Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ) );
             }
@@ -187,6 +202,61 @@ namespace scidb4gdal
 
         return CE_None;
     }
+
+
+
+
+    CPLErr SciDBRasterBand::IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
+    {
+        //TODO: Improve error handling
+
+        SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
+
+
+        // 1. Compute array bounds from block offsets
+        int xmin = nBlockYOff * this->nBlockYSize + _array->getXDim().low;
+        int xmax = xmin + this->nBlockYSize - 1;
+        if ( xmax > _array->getXDim().high ) xmax = _array->getXDim().high;
+
+        int ymin = nBlockXOff * this->nBlockXSize + _array->getYDim().low;
+        int ymax = ymin + this->nBlockXSize - 1;
+        if ( ymax > _array->getYDim().high ) ymax = _array->getYDim().high;
+
+
+
+        // Last blocks must be treated separately if covering area outside actual array: (0 | 1 | 2 | 3 || 4 | 5 | 6 | 7) vs. (0 | 1 | - | - || 3 | 4 | - | -) for 4x2 block with only 2x2 data
+        bool xOuter = ( nBlockXOff + 1 ) * this->nBlockXSize > poGDS->nRasterXSize; // or >= ???
+        if ( xOuter ) {
+            // This is a bit of a hack...
+            size_t pixelSize = 0;
+            uint32_t nx = ( 1 + xmax - xmin );
+            uint32_t ny = ( 1 + ymax - ymin );
+            for ( uint16_t i = 0; i < _array->attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( _array->attrs[i].typeId );
+            size_t dataSize = pixelSize *  nx * ny;
+            void *buf = malloc ( dataSize );
+
+            stringstream v;
+            v << "Write to bounds: x=(" << xmin << "," << xmax << ") y=(" << ymin << "," << ymax << ") nx=" << nx << " ny=" << ny << " BLOCKSIZE X " << this->nBlockXSize << " BLOCKSIZE Y " << this->nBlockYSize;
+            Utils::debug ( v.str() );
+
+            // Write to temporary buffer first
+            for ( uint32_t i = 0; i < nx; ++i ) {
+                // TODO: In the following call, check whether this->nBlockXSize must be replaced with this->nBlockYSize for unequally sized chunk dimensions
+                uint8_t *src  = & ( ( uint8_t * ) pImage ) [i * this->nBlockXSize * pixelSize];
+                uint8_t *dest  = & ( ( uint8_t * ) buf ) [i * ny * pixelSize];
+                memcpy ( dest, src, ny * pixelSize );
+            }
+            // Write from buf instead of pImage
+            poGDS->getClient()->insertData ( *_array, buf, xmin, ymin, xmax, ymax );
+
+            free ( buf );
+        }
+        else poGDS->getClient()->insertData ( *_array, pImage, xmin, ymin, xmax, ymax );
+
+
+        return CE_None;
+    }
+
 
 
 
@@ -222,6 +292,9 @@ namespace scidb4gdal
         this->nRasterYSize = 1 + _array.getXDim().high - _array.getXDim().low ;
         this->nRasterXSize = 1 + _array.getYDim().high - _array.getYDim().low ;
 
+        stringstream sd;
+        sd << nRasterXSize << "x" << nRasterYSize;
+        Utils::debug ( sd.str() );
 
 
         // Create GDAL Bands
@@ -242,33 +315,67 @@ namespace scidb4gdal
 
 
 
+    CPLErr SciDBDataset::SetProjection ( const char *wkt )
+    {
+        _array.srtext = wkt;
+        OGRSpatialReference srs ( wkt );
+        srs.AutoIdentifyEPSG();
+        _array.auth_name = srs.GetAuthorityName ( NULL );
+        _array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
+        char *proj4;
+        srs.exportToProj4 ( &proj4 );
+        _array.proj4text.assign ( proj4 );
+        CPLFree ( proj4 );
+
+        _array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+        _array.ydim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+
+
+        // Only perform database update, if affine transformation has already been set
+        if ( !_array.affineTransform.isIdentity() ) {
+            _client->updateSRS ( _array );
+        }
+
+        return CE_None;
+    }
+
+
+    CPLErr SciDBDataset::SetGeoTransform ( double *padfTransform )
+    {
+
+        AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
+        _array.affineTransform = a;
+
+
+//  stringstream sdebug;
+//  sdebug << std::setprecision(15) << "SetGeoTransform(" << padfTransform[0] <<","<< padfTransform[1]<<","<< padfTransform[2]<<","<< padfTransform[3]<<","<< padfTransform[4]<<","<< padfTransform[5] << ")";
+//  Utils::debug(sdebug.str());
+//  Utils::debug(a.toString());
+        // Only perform database update, if srs has already been set
+        if ( !_array.srtext.empty() ) {
+            _client->updateSRS ( _array );
+
+        }
+        return CE_None;
+    }
 
 
 
-    GDALDataset *SciDBDataset::SciDBCreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions,
-            GDALProgressFunc pfnProgress, void *pProgressData )
+    GDALDataset *SciDBDataset::Create ( const char *pszFilename, int nXSize, int nYSize, int nBands, GDALDataType eType, char   **papszParmList )
     {
 
         ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename );
 
-
-        int  nBands = poSrcDS->GetRasterCount();
-        int  nXSize = poSrcDS->GetRasterXSize();
-        int  nYSize = poSrcDS->GetRasterYSize();
-
-        // TODO: Fetch user option
-
-        // Create array metadata
-
+        // Create array metadata structure
         SciDBSpatialArray array;
-        array.name = pars->arrayname; // TODO: Extract from connection string
+        array.name = pars->arrayname;
 
         // Attributes
         vector<SciDBAttribute> attrs;
         for ( int i = 0; i < nBands; ++i ) {
             SciDBAttribute a;
             a.nullable = false; // TODO
-            a.typeId = Utils::gdalTypeToSciDBTypeId ( poSrcDS->GetRasterBand ( i )->GetRasterDataType() );
+            a.typeId = Utils::gdalTypeToSciDBTypeId ( eType ); // All attribtues must have the same data type
             stringstream aname;
             aname << "band" << i + 1;
             a.name = aname.str();
@@ -284,14 +391,14 @@ namespace scidb4gdal
 
         SciDBDimension dimx;
         dimx.low = 0;
-        dimx.high = nXSize - 1;
+        dimx.high = nYSize - 1;
         dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
         dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_X;
         dimx.typeId = "int64";
 
         SciDBDimension dimy;
         dimy.low = 0;
-        dimy.high = nYSize - 1;
+        dimy.high = nXSize - 1;
         dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
         dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y;
         dimy.typeId = "int64";
@@ -302,18 +409,7 @@ namespace scidb4gdal
 
         array.dims = dims;
 
-
-
-        // Spatial reference
-        array.xdim = dimx.name;
-        array.ydim = dimy.name;
-        array.srtext = poSrcDS->GetProjectionRef();
-
-        double a[6];
-        poSrcDS->GetGeoTransform ( a );
-        array.affineTransform = * ( new AffineTransform ( a[0], a[3], a[1], a[5], a[2], a[4] ) );
-        // TODO: also fill auth_name, a, based on AUTHORITY["EPSG","2034"] part
-
+        // Spatial reference is handled automatically by GDAL calling SetGeoTransform() and SetProjection()
 
 
         // Create shim client
@@ -321,31 +417,20 @@ namespace scidb4gdal
 
 
         // Create array in SciDB
+        client->createArray ( array );
 
-
-
-
-        // Load data
-        //RasterIO( GF_Read,
-
-
-        // insert
-
-
-        //
 
         delete client;
-        delete pars;
-
-        return 0; // TODO
+        return ( GDALDataset * ) GDALOpen ( pszFilename, GA_Update );
     }
+
+
 
 
 
     SciDBDataset::~SciDBDataset()
     {
         FlushCache();
-        _client->disconnect();
         delete _client;
     }
 
@@ -382,14 +467,15 @@ namespace scidb4gdal
     }
 
 
+    CPLErr SciDBDataset::Delete ( const char *pszName )
+    {
+        // TODO
+        return CE_None;
+    }
+
+
     GDALDataset *SciDBDataset::Open ( GDALOpenInfo *poOpenInfo )
     {
-        // TODO:
-        // * Add different modes for handling chunks as different images
-        // * Add query params like trimming, projecting, ...
-        // * Implement dataset without specified array similar to PostGIS raster (with each spatial array being a subdataset)
-        // * Assert that array exists
-        // *
 
         string connstr = poOpenInfo->pszFilename;
 
@@ -400,10 +486,11 @@ namespace scidb4gdal
 
 
         // Do not allow update access
-        if ( poOpenInfo->eAccess == GA_Update ) {
-            CPLError ( CE_Failure, CPLE_NotSupported, "scidb4gdal currently does not support update access to existing arrays.\n" );
-            return NULL;
-        }
+//         if (poOpenInfo->eAccess == GA_Update)
+//         {
+//             CPLError(CE_Failure, CPLE_NotSupported, "scidb4gdal currently does not support update access to existing arrays.\n");
+//             return NULL;
+//         }
 
 
         // Create the dataset

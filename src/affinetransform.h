@@ -81,7 +81,13 @@ namespace scidb4gdal
         /**
          * Transformation parameters, _x0, _y0 represent translation. _a11,_a12,_a21,_a22 desribe the 2x2 transformation matrix
          */
-        double _x0, _y0, _a11, _a12, _a21, _a22;
+        double _x0, _y0, _a11, _a22, _a12, _a21;
+
+
+        /**
+         * Checks whether an affine transformation is the identity functions
+         */
+        bool isIdentity();
 
     };
 
