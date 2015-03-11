@@ -7,7 +7,7 @@ Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensi
 
 The main purpose of the plugin is to use SciDB for complex geospatial analytics and your favorite GIS tool to explore results. 
 
-Currently, the driver is read only.
+The driver offers experimental support for creating new SciDB arrays from  existing GDAL datasets using gdal_translate.
 
 ## Getting Started
 Similar to other database drivers for GDAL, we use a connection string as a descriptor for array data sources. 
@@ -16,7 +16,11 @@ Similar to other database drivers for GDAL, we use a connection string as a desc
 
 Notice that the string must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array.
 
+### Writing GDAL datasets to SciDB
+`gdal_translate -of SciDB <input> "SCIDB:array=scidb4gdal_testarray"`
 
+### Exporting SciDB arrays
+`gdal_translate -of GTiff "SCIDB:array=<arrayname>" /tmp/test.tif`
 
 ## Dependencies
 - At the moment we require [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers as in [SciDB-Py](https://github.com/Paradigm4/SciDB-Py)
