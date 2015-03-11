@@ -53,22 +53,22 @@ namespace scidb4gdal
         /**
          * Constructor for translation only
          */
-        AffineTransform ( double x0, double y0 );
+        AffineTransform (double x0, double y0);
 
         /**
          * Constructor for translation and scaling, no rotation, shear
         */
-        AffineTransform ( double x0, double y0, double a11, double a22 );
+        AffineTransform (double x0, double y0, double a11, double a22);
 
         /**
          * Constructor for specification of all parameters
          */
-        AffineTransform ( double x0, double y0, double a11, double a22, double a12, double a21 ) ;
+        AffineTransform (double x0, double y0, double a11, double a22, double a12, double a21) ;
 
         /**
          * Constructor for parsing string representations
          */
-        AffineTransform ( const string &astr );
+        AffineTransform (const string& astr);
 
 
 

@@ -68,24 +68,29 @@ namespace scidb4gdal
 {
     using namespace std;
 
-    enum StatusCode {
-        SUCCESS                   = 0,
+    enum StatusCode
+    {
+        SUCCESS                   		= 0,
 
-        ERR_READ_ARRAYUNKNOWN         = 100 + 1,
-        ERR_READ_WRONGDIMENSIONALITY      = 100 + 2,
-        ERR_READ_UNKNOWN              = 100 + 99,
+        ERR_READ_ARRAYUNKNOWN         		= 100 + 1,
+        ERR_READ_WRONGDIMENSIONALITY      	= 100 + 2,
+        ERR_READ_UNKNOWN             		= 100 + 99,
 
-        ERR_CREATE_ARRAYEXISTS            = 200 + 1,
-        ERR_CREATE_WRONGDIMENSIONALITY        = 200 + 2,
-        ERR_CREATE_INVALIDARRAYNAME       = 200 + 3,
-        ERR_CREATE_UNKNOWN            = 200 + 99,
+        ERR_CREATE_ARRAYEXISTS            	= 200 + 1,
+        ERR_CREATE_WRONGDIMENSIONALITY        	= 200 + 2,
+        ERR_CREATE_INVALIDARRAYNAME       	= 200 + 3,
+        ERR_CREATE_UNKNOWN            		= 200 + 99,
 
-        ERR_GLOBAL_CANNOTCONNECT          = 300 + 1,
-        ERR_GLOBAL_INVALIDARRAYNAME       = 300 + 2,
-        ERR_GLOBAL_DATATYPEMISMATCH       = 300 + 3,
-        ERR_GLOBAL_INVALIDCONNECTIONSTRING    = 300 + 4,
+        ERR_GLOBAL_CANNOTCONNECT          	= 300 + 1,
+        ERR_GLOBAL_INVALIDARRAYNAME       	= 300 + 2,
+        ERR_GLOBAL_DATATYPEMISMATCH       	= 300 + 3,
+        ERR_GLOBAL_INVALIDCONNECTIONSTRING    	= 300 + 4,
 
-        ERR_GLOBAL_UNKNOWN            = 300 + 99
+        ERR_GLOBAL_UNKNOWN            		= 300 + 99,
+
+
+        ERR_SRS_NOSPATIALREFFOUND   		= 400 + 1,
+        ERR_SRS_NOSCIDB4GEO     		= 400 + 2
     };
 
 
@@ -96,7 +101,7 @@ namespace scidb4gdal
          * @param typeId SciDB type identifier string e.g. "int32"
          * @return A GDALDataType item
          */
-        GDALDataType scidbTypeIdToGDALType ( const string &typeId );
+        GDALDataType scidbTypeIdToGDALType (const string& typeId);
 
 
         /**
@@ -104,7 +109,7 @@ namespace scidb4gdal
          * @param type value of GDALDataType enumeration
          * @return SciDB type identifier string e.g. "int32"
          */
-        string gdalTypeToSciDBTypeId ( GDALDataType type );
+        string gdalTypeToSciDBTypeId (GDALDataType type);
 
 
         /**
@@ -112,7 +117,7 @@ namespace scidb4gdal
          * @param typeId SciDB type identifier string e.g. "int32"
          * @return Size in bytes
          */
-        size_t scidbTypeIdBytes ( const string &typeId );
+        size_t scidbTypeIdBytes (const string& typeId);
 
 
         /**
@@ -120,35 +125,35 @@ namespace scidb4gdal
          * @param typeId SciDB type identifier string e.g. "int32"
          * @return Size in bytes
          */
-        size_t gdalTypeBytes ( GDALDataType type );
+        size_t gdalTypeBytes (GDALDataType type);
 
 
         /**
         * Error handling function, calls CPLError()
          */
-        void error ( const string &msg );
+        void error (const string& msg, bool kill = false);
 
         /**
          * Error handling function, calls CPLError()
          */
-        void warn ( const string &msg ) ;
+        void warn (const string& msg) ;
 
         /**
          * Error handling function, calls CPLDebug()
          */
-        void debug ( const string &msg ) ;
+        void debug (const string& msg) ;
 
         /**
          * Utility function for sleeping after connection retries
          */
-        void sleep ( long ms );
+        void sleep (long ms);
 
 
         /**
          * Rounds up to the next power of two
          * @param x integer number
          */
-        uint32_t nextPow2 ( uint32_t x );
+        uint32_t nextPow2 (uint32_t x);
 
     }
 
@@ -157,3 +162,4 @@ namespace scidb4gdal
 }
 
 #endif
+

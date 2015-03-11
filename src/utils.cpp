@@ -36,114 +36,119 @@ namespace scidb4gdal
         string getCurDatetime()
         {
             // Current date/time based on current system
-            time_t now = time ( 0 );
+            time_t now = time(0);
 
             // Convert now to tm struct for local timezone
-            tm *localtm = localtime ( &now );
+            tm* localtm = localtime(&now);
 
             std::stringstream out;
-            out << ( localtm->tm_year + 1900 ) << "-"  << ( localtm->tm_mon + 1 ) << "-" <<  localtm->tm_mday << " " << localtm->tm_hour << ":" << localtm->tm_min << ":" << localtm->tm_sec;
+            out << (localtm->tm_year + 1900) << "-"  << (localtm->tm_mon + 1) << "-" <<  localtm->tm_mday << " " << localtm->tm_hour << ":" << localtm->tm_min << ":" << localtm->tm_sec;
             return out.str();
         }
 
 
-        void error ( const string &msg )
+        void error(const string& msg, bool kill)
         {
             //std::cout << "(" << getCurDatetime() << ") ERROR: " << msg << std::endl;
-            CPLError ( CE_Fatal, CPLE_AppDefined, msg.c_str() );
+            if (kill)
+                CPLError(CE_Fatal, CPLE_AppDefined, msg.c_str(), "");
+            else
+                CPLError(CE_Failure, CPLE_AppDefined, msg.c_str(), "");
             //throw msg;
         }
 
 
-        void warn ( const string &msg )
+        void warn(const string& msg)
         {
             //std::cout << "(" << getCurDatetime() << ") WARNING: " << msg << std::endl;
-            CPLError ( CE_Warning, CPLE_AppDefined, msg.c_str() );
+            CPLError(CE_Warning, CPLE_AppDefined, msg.c_str(), "");
         }
 
-        void debug ( const string &msg )
+        void debug(const string& msg)
         {
             //std::cout << "(" << getCurDatetime() << ") DEBUG: " << msg << std::endl;
-            CPLDebug ( "scidb4gdal", msg.c_str() );
+            CPLDebug("scidb4gdal", msg.c_str(), "");
         }
 
-        GDALDataType scidbTypeIdToGDALType ( const string &typeId )
+        GDALDataType scidbTypeIdToGDALType(const string& typeId)
         {
             // see src/query/TypeSystem.h of SciDB for definitions
-            if ( typeId == "int8" )         return GDT_Byte; // signed vs unsigned might lead to conflicts
-            else if ( typeId == "int16" )   return GDT_Int16;
-            else if ( typeId == "int32" )   return GDT_Int32;
-            else if ( typeId == "uint8" )   return GDT_Byte;
-            else if ( typeId == "uint16" )  return GDT_UInt16;
-            else if ( typeId == "uint32" )  return GDT_UInt32;
-            else if ( typeId == "float" )   return GDT_Float32;
-            else if ( typeId == "double" )  return GDT_Float64;
+            if (typeId == "int8")         return GDT_Byte;   // signed vs unsigned might lead to conflicts
+            else if (typeId == "int16")   return GDT_Int16;
+            else if (typeId == "int32")   return GDT_Int32;
+            else if (typeId == "uint8")   return GDT_Byte;
+            else if (typeId == "uint16")  return GDT_UInt16;
+            else if (typeId == "uint32")  return GDT_UInt32;
+            else if (typeId == "float")   return GDT_Float32;
+            else if (typeId == "double")  return GDT_Float64;
             return GDT_Unknown; // No GDAL support for int64, uint64, string
         }
 
 
-        string gdalTypeToSciDBTypeId ( GDALDataType type )
+        string gdalTypeToSciDBTypeId(GDALDataType type)
         {
-            if ( type == GDT_Byte )     return "uint8";
-            else if ( type == GDT_UInt32 )  return "uint32";
-            else if ( type == GDT_Int32 )   return "int32";
-            else if ( type == GDT_Int16 )   return "int16";
-            else if ( type == GDT_UInt16 )  return "uint16";
-            else if ( type == GDT_Float32 ) return "float";
-            else if ( type == GDT_Float64 ) return "double";
+            if (type == GDT_Byte)     return "uint8";
+            else if (type == GDT_UInt32)  return "uint32";
+            else if (type == GDT_Int32)   return "int32";
+            else if (type == GDT_Int16)   return "int16";
+            else if (type == GDT_UInt16)  return "uint16";
+            else if (type == GDT_Float32) return "float";
+            else if (type == GDT_Float64) return "double";
             return 0;
         }
 
 
 
 
-        size_t scidbTypeIdBytes ( const string &typeId )
+        size_t scidbTypeIdBytes(const string& typeId)
         {
-            if ( typeId == "int8" )         return 1;
-            else if ( typeId == "int16" )   return 2;
-            else if ( typeId == "int32" )   return 4;
-            else if ( typeId == "uint8" )   return 1;
-            else if ( typeId == "uint16" )  return 2;
-            else if ( typeId == "uint32" )  return 4;
-            else if ( typeId == "float" )   return 4;
-            else if ( typeId == "double" )  return 8;
+            if (typeId == "int8")         return 1;
+            else if (typeId == "int16")   return 2;
+            else if (typeId == "int32")   return 4;
+            else if (typeId == "uint8")   return 1;
+            else if (typeId == "uint16")  return 2;
+            else if (typeId == "uint32")  return 4;
+            else if (typeId == "float")   return 4;
+            else if (typeId == "double")  return 8;
             return 0;
         }
 
 
-        size_t gdalTypeBytes ( GDALDataType type )
+        size_t gdalTypeBytes(GDALDataType type)
         {
-            if ( type == GDT_Byte )     return 1;
-            else if ( type == GDT_UInt32 )  return 4;
-            else if ( type == GDT_Int32 )   return 4;
-            else if ( type == GDT_Int16 )   return 2;
-            else if ( type == GDT_UInt16 )  return 2;
-            else if ( type == GDT_Float32 ) return 4;
-            else if ( type == GDT_Float64 ) return 8;
+            if (type == GDT_Byte)     return 1;
+            else if (type == GDT_UInt32)  return 4;
+            else if (type == GDT_Int32)   return 4;
+            else if (type == GDT_Int16)   return 2;
+            else if (type == GDT_UInt16)  return 2;
+            else if (type == GDT_Float32) return 4;
+            else if (type == GDT_Float64) return 8;
             return 0;
         }
 
 
 
-        void sleep ( long int ms )
+        void sleep(long int ms)
         {
 #ifdef WIN32
-            Sleep ( ms );
+            Sleep(ms);
 #else
-            usleep ( ms * 1000 );
+            usleep(ms * 1000);
 #endif
         }
 
 
 
 
-        uint32_t nextPow2 ( uint32_t x )
+        uint32_t nextPow2(uint32_t x)
         {
-            if ( ! ( x & ( x - 1 ) ) ) {
-                return ( x );
+            if (!(x & (x - 1)))
+            {
+                return (x);
             }
-            while ( x & ( x - 1 ) ) {
-                x = x & ( x - 1 );
+            while (x & (x - 1))
+            {
+                x = x & (x - 1);
             }
             x = x << 1;
             return x;

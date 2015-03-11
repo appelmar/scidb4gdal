@@ -43,7 +43,7 @@ SOFTWARE.
 #define SHIMENDPOINT_READ_LINES         "/read_lines "
 #define SHIMENDPOINT_READ_BYTES         "/read_bytes"
 #define SHIMENDPOINT_RELEASE_SESSION    "/release_session"
-#define SHIMENDPOINT_LOGIN          "/login"
+#define SHIMENDPOINT_LOGIN         	"/login"
 #define SHIMENDPOINT_LOGOUT             "/logout"
 #define SHIMENDPOINT_UPLOAD_FILE        "/upload_file"
 #define SHIMENDPOINT_VERSION            "/version"
@@ -61,20 +61,23 @@ namespace scidb4gdal
     /**
      * A structure for storing metadata of a SciDB array attribute
      */
-    struct SciDBAttribute {
+    struct SciDBAttribute
+    {
         string name;
         string typeId;
         bool nullable;
     };
 
-    struct SciDBAttributeStats {
+    struct SciDBAttributeStats
+    {
         double min, max, mean, stdev;
     };
 
     /**
     * A structure for storing metadata of a SciDB array dimension
     */
-    struct SciDBDimension {
+    struct SciDBDimension
+    {
         string name;
         int64_t low;
         int64_t high;
@@ -87,24 +90,28 @@ namespace scidb4gdal
     /**
     * A structure for storing general metadata of a SciDB array
     */
-    struct SciDBArray {
+    struct SciDBArray
+    {
         string name;
         vector<SciDBAttribute> attrs;
         vector<SciDBDimension> dims;
 
-        string toString() {
+        string toString()
+        {
             stringstream s;
             s << "'" << name << "'" << ":";
-            for ( uint32_t i = 0; i < dims.size(); ++i ) s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high << "," << dims[i].typeId << ">";
-            for ( uint32_t i = 0; i < attrs.size(); ++i ) s << "['" << attrs[i].name << "'," << attrs[i].typeId << "," << attrs[i].nullable << "]";
+            for (uint32_t i = 0; i < dims.size(); ++i) s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high << "," << dims[i].typeId << ">";
+            for (uint32_t i = 0; i < attrs.size(); ++i) s << "['" << attrs[i].name << "'," << attrs[i].typeId << "," << attrs[i].nullable << "]";
             s << "\n";
             return s.str();
         }
 
-        string getFormatString() {
+        string getFormatString()
+        {
             stringstream s;
             s << "(";
-            for ( uint32_t i = 0; i < attrs.size() - 1; ++i ) {
+            for (uint32_t i = 0; i < attrs.size() - 1; ++i)
+            {
                 s << attrs[i].typeId << ","; // TODO: Add nullable
             }
             s << attrs[attrs.size() - 1].typeId; // TODO: Add nullable
@@ -116,7 +123,8 @@ namespace scidb4gdal
     /**
     * A structure for storing spatial reference of a SciDB array
     */
-    struct SciDBSpatialReference {
+    struct SciDBSpatialReference
+    {
         string srtext;
         string proj4text; // TODO: Fill while reading a dataset or already done?
         string xdim;
@@ -126,15 +134,17 @@ namespace scidb4gdal
 
         AffineTransform affineTransform;
 
-        string toString() {
+        string toString()
+        {
             stringstream s;
             s << "SPATIAL REFERENCE (" << xdim << "," << ydim << ") :" << affineTransform.toString() << "-->" << proj4text;
             s << "\n";
             return s.str();
         }
 
-        bool isSpatial() {
-            return ( xdim != "" && ydim != "" && ( srtext != "" || proj4text != "" ) );
+        bool isSpatial()
+        {
+            return (xdim != "" && ydim != "" && (srtext != "" || proj4text != ""));
         }
     };
 
@@ -143,11 +153,13 @@ namespace scidb4gdal
     /**
      * A structure for storing metadata of a spatially referenced SciDB array
      */
-    struct SciDBSpatialArray : SciDBArray, SciDBSpatialReference {
+    struct SciDBSpatialArray : SciDBArray, SciDBSpatialReference
+    {
 
-        SciDBSpatialArray() : _x_idx ( -1 ), _y_idx ( -1 ) {}
+        SciDBSpatialArray() : _x_idx (-1), _y_idx (-1) {}
 
-        string toString() {
+        string toString()
+        {
             stringstream s;
             s << SciDBArray::toString();
             s << SciDBSpatialReference::toString();
@@ -155,23 +167,27 @@ namespace scidb4gdal
             return s.str();
         }
 
-        SciDBDimension getYDim() {
-            if ( _y_idx < 0 ) deriveDimensionIndexes();
+        SciDBDimension getYDim()
+        {
+            if (_y_idx < 0) deriveDimensionIndexes();
             return dims[_y_idx];
         }
-        SciDBDimension getXDim() {
-            if ( _x_idx < 0 ) deriveDimensionIndexes();
+        SciDBDimension getXDim()
+        {
+            if (_x_idx < 0) deriveDimensionIndexes();
             return dims[_x_idx];
         }
 
-        int getXDimIdx() {
-            if ( _x_idx < 0 ) deriveDimensionIndexes();
+        int getXDimIdx()
+        {
+            if (_x_idx < 0) deriveDimensionIndexes();
             return _x_idx;
         }
 
 
-        int getYDimIdx() {
-            if ( _y_idx < 0 ) deriveDimensionIndexes();
+        int getYDimIdx()
+        {
+            if (_y_idx < 0) deriveDimensionIndexes();
             return _y_idx;
         }
 
@@ -180,28 +196,29 @@ namespace scidb4gdal
         int _y_idx;
 
 
-        void deriveDimensionIndexes() {
+        void deriveDimensionIndexes()
+        {
             _x_idx = 0;
             _y_idx = 1;
-            if ( xdim != "" && ydim != "" ) {
-                for ( int i = 0; i < 2; ++i ) { // Assuming 2 dimensions!!!
-                    if ( dims[i].name == xdim ) _x_idx = i;
-                    if ( dims[i].name == ydim ) _y_idx = i;
+            if (xdim != "" && ydim != "")
+            {
+                for (int i = 0; i < 2; ++i)     // Assuming 2 dimensions!!!
+                {
+                    if (dims[i].name == xdim) _x_idx = i;
+                    if (dims[i].name == ydim) _y_idx = i;
                 }
                 // TODO: Assert x_idx != y_idx
             }
-            else { // Try default dimension names
-                for ( int i = 0; i < 2; ++i ) { // Assuming 2 dimensions!!!
-                    if ( dims[i].name == SCIDB4GDAL_DEFAULT_XDIMNAME ) _x_idx = i;
-                    if ( dims[i].name == SCIDB4GDAL_DEFAULT_YDIMNAME ) _y_idx = i;
+            else   // Try default dimension names
+            {
+                for (int i = 0; i < 2; ++i)     // Assuming 2 dimensions!!!
+                {
+                    if (dims[i].name == SCIDB4GDAL_DEFAULT_XDIMNAME) _x_idx = i;
+                    if (dims[i].name == SCIDB4GDAL_DEFAULT_YDIMNAME) _y_idx = i;
                 }
                 // TODO: Assert x_idx != y_idx
             }
         }
-
-
-
-
     };
 
 
@@ -228,7 +245,7 @@ namespace scidb4gdal
          * @param user username
          * @param passwd password
          */
-        ShimClient ( string host, uint16_t port, string user, string passwd );
+        ShimClient (string host, uint16_t port, string user, string passwd);
 
         /**
          * Default destructor f Shim clients.
@@ -240,9 +257,10 @@ namespace scidb4gdal
          * Requests metadata for a given array from shim.
          * Metadata include dimensions, attributes, and spatial reference information.
          * @param inArrayName name of a SciDB array
-         * @return metadata of an array as SciDBSpatialArray instance, spatial reference information can be missing if not found
+         * @param out metadata of an array as SciDBSpatialArray instance, spatial reference information can be missing if not found
+         * @return status code
          */
-        SciDBSpatialArray getArrayDesc ( const string &inArrayName );
+        StatusCode getArrayDesc (const string& inArrayName, SciDBSpatialArray& out);
 
         /**
          * Gets a list of all spatially referenced arrays, currently not needed!
@@ -251,22 +269,29 @@ namespace scidb4gdal
 
 
 
-        //void getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk );
+
+	/**
+	* Retreives single attribute data from shim for a given bounding box
+	* @param array metadata of an existing array
+	* @param nband index of the requested attribute (starting with 0).
+	* @param outchunk pointer to a chunk of memory that gets result data, must be allocated before(!) calling this function, which is usually done by GDAL
+	* @param xmin left boundary, we assume x to be "easting" which is different from GDAL!
+	* @param ymin lower boundary, we assume y to be "northing" which is different from GDAL!
+	* @param xmax right boundary, we assume x to be "easting" which is different from GDAL!
+	* @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
+	* @return status code
+	*/
+        StatusCode getData (SciDBSpatialArray& array, uint8_t nband, void* outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max);
+
 
         /**
-        * Retreives single attribute data from shim for a given bounding box
+         * Gets simple band statistics using in-database aggregation functions
          * @param array metadata of an existing array
-         * @param nband index of the requested attribute (starting with 0).
-         * @param outchunk pointer to a chunk of memory that gets result data, must be allocated before(!) calling this function, which is usually done by GDAL
-         * @param xmin left boundary, we assume x to be "easting" which is different from GDAL!
-         * @param ymin lower boundary, we assume y to be "northing" which is different from GDAL!
-         * @param xmax right boundary, we assume x to be "easting" which is different from GDAL!
-         * @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
+         * @param nband band index, 0 based
+         * @param out result statistics, i.e. min, max, mean, sd
+         * @return status code
          */
-        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
-
-
-        SciDBAttributeStats getAttributeStats ( SciDBSpatialArray &array, uint8_t nband );
+        StatusCode getAttributeStats (SciDBSpatialArray& array, uint8_t nband, SciDBAttributeStats& out);
 
         /**
          * Initializes cURL's easy interface, should be performaed before each web service request
@@ -294,8 +319,9 @@ namespace scidb4gdal
         /**
          * Creates a new SciDB array
          * @param array metadata of the new array
+         * @return status code
          */
-        StatusCode createArray ( SciDBSpatialArray &array );
+        StatusCode createArray (SciDBSpatialArray& array);
 
         /**
          * Inserts a chunk of data to an existing array
@@ -305,47 +331,63 @@ namespace scidb4gdal
          * @param ymin lower boundary, we assume y to be "northing" which is different from GDAL!
          * @param xmax right boundary, we assume x to be "easting" which is different from GDAL!
          * @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
+         * @return status code
          */
-        StatusCode insertData ( SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
+        StatusCode insertData (SciDBSpatialArray& array, void* inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max);
 
 
         /**
-         * Updates the spatial reference system of an array
-         * @param array metadata including its srs to be updated
-         */
-        StatusCode updateSRS ( SciDBSpatialArray &array );
+        * Updates the spatial reference system of an array
+        * @param array metadata including its srs to be updated
+        * @return status code
+        */
+        StatusCode updateSRS (SciDBSpatialArray& array);
 
 
+        /**
+        * Removes an existing array
+        * @param inArrayName string name of an existing array
+        * @return status code
+        */
+        StatusCode removeArray (const string& inArrayName);
 
-        StatusCode removeArray ( const string &inArrayName );
 
+        /**
+        * Checks whether an array exists or notice
+        * @param inArrayName input array name string
+        * @param out output, true if array already exists in SciDB
+        */
+        StatusCode arrayExists (const string& inArrayName, bool& out);
 
 
     protected:
 
         /**
-         * Gets metadata of an array's attributes
-         * @param inArrayName name of existing array
-         * @return list of SciDBAtribute descriptors
-         * @see SciDBAttribute
-         */
-        vector<SciDBAttribute> getAttributeDesc ( const string &inArrayName );
+        * Gets metadata of an array's attributes
+        * @param inArrayName name of existing array
+        * @param out list of SciDBAtribute descriptors
+        * @return status code
+        * @see SciDBAttribute
+        */
+        StatusCode getAttributeDesc (const string& inArrayName, vector<SciDBAttribute>& out);
 
         /**
-         * Gets metadata of an array's dimensions
-         * @param inArrayName name of existing array
-         * @return list of SciDBDimension descriptors
-         * @see SciDBDimension
-         */
-        vector<SciDBDimension> getDimensionDesc ( const string &inArrayName );
+        * Gets metadata of an array's dimensions
+        * @param inArrayName name of existing array
+        * @param out list of SciDBDimension descriptors
+        * @return status code
+        * @see SciDBDimension
+        */
+        StatusCode getDimensionDesc (const string& inArrayName, vector<SciDBDimension>& out);
 
         /**
-         * Gets metadata of an array's spatial reference if available. Otherwise, result contains default values representing no reference.
-         * @param inArrayName name of existing array
-         * @return Spatial reference description
-         * @see SciDBSpatialReference
-         */
-        SciDBSpatialReference  getSRSDesc ( const string &inArrayName );
+        * Gets metadata of an array's spatial reference if available. Otherwise, result contains default values representing no reference.
+        * @param inArrayName name of existing array
+        * @param out Spatial reference description
+        * @return status code
+        * @see SciDBSpatialReference
+        */
+        StatusCode getSRSDesc (const string& inArrayName, SciDBSpatialReference& out);
 
         /**
          * Creates a new shim session and returns its ID
@@ -357,15 +399,7 @@ namespace scidb4gdal
          * Releases an existing shim session
          * @param sessionID integer session ID
          */
-        void releaseSession ( int sessionID );
-
-
-
-
-
-
-
-        // TODO: Add general executeQuery(), readBytes() functions to make code less redundant
+        void releaseSession (int sessionID);
 
 
 
@@ -375,7 +409,7 @@ namespace scidb4gdal
         uint16_t    _port;
         string      _user;
         string      _passwd;
-        CURL       *_curl_handle;
+        CURL*       _curl_handle;
 
         bool _curl_initialized;
 
