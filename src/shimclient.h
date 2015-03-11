@@ -263,7 +263,7 @@ namespace scidb4gdal
          * @param xmax right boundary, we assume x to be "easting" which is different from GDAL!
          * @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
          */
-        void getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
+        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
 
 
         SciDBAttributeStats getAttributeStats ( SciDBSpatialArray &array, uint8_t nband );
@@ -288,14 +288,14 @@ namespace scidb4gdal
         /**
          * Tests a shim connection by requesting version information
          */
-        void testConnection();
+        StatusCode testConnection();
 
 
         /**
          * Creates a new SciDB array
          * @param array metadata of the new array
          */
-        void createArray ( SciDBSpatialArray &array );
+        StatusCode createArray ( SciDBSpatialArray &array );
 
         /**
          * Inserts a chunk of data to an existing array
@@ -306,14 +306,18 @@ namespace scidb4gdal
          * @param xmax right boundary, we assume x to be "easting" which is different from GDAL!
          * @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
          */
-        void insertData ( SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
+        StatusCode insertData ( SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
 
 
         /**
          * Updates the spatial reference system of an array
          * @param array metadata including its srs to be updated
          */
-        void updateSRS ( SciDBSpatialArray &array );
+        StatusCode updateSRS ( SciDBSpatialArray &array );
+
+
+
+        StatusCode removeArray ( const string &inArrayName );
 
 
 

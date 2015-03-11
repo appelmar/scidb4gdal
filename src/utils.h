@@ -68,6 +68,27 @@ namespace scidb4gdal
 {
     using namespace std;
 
+    enum StatusCode {
+        SUCCESS                   = 0,
+
+        ERR_READ_ARRAYUNKNOWN         = 100 + 1,
+        ERR_READ_WRONGDIMENSIONALITY      = 100 + 2,
+        ERR_READ_UNKNOWN              = 100 + 99,
+
+        ERR_CREATE_ARRAYEXISTS            = 200 + 1,
+        ERR_CREATE_WRONGDIMENSIONALITY        = 200 + 2,
+        ERR_CREATE_INVALIDARRAYNAME       = 200 + 3,
+        ERR_CREATE_UNKNOWN            = 200 + 99,
+
+        ERR_GLOBAL_CANNOTCONNECT          = 300 + 1,
+        ERR_GLOBAL_INVALIDARRAYNAME       = 300 + 2,
+        ERR_GLOBAL_DATATYPEMISMATCH       = 300 + 3,
+        ERR_GLOBAL_INVALIDCONNECTIONSTRING    = 300 + 4,
+
+        ERR_GLOBAL_UNKNOWN            = 300 + 99
+    };
+
+
     namespace Utils
     {
         /**

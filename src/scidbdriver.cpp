@@ -62,8 +62,11 @@ void GDALRegister_SciDB()
         poDriver->SetMetadataItem ( GDAL_DMD_HELPTOPIC, "frmt_scidb.html" );
         poDriver->pfnOpen = scidb4gdal::SciDBDataset::Open;
         poDriver->pfnIdentify = scidb4gdal::SciDBDataset::Identify;
-        poDriver->pfnCreate = scidb4gdal::SciDBDataset::Create;
+        // poDriver->pfnCreate = scidb4gdal::SciDBDataset::Create;
         poDriver->pfnDelete = scidb4gdal::SciDBDataset::Delete;
+
+        poDriver->pfnCreateCopy = scidb4gdal::SciDBDataset::CreateCopy;
+
         GetGDALDriverManager()->RegisterDriver ( poDriver );
     }
 }
@@ -204,58 +207,58 @@ namespace scidb4gdal
     }
 
 
+    /*
+
+        CPLErr SciDBRasterBand::IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
+        {
+            //TODO: Improve error handling
+
+            SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
 
 
-    CPLErr SciDBRasterBand::IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
-    {
-        //TODO: Improve error handling
+            // 1. Compute array bounds from block offsets
+            int xmin = nBlockYOff * this->nBlockYSize + _array->getXDim().low;
+            int xmax = xmin + this->nBlockYSize - 1;
+            if ( xmax > _array->getXDim().high ) xmax = _array->getXDim().high;
 
-        SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
-
-
-        // 1. Compute array bounds from block offsets
-        int xmin = nBlockYOff * this->nBlockYSize + _array->getXDim().low;
-        int xmax = xmin + this->nBlockYSize - 1;
-        if ( xmax > _array->getXDim().high ) xmax = _array->getXDim().high;
-
-        int ymin = nBlockXOff * this->nBlockXSize + _array->getYDim().low;
-        int ymax = ymin + this->nBlockXSize - 1;
-        if ( ymax > _array->getYDim().high ) ymax = _array->getYDim().high;
+            int ymin = nBlockXOff * this->nBlockXSize + _array->getYDim().low;
+            int ymax = ymin + this->nBlockXSize - 1;
+            if ( ymax > _array->getYDim().high ) ymax = _array->getYDim().high;
 
 
 
-        // Last blocks must be treated separately if covering area outside actual array: (0 | 1 | 2 | 3 || 4 | 5 | 6 | 7) vs. (0 | 1 | - | - || 3 | 4 | - | -) for 4x2 block with only 2x2 data
-        bool xOuter = ( nBlockXOff + 1 ) * this->nBlockXSize > poGDS->nRasterXSize; // or >= ???
-        if ( xOuter ) {
-            // This is a bit of a hack...
-            size_t pixelSize = 0;
-            uint32_t nx = ( 1 + xmax - xmin );
-            uint32_t ny = ( 1 + ymax - ymin );
-            for ( uint16_t i = 0; i < _array->attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( _array->attrs[i].typeId );
-            size_t dataSize = pixelSize *  nx * ny;
-            void *buf = malloc ( dataSize );
+            // Last blocks must be treated separately if covering area outside actual array: (0 | 1 | 2 | 3 || 4 | 5 | 6 | 7) vs. (0 | 1 | - | - || 3 | 4 | - | -) for 4x2 block with only 2x2 data
+            bool xOuter = ( nBlockXOff + 1 ) * this->nBlockXSize > poGDS->nRasterXSize; // or >= ???
+            if ( xOuter ) {
+                // This is a bit of a hack...
+                size_t pixelSize = 0;
+                uint32_t nx = ( 1 + xmax - xmin );
+                uint32_t ny = ( 1 + ymax - ymin );
+                for ( uint16_t i = 0; i < _array->attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( _array->attrs[i].typeId );
+                size_t dataSize = pixelSize *  nx * ny;
+                void *buf = malloc ( dataSize );
 
-            stringstream v;
-            v << "Write to bounds: x=(" << xmin << "," << xmax << ") y=(" << ymin << "," << ymax << ") nx=" << nx << " ny=" << ny << " BLOCKSIZE X " << this->nBlockXSize << " BLOCKSIZE Y " << this->nBlockYSize;
-            Utils::debug ( v.str() );
+                stringstream v;
+                v << "Write to bounds: x=(" << xmin << "," << xmax << ") y=(" << ymin << "," << ymax << ") nx=" << nx << " ny=" << ny << " BLOCKSIZE X " << this->nBlockXSize << " BLOCKSIZE Y " << this->nBlockYSize;
+                Utils::debug ( v.str() );
 
-            // Write to temporary buffer first
-            for ( uint32_t i = 0; i < nx; ++i ) {
-                // TODO: In the following call, check whether this->nBlockXSize must be replaced with this->nBlockYSize for unequally sized chunk dimensions
-                uint8_t *src  = & ( ( uint8_t * ) pImage ) [i * this->nBlockXSize * pixelSize];
-                uint8_t *dest  = & ( ( uint8_t * ) buf ) [i * ny * pixelSize];
-                memcpy ( dest, src, ny * pixelSize );
+                // Write to temporary buffer first
+                for ( uint32_t i = 0; i < nx; ++i ) {
+                    // TODO: In the following call, check whether this->nBlockXSize must be replaced with this->nBlockYSize for unequally sized chunk dimensions
+                    uint8_t *src  = & ( ( uint8_t * ) pImage ) [i * this->nBlockXSize * pixelSize];
+                    uint8_t *dest  = & ( ( uint8_t * ) buf ) [i * ny * pixelSize];
+                    memcpy ( dest, src, ny * pixelSize );
+                }
+                // Write from buf instead of pImage
+                poGDS->getClient()->insertData ( *_array, buf, xmin, ymin, xmax, ymax );
+
+                free ( buf );
             }
-            // Write from buf instead of pImage
-            poGDS->getClient()->insertData ( *_array, buf, xmin, ymin, xmax, ymax );
-
-            free ( buf );
-        }
-        else poGDS->getClient()->insertData ( *_array, pImage, xmin, ymin, xmax, ymax );
+            else poGDS->getClient()->insertData ( *_array, pImage, xmin, ymin, xmax, ymax );
 
 
-        return CE_None;
-    }
+            return CE_None;
+        }*/
 
 
 
@@ -314,55 +317,61 @@ namespace scidb4gdal
     }
 
 
+    /*
+        CPLErr SciDBDataset::SetProjection ( const char *wkt )
+        {
+            _array.srtext = wkt;
+            OGRSpatialReference srs ( wkt );
+            srs.AutoIdentifyEPSG();
+            _array.auth_name = srs.GetAuthorityName ( NULL );
+            _array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
+            char *proj4;
+            srs.exportToProj4 ( &proj4 );
+            _array.proj4text.assign ( proj4 );
+            CPLFree ( proj4 );
 
-    CPLErr SciDBDataset::SetProjection ( const char *wkt )
-    {
-        _array.srtext = wkt;
-        OGRSpatialReference srs ( wkt );
-        srs.AutoIdentifyEPSG();
-        _array.auth_name = srs.GetAuthorityName ( NULL );
-        _array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
-        char *proj4;
-        srs.exportToProj4 ( &proj4 );
-        _array.proj4text.assign ( proj4 );
-        CPLFree ( proj4 );
-
-        _array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
-        _array.ydim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+            _array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+            _array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
 
 
-        // Only perform database update, if affine transformation has already been set
-        if ( !_array.affineTransform.isIdentity() ) {
-            _client->updateSRS ( _array );
+            // Only perform database update, if affine transformation has already been set
+            if ( !_array.affineTransform.isIdentity() ) {
+                _client->updateSRS ( _array );
+            }
+
+            return CE_None;
         }
 
-        return CE_None;
-    }
+
+        CPLErr SciDBDataset::SetGeoTransform ( double *padfTransform )
+        {
+
+            AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
+            _array.affineTransform = a;
+
+            // Only perform database update, if srs has already been set
+            if ( !_array.srtext.empty() ) {
+                _client->updateSRS ( _array );
+
+            }
+            return CE_None;
+        }*/
 
 
-    CPLErr SciDBDataset::SetGeoTransform ( double *padfTransform )
+
+    GDALDataset *SciDBDataset::CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData )
     {
 
-        AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
-        _array.affineTransform = a;
+
+        int  nBands = poSrcDS->GetRasterCount();
+        int  nXSize = poSrcDS->GetRasterXSize();
+        int  nYSize = poSrcDS->GetRasterYSize();
 
 
-//  stringstream sdebug;
-//  sdebug << std::setprecision(15) << "SetGeoTransform(" << padfTransform[0] <<","<< padfTransform[1]<<","<< padfTransform[2]<<","<< padfTransform[3]<<","<< padfTransform[4]<<","<< padfTransform[5] << ")";
-//  Utils::debug(sdebug.str());
-//  Utils::debug(a.toString());
-        // Only perform database update, if srs has already been set
-        if ( !_array.srtext.empty() ) {
-            _client->updateSRS ( _array );
-
-        }
-        return CE_None;
-    }
+        // TODO: Do some checks, e.g. whether target array exists etc.
 
 
 
-    GDALDataset *SciDBDataset::Create ( const char *pszFilename, int nXSize, int nYSize, int nBands, GDALDataType eType, char   **papszParmList )
-    {
 
         ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename );
 
@@ -375,7 +384,7 @@ namespace scidb4gdal
         for ( int i = 0; i < nBands; ++i ) {
             SciDBAttribute a;
             a.nullable = false; // TODO
-            a.typeId = Utils::gdalTypeToSciDBTypeId ( eType ); // All attribtues must have the same data type
+            a.typeId = Utils::gdalTypeToSciDBTypeId ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() ); // All attribtues must have the same data type
             stringstream aname;
             aname << "band" << i + 1;
             a.name = aname.str();
@@ -409,20 +418,201 @@ namespace scidb4gdal
 
         array.dims = dims;
 
-        // Spatial reference is handled automatically by GDAL calling SetGeoTransform() and SetProjection()
+
+
 
 
         // Create shim client
         ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd );
 
 
+
         // Create array in SciDB
-        client->createArray ( array );
+        if ( client->createArray ( array ) != SUCCESS ) {
+            Utils::error ( "Could not create SciDB array, does it exist?" );
+            return NULL;
+        }
+
+
+
+        // Set Spatial reference
+        double padfTransform[6];
+        string wkt ( poSrcDS->GetProjectionRef() );
+        if ( wkt != "" && poSrcDS->GetGeoTransform ( padfTransform ) == CE_None ) {
+            AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
+
+            array.affineTransform = a;
+            Utils::debug ( a.toString() );
+
+            array.srtext = wkt;
+            OGRSpatialReference srs ( wkt.c_str() );
+            srs.AutoIdentifyEPSG();
+            array.auth_name = srs.GetAuthorityName ( NULL );
+            array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
+            char *proj4;
+            srs.exportToProj4 ( &proj4 );
+            array.proj4text.assign ( proj4 );
+            CPLFree ( proj4 );
+
+            array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+            array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
+
+
+
+            client->updateSRS ( array );
+        }
+
+
+
+
+
+
+
+
+
+
+
+        // Copy data and write to SciDB
+
+
+        size_t pixelSize = 0;
+        for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
+        size_t totalSize = pixelSize *  dimx.chunksize * dimy.chunksize;
+
+        uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
+
+
+        uint32_t nBlockX = ( uint32_t ) ( nXSize / dimx.chunksize );
+        if ( nXSize % dimx.chunksize != 0 ) ++nBlockX;
+
+        uint32_t nBlockY = ( uint32_t ) ( nYSize / dimy.chunksize );
+        if ( nYSize % dimy.chunksize != 0 ) ++nBlockY;
+
+
+
+
+        for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
+            for ( uint32_t by = 0; by < nBlockY; ++by ) {
+
+                size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
+
+                // This is taken from IWriteBlock
+                // 1. Compute array bounds from block offsets
+                int xmin = bx *  dimx.chunksize + dimx.low; // TODO: Check whether x, y is correct
+                int xmax = xmin +  dimx.chunksize - 1; // TODO: Check whether x, y is correct
+                if ( xmax > dimx.high ) xmax = dimx.high; // TODO: Check whether x, y is correct
+
+                int ymin = by *  dimy.chunksize + dimy.low; // TODO: Check whether x, y is correct
+                int ymax = ymin + dimy.chunksize - 1; // TODO: Check whether x, y is correct
+                if ( ymax > dimy.high ) ymax = dimy.high; // TODO: Check whether x, y is correct
+
+                // We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
+                for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
+                    void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+
+                    // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
+                    GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
+                    poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+
+                    /* SciDB load file format is band interleaved by pixel / cell, whereas common
+                    GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
+                    manually. */
+
+                    // Variable (unknown) data types and band numbers make this somewhat ugly
+                    for ( int i = 0; i < ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ); ++i ) {
+                        memcpy ( & ( ( char * ) bandInterleavedChunk ) [i * pixelSize + bandOffset], & ( ( char * ) blockBandBuf ) [i * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId )], Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+                    }
+                    free ( blockBandBuf );
+                    bandOffset += Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId );
+
+                }
+
+                if ( client->insertData ( array, bandInterleavedChunk, xmin, ymin, xmax, ymax ) != SUCCESS ) {
+                    Utils::error ( "Copying data to SciDB array failed, trying to recover initial state..." );
+                    if ( client->removeArray ( array.name ) != SUCCESS ) {
+                        Utils::error ( "Recovery faild, could not delete array '" + array.name + "'. Please do this manually in SciDB" );
+                    }
+                    return NULL;
+                }
+            }
+        }
+
+
+
+        free ( bandInterleavedChunk );
 
 
         delete client;
-        return ( GDALDataset * ) GDALOpen ( pszFilename, GA_Update );
+
+        return ( GDALDataset * ) GDALOpen ( pszFilename, GA_ReadOnly );
+
     }
+
+
+
+    /*
+        GDALDataset *SciDBDataset::Create ( const char *pszFilename, int nXSize, int nYSize, int nBands, GDALDataType eType, char   **papszParmList )
+        {
+
+            ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename );
+
+            // Create array metadata structure
+            SciDBSpatialArray array;
+            array.name = pars->arrayname;
+
+            // Attributes
+            vector<SciDBAttribute> attrs;
+            for ( int i = 0; i < nBands; ++i ) {
+                SciDBAttribute a;
+                a.nullable = false; // TODO
+                a.typeId = Utils::gdalTypeToSciDBTypeId ( eType ); // All attribtues must have the same data type
+                stringstream aname;
+                aname << "band" << i + 1;
+                a.name = aname.str();
+                attrs.push_back ( a );
+            }
+            array.attrs = attrs;
+
+
+
+            // Dimensions
+
+            vector<SciDBDimension> dims;
+
+            SciDBDimension dimx;
+            dimx.low = 0;
+            dimx.high = nYSize - 1;
+            dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
+            dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_X;
+            dimx.typeId = "int64";
+
+            SciDBDimension dimy;
+            dimy.low = 0;
+            dimy.high = nXSize - 1;
+            dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
+            dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y;
+            dimy.typeId = "int64";
+
+            // TODO: Check order
+            dims.push_back ( dimx );
+            dims.push_back ( dimy );
+
+            array.dims = dims;
+
+            // Spatial reference is handled automatically by GDAL calling SetGeoTransform() and SetProjection()
+
+
+            // Create shim client
+            ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd );
+
+
+            // Create array in SciDB
+            client->createArray ( array );
+
+
+            delete client;
+            return ( GDALDataset * ) GDALOpen ( pszFilename, GA_Update );
+        }*/
 
 
 
@@ -470,6 +660,7 @@ namespace scidb4gdal
     CPLErr SciDBDataset::Delete ( const char *pszName )
     {
         // TODO
+        Utils::debug ( "Deleting SciDB arrays from GDAL is currently not allowed..." );
         return CE_None;
     }
 
@@ -481,16 +672,16 @@ namespace scidb4gdal
 
 
         // Check whether dataset matches SciDB dataset
-        if ( !Identify ( poOpenInfo ) )
+        if ( !Identify ( poOpenInfo ) ) {
+            Utils::error ( "This is not a SciDB dataset" );
             return NULL;
-
+        }
 
         // Do not allow update access
-//         if (poOpenInfo->eAccess == GA_Update)
-//         {
-//             CPLError(CE_Failure, CPLE_NotSupported, "scidb4gdal currently does not support update access to existing arrays.\n");
-//             return NULL;
-//         }
+        if ( poOpenInfo->eAccess == GA_Update ) {
+            CPLError ( CE_Failure, CPLE_NotSupported, "scidb4gdal currently does not support update access to existing arrays.\n" );
+            return NULL;
+        }
 
 
         // Create the dataset

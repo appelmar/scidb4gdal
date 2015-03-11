@@ -8,7 +8,7 @@ cd /home/scidb/Desktop/gdal-1.11.2/apps
 
 ./gdalinfo "SCIDB:array=chicago2"
 ./gdal_translate -of GTiff "SCIDB:array=GDAL_chicago1" /tmp/test.tif 
-./gdal_translate -of JPEG "SCIDB:array=GDAL_chicago1" /tmp/test1.jpg
+./gdal_translate -of JPEG "SCIDB:array=GDAL_bogota1" /tmp/test1.jpg
 
 
 

@@ -51,7 +51,7 @@ namespace scidb4gdal
         {
             //std::cout << "(" << getCurDatetime() << ") ERROR: " << msg << std::endl;
             CPLError ( CE_Fatal, CPLE_AppDefined, msg.c_str() );
-            throw msg;
+            //throw msg;
         }
 
 

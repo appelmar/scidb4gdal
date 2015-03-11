@@ -76,7 +76,7 @@ namespace scidb4gdal
     string AffineTransform::toString()
     {
         stringstream sstr;
-        sstr << sstr << setprecision ( numeric_limits< double >::digits10 )
+        sstr << setprecision ( numeric_limits< double >::digits10 )
              << "x0" << "=" << _x0  << " "
              << "y0"  << "=" << _y0  << " "
              << "a11" << "=" << _a11 << " "

@@ -40,7 +40,7 @@ namespace scidb4gdal
     /**
      * GDALDataset subclass implementing core GDAL functionality
      */
-    class SciDBDataset : public GDALPamDataset
+    class SciDBDataset : public GDALDataset
     {
         friend class SciDBRasterBand;
 
@@ -93,13 +93,13 @@ namespace scidb4gdal
         /**
          * Sets an array's affine transformation for converting image to world coordinates
          */
-        CPLErr SetGeoTransform ( double   *padfTransform );
+        //CPLErr SetGeoTransform ( double   *padfTransform );
 
         /**
          * Sets an array's spatial reference system
          * @param wkt WKT representation  of a spatial reference system
          */
-        CPLErr SetProjection ( const char *wkt );
+        //CPLErr SetProjection ( const char *wkt );
 
 
 
@@ -108,7 +108,16 @@ namespace scidb4gdal
         * WITH ALL BANDS HAVING THE SAME DATATYPE
         * @see GDALDriver::Create()
         */
-        static GDALDataset *Create ( const char *pszFilename, int nXSize, int nYSize, int nBands, GDALDataType eType, char   **papszParmList );
+        //static GDALDataset *Create ( const char *pszFilename, int nXSize, int nYSize, int nBands, GDALDataType eType, char   **papszParmList );
+
+
+
+        /**
+        * Function for creating a new SciDB array based on an existing GDAL dataset.
+        * @see GDALDriver::CreateCopy()
+        */
+        static GDALDataset *CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData );
+
 
 
         // Not yet implemented, important for create, does nothing...
@@ -147,9 +156,9 @@ namespace scidb4gdal
         virtual CPLErr IReadBlock ( int nBlockXOff, int nBlockYOff, void *pImage );
 
         /**
-             * GDAL function called as array attribtue data shall be written, uploads data to SciDB and thus might take some time
-             */
-        virtual CPLErr IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage );
+        * GDAL function called as array attribtue data shall be written, uploads data to SciDB and thus might take some time
+         */
+        //virtual CPLErr IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage );
 
         /**
          * GDAL function for computing min,max,mean,and stdev of an array attribute
