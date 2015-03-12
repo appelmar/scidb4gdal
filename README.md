@@ -7,23 +7,24 @@ Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensi
 
 The main purpose of the plugin is to use SciDB for complex geospatial analytics and your favorite GIS tool to explore results. 
 
-The driver offers experimental support for creating new SciDB arrays from  existing GDAL datasets using gdal_translate.
+The driver offers support for reading and writing SciDB arrays. Update access to existing arrays is currently not implemented but planned for future releases.
+
 
 ## Getting Started
 Similar to other database drivers for GDAL, we use a connection string as a descriptor for array data sources. 
 
 `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
 
-Notice that the string must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array.
+Notice that the string must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. The following examples demonstrate how you can use gdal_translate to load / read imagery to / from SciDB: 
 
-### Writing GDAL datasets to SciDB
-`gdal_translate -of SciDB <input> "SCIDB:array=scidb4gdal_testarray"`
+- Writing GDAL datasets to SciDB: `gdal_translate -of SciDB sample.tif "SCIDB:array=sample_array_gdal host=http://localhost"`
 
-### Exporting SciDB arrays
-`gdal_translate -of GTiff "SCIDB:array=<arrayname>" /tmp/test.tif`
+- Exporting SciDB arrays: `gdal_translate -of GTiff "SCIDB:array=sample_array_gdal host=http://localhost" sample.tif`
+
+- Array metadata: `gdalinfo "SCIDB:array=sample_array_gdal host=http://localhost"`
 
 ## Dependencies
-- At the moment we require [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers as in [SciDB-Py](https://github.com/Paradigm4/SciDB-Py)
+- At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers
 - We use [cURL](http://curl.haxx.se/) to interface with SciDB's web service shim
 - Some [Boost](http://www.boost.org) header-only libraries (no external libraries required for linking) for string functions
 
