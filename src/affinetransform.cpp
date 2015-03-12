@@ -42,33 +42,29 @@ namespace scidb4gdal
 
 
 
-    AffineTransform::AffineTransform() : _x0 (0),  _y0 (0),  _a11 (1), _a22 (1), _a12 (0), _a21 (0) {}
-    AffineTransform::AffineTransform (double x0, double y0) : _x0 (x0),  _y0 (y0),  _a11 (1), _a22 (1), _a12 (0), _a21 (0) {}
-    AffineTransform::AffineTransform (double x0, double y0, double a11, double a22) : _x0 (x0),  _y0 (y0),  _a11 (a11), _a22 (a22), _a12 (0), _a21 (0) {}
-    AffineTransform::AffineTransform (double x0, double y0, double a11, double a22, double a12, double a21)  : _x0 (x0),  _y0 (y0), _a11 (a11),  _a22 (a22), _a12 (a12), _a21 (a21)   {}
-    AffineTransform::AffineTransform (const string& astr) : _x0 (0),  _y0 (0),  _a11 (1), _a22 (1), _a12 (0), _a21 (0)
+    AffineTransform::AffineTransform() : _x0 ( 0 ),  _y0 ( 0 ),  _a11 ( 1 ), _a22 ( 1 ), _a12 ( 0 ), _a21 ( 0 ) {}
+    AffineTransform::AffineTransform ( double x0, double y0 ) : _x0 ( x0 ),  _y0 ( y0 ),  _a11 ( 1 ), _a22 ( 1 ), _a12 ( 0 ), _a21 ( 0 ) {}
+    AffineTransform::AffineTransform ( double x0, double y0, double a11, double a22 ) : _x0 ( x0 ),  _y0 ( y0 ),  _a11 ( a11 ), _a22 ( a22 ), _a12 ( 0 ), _a21 ( 0 ) {}
+    AffineTransform::AffineTransform ( double x0, double y0, double a11, double a22, double a12, double a21 )  : _x0 ( x0 ),  _y0 ( y0 ), _a11 ( a11 ),  _a22 ( a22 ), _a12 ( a12 ), _a21 ( a21 )   {}
+    AffineTransform::AffineTransform ( const string &astr ) : _x0 ( 0 ),  _y0 ( 0 ),  _a11 ( 1 ), _a22 ( 1 ), _a12 ( 0 ), _a21 ( 0 )
     {
         vector<string> parts;
-        boost::split (parts, astr, boost::is_any_of (",; "));
-        for (vector<string>::iterator it = parts.begin(); it != parts.end(); ++it)
-        {
+        boost::split ( parts, astr, boost::is_any_of ( ",; " ) );
+        for ( vector<string>::iterator it = parts.begin(); it != parts.end(); ++it ) {
             vector<string> kv;
-            boost::split (kv, *it, boost::is_any_of ("=:"));
-            if (kv.size() != 2)
-            {
-                Utils::warn ("Unreadable affine transformation string '" + *it + "' will be ignored");
+            boost::split ( kv, *it, boost::is_any_of ( "=:" ) );
+            if ( kv.size() != 2 ) {
+                Utils::warn ( "Unreadable affine transformation string '" + *it + "' will be ignored" );
             }
-            else
-            {
-                if (kv[0].compare ("x0") == 0) _x0 = boost::lexical_cast<double> (kv[1]);
-                else if (kv[0].compare ("y0") == 0) _y0 = boost::lexical_cast<double> (kv[1]);
-                else if (kv[0].compare ("a11") == 0) _a11 = boost::lexical_cast<double> (kv[1]);
-                else if (kv[0].compare ("a22") == 0) _a22 = boost::lexical_cast<double> (kv[1]);
-                else if (kv[0].compare ("a12") == 0) _a12 = boost::lexical_cast<double> (kv[1]);
-                else if (kv[0].compare ("a21") == 0) _a21 = boost::lexical_cast<double> (kv[1]);
-                else
-                {
-                    Utils::warn ("Unkown affine transformation parameter '" + kv[0] + "' will be ignored");
+            else {
+                if ( kv[0].compare ( "x0" ) == 0 ) _x0 = boost::lexical_cast<double> ( kv[1] );
+                else if ( kv[0].compare ( "y0" ) == 0 ) _y0 = boost::lexical_cast<double> ( kv[1] );
+                else if ( kv[0].compare ( "a11" ) == 0 ) _a11 = boost::lexical_cast<double> ( kv[1] );
+                else if ( kv[0].compare ( "a22" ) == 0 ) _a22 = boost::lexical_cast<double> ( kv[1] );
+                else if ( kv[0].compare ( "a12" ) == 0 ) _a12 = boost::lexical_cast<double> ( kv[1] );
+                else if ( kv[0].compare ( "a21" ) == 0 ) _a21 = boost::lexical_cast<double> ( kv[1] );
+                else {
+                    Utils::warn ( "Unkown affine transformation parameter '" + kv[0] + "' will be ignored" );
                 }
             }
         }
@@ -80,7 +76,7 @@ namespace scidb4gdal
     string AffineTransform::toString()
     {
         stringstream sstr;
-        sstr << setprecision (numeric_limits< double >::digits10)
+        sstr << setprecision ( numeric_limits< double >::digits10 )
              << "x0" << "=" << _x0  << " "
              << "y0"  << "=" << _y0  << " "
              << "a11" << "=" << _a11 << " "
@@ -93,7 +89,7 @@ namespace scidb4gdal
 
     bool AffineTransform::isIdentity()
     {
-        return (_a11 == 1 && _a12 == 0 && _a21 == 0 && _a22 == 1 && _x0 == 0 && _y0 == 0);
+        return ( _a11 == 1 && _a12 == 0 && _a21 == 0 && _a22 == 1 && _x0 == 0 && _y0 == 0 );
     }
 
 
