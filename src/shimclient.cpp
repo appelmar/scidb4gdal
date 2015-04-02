@@ -30,16 +30,17 @@ SOFTWARE.
 namespace scidb4gdal
 {
 
-    ShimClient::ShimClient() : _host ( "http://localhost" ), _port ( 8080 ), _user ( "scidb" ), _passwd ( "scidb" ), _curl_handle ( 0 ), _curl_initialized ( false )
+    ShimClient::ShimClient() : _host ( "https://localhost" ), _port ( 8083 ), _user ( "scidb" ), _passwd ( "scidb" ), _ssl ( true ), _curl_handle ( 0 ), _curl_initialized ( false ), _auth ( "" )
     {
         curl_global_init ( CURL_GLOBAL_ALL );
     }
-    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd ) : _host ( host ), _port ( port ), _user ( user ), _passwd ( passwd ), _curl_handle ( 0 ), _curl_initialized ( false )
+    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false ) : _host ( host ), _port ( port ), _user ( user ), _passwd ( passwd ), _ssl ( ssl ),  _curl_handle ( 0 ), _curl_initialized ( false ), _auth ( "" )
     {
         curl_global_init ( CURL_GLOBAL_ALL );
     }
     ShimClient::~ShimClient()
     {
+        if ( _ssl && !_auth.empty() ) logout();
         curl_global_cleanup();
         _curl_handle = 0;
     }
@@ -62,6 +63,12 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST );
         curl_easy_setopt ( _curl_handle, CURLOPT_USERNAME, _user.c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_PASSWORD, _passwd.c_str() );
+
+        if ( _ssl ) {
+            curl_easy_setopt ( _curl_handle, CURLOPT_SSL_VERIFYPEER, 0 );
+            curl_easy_setopt ( _curl_handle, CURLOPT_SSL_VERIFYHOST, 0 );
+        }
+
 #ifdef CURL_VERBOSE
         curl_easy_setopt ( _curl_handle, CURLOPT_VERBOSE, 1L );
 #else
@@ -84,6 +91,7 @@ namespace scidb4gdal
 
     CURLcode ShimClient::curlPerform()
     {
+
         CURLcode res = curl_easy_perform ( _curl_handle );
         for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
             stringstream s;
@@ -122,6 +130,7 @@ namespace scidb4gdal
 
         stringstream ss;
         ss << _host << SHIMENDPOINT_VERSION;
+        if ( _ssl && !_auth.empty() ) ss << "?auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
 
         // Test connection
@@ -146,6 +155,9 @@ namespace scidb4gdal
     int ShimClient::newSession()
     {
 
+        if ( _ssl && _auth.empty() ) login();
+
+
         curlBegin();
 
         stringstream ss;
@@ -153,6 +165,7 @@ namespace scidb4gdal
 
         // NEW SESSION ID ////////////////////////////
         ss << _host << SHIMENDPOINT_NEW_SESSION;
+        if ( _ssl && !_auth.empty() ) ss << "?auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
 
@@ -184,11 +197,59 @@ namespace scidb4gdal
         stringstream ss;
         ss << _host << SHIMENDPOINT_RELEASE_SESSION;
         ss << "?" << "id=" << sessionID;
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
         string response;
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+        curlPerform();
+        curlEnd();
+
+    }
+
+
+    void ShimClient::login()
+    {
+
+        curlBegin();
+
+        stringstream ss;
+        string response;
+
+        ss << _host << SHIMENDPOINT_LOGIN << "?username=" << _user << "&password=" << _passwd;
+        curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+        curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+
+        curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+        curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+        curlPerform();
+        curlEnd();
+
+        //int sessionID = boost::lexical_cast<int>(response.data());
+        if ( response.length() > 0 ) {
+            _auth = response;
+            Utils::debug ( ( string ) "Login to SciDB successsful, using auth key: " + _auth );
+        }
+        else {
+            Utils::error ( ( string ) ( "Login to SciDB failed" ), true );
+        }
+    }
+
+
+    void ShimClient::logout()
+    {
+        curlBegin();
+
+        stringstream ss;
+
+
+        // NEW SESSION ID ////////////////////////////
+        ss << _host << SHIMENDPOINT_LOGOUT << "?auth=" << _auth;
+        curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+        curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+
+
         curlPerform();
         curlEnd();
 
@@ -222,6 +283,7 @@ namespace scidb4gdal
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY;
             ss << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "csv";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -245,6 +307,7 @@ namespace scidb4gdal
             ss.str ( "" );
             // READ BYTES  ///////////////////////////
             ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
 
@@ -322,6 +385,7 @@ namespace scidb4gdal
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str()  << "&save=" << "csv";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
 
@@ -342,6 +406,7 @@ namespace scidb4gdal
             stringstream ss;
             response = "";
             ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
             curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
@@ -426,6 +491,7 @@ namespace scidb4gdal
             afl << "project(st_getsrs(" << inArrayName << "),name,xdim,ydim,srtext,proj4text,A)";  // project(dimensions(chicago2),name,low,high,type)
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "csv";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
             response = "";
@@ -446,6 +512,7 @@ namespace scidb4gdal
             // READ BYTES  ////////////////////////////
             ss.str ( "" );
             ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -610,7 +677,8 @@ namespace scidb4gdal
 
 
 
-
+    // TODO: This is inefficent for line-oriented formats, every line loads the same chunk repeatedly
+    // TODO: Implement Chunk cache!
     StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max )
     {
 
@@ -650,13 +718,14 @@ namespace scidb4gdal
 
         stringstream afl;
         if ( x_idx > y_idx ) // TODO: need to check performance of differend ordering
-            afl << "transpose(project(subarray(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
+            afl << "transpose(project(between(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
         else
-            afl << "project(subarray(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
+            afl << "project(between(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
 
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
         ss << "&query=" << afl.str() << "&save=" << "(" << array.attrs[nband].typeId << ")"; //  //if (array.attrs[nband].nullable) ss << " null";  TODO: Null value handling
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -670,6 +739,7 @@ namespace scidb4gdal
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
 
@@ -692,7 +762,7 @@ namespace scidb4gdal
 
 
 
-    StatusCode ShimClient::createArray ( SciDBSpatialArray &array )
+    StatusCode ShimClient::createTempArray ( SciDBSpatialArray &array )
     {
 
         if ( array.name == "" ) {
@@ -723,7 +793,7 @@ namespace scidb4gdal
 
         // Build afl query, e.g. CREATE ARRAY A <x: double, err: double> [i=0:99,10,0, j=0:99,10,0];
         stringstream afl;
-        afl << "CREATE ARRAY " << array.name;
+        afl << "CREATE TEMP ARRAY " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP;
         afl << " <";
         for ( uint32_t i = 0; i < array.attrs.size() - 1; ++i ) {
             afl << array.attrs[i].name << ": " << array.attrs[i].typeId << ",";
@@ -745,6 +815,7 @@ namespace scidb4gdal
         // EXECUTE QUERY  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, aflquery.c_str(), 0 );
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
         if ( curlPerform() != CURLE_OK ) {
@@ -762,6 +833,61 @@ namespace scidb4gdal
     }
 
 
+
+    StatusCode ShimClient::copyArray ( string src, string dest )
+    {
+        if ( dest == "" ) {
+            Utils::error ( "Cannot create unnamed arrays" );
+            return ERR_CREATE_INVALIDARRAYNAME;
+
+        }
+        bool exists;
+        arrayExists ( dest, exists );
+        if ( exists ) {
+            Utils::error ( "Target array '" + dest + "' already exists in SciDB database" );
+            return ERR_CREATE_ARRAYEXISTS;
+        }
+
+        arrayExists ( src, exists );
+        if ( !exists ) {
+            Utils::error ( "Source array '" + src + "' does not exist in SciDB database" );
+            return ERR_CREATE_ARRAYEXISTS;
+        }
+
+
+
+        int sessionID = newSession();
+
+
+        stringstream afl;
+        afl << "store(" << src << ", " << dest << ")";
+        Utils::debug ( "Performing AFL Query: " +  afl.str() );
+
+        //Utils::debug("AFL QUERY: " + afl.str());
+
+        curlBegin();
+        // EXECUTE QUERY  ////////////////////////////
+        stringstream ss;
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+        curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+        curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+        if ( curlPerform() != CURLE_OK ) {
+            curlEnd();
+            return ERR_GLOBAL_UNKNOWN;
+        }
+        curlEnd();
+
+        releaseSession ( sessionID );
+
+
+        return SUCCESS;
+    }
+
+
+
+
+
     // This is probably incomplete but should be enough for shim generated filenames on the server
     bool isIllegalFilenameCharacter ( char c )
     {
@@ -772,7 +898,7 @@ namespace scidb4gdal
     {
         // TODO: Do some checks
 
-        string tempArray = array.name + "_tempload"; // SciDB 14.12 marks nested load operations as deprecated, so we create a temporary array first
+        string tempArray = array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMPLOAD; // SciDB 14.12 marks nested load operations as deprecated, so we create a temporary array first
         // If temporary load array exists, it will be automatically removed
         bool exists;
         arrayExists ( tempArray, exists );
@@ -805,7 +931,7 @@ namespace scidb4gdal
         ss.str ( "" );
         ss << _host << ":" << _port <<  SHIMENDPOINT_UPLOAD_FILE; // neccessary to put port in URL due to  HTTP 100-continue
         ss << "?" << "id=" << sessionID;
-
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
         struct curl_httppost *formpost = NULL;
         struct curl_httppost *lastptr = NULL;
@@ -843,18 +969,20 @@ namespace scidb4gdal
              */
 
             stringstream afl;
-            afl << "CREATE ARRAY " << tempArray;
+            afl << "CREATE TEMP ARRAY " << tempArray;
             afl << " <";
             for ( uint32_t i = 0; i < array.attrs.size() - 1; ++i ) {
                 afl << array.attrs[i].name << ": " << array.attrs[i].typeId << ",";
             }
             afl << array.attrs[array.attrs.size() - 1].name << ": " << array.attrs[array.attrs.size() - 1].typeId << ">";
-            afl << " [" << "i=0:*," << SCIDB4GDAL_DEFAULT_BLOCKSIZE_X *SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y << ",0]";
+            //afl << " [" << "i=0:*," << SCIDB4GDAL_DEFAULT_BLOCKSIZE_X *SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y << ",0]";
+            afl << " [" << "i=0:*," << array.getXDim().chunksize *array.getYDim().chunksize << ",0]";
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
             curlBegin();
             ss.str ( "" );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
             if ( curlPerform() != CURLE_OK ) {
@@ -879,6 +1007,7 @@ namespace scidb4gdal
             curlBegin();
             ss.str ( "" );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
             if ( curlPerform() != CURLE_OK ) {
@@ -906,7 +1035,7 @@ namespace scidb4gdal
             afl << array.dims[array.getYDimIdx()].name << "," << "int64(" << y_min  << ") + int64(i) % int64(" << ny << ")";
             afl << ",";
             afl << array.dims[array.getXDimIdx()].name << "," << "int64(" << x_min  << ") + int64(int64(i) / int64(" << ny << "))";
-            afl << "), " << array.name << "), " << array.name << ")";
+            afl << "), " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << "), " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << ")";
 
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
@@ -914,6 +1043,7 @@ namespace scidb4gdal
             curlBegin();
             ss.str ( "" );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -941,6 +1071,7 @@ namespace scidb4gdal
             curlBegin();
             ss.str ( "" );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
             if ( curlPerform() != CURLE_OK ) {
@@ -982,6 +1113,7 @@ namespace scidb4gdal
 
         ss.str();
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(double,double,double,double)";
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
         curlBegin();
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
@@ -995,6 +1127,7 @@ namespace scidb4gdal
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
 
@@ -1040,6 +1173,7 @@ namespace scidb4gdal
 
         ss.str();
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(int64)";
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
         curlBegin();
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
@@ -1053,6 +1187,7 @@ namespace scidb4gdal
         // READ BYTES  ////////////////////////////
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
 
@@ -1102,7 +1237,7 @@ namespace scidb4gdal
 
             stringstream ss;
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
-
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
             curlPerform();
@@ -1126,10 +1261,13 @@ namespace scidb4gdal
     {
         int sessionID = newSession();
 
+
+        curlBegin();
         stringstream ss, afl;
         afl << "remove(" << inArrayName << ")";
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
         if ( curlPerform() != CURLE_OK ) {

@@ -1,5 +1,5 @@
 
-OBJ	=	scidbdriver.o shimclient.o utils.o affinetransform.o
+OBJ	=	scidbdriver.o shimclient.o utils.o affinetransform.o tilecache.o
 
 EXTRAFLAGS = -I../../ogr
 

@@ -28,6 +28,7 @@ SOFTWARE.
 #include <iostream>
 #include "utils.h"
 #include "shimclient.h"
+#include "tilecache.h"
 
 namespace scidb4gdal
 {
@@ -46,6 +47,7 @@ namespace scidb4gdal
 
         SciDBSpatialArray _array; //!< associated array metadata object
         ShimClient *_client; //!< associated shim client metadata object
+        TileCache _cache;
 
     public:
         /**

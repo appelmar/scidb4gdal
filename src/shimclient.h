@@ -34,6 +34,7 @@ SOFTWARE.
 #include <sstream>
 #include <stack>
 
+
 #include "affinetransform.h"
 #include "utils.h"
 
@@ -112,6 +113,10 @@ namespace scidb4gdal
             return s.str();
         }
     };
+
+
+
+
 
     /**
     * A structure for storing spatial reference of a SciDB array
@@ -202,6 +207,7 @@ namespace scidb4gdal
 
 
 
+
     /**
      * Basic Shim client class
      */
@@ -224,7 +230,7 @@ namespace scidb4gdal
          * @param user username
          * @param passwd password
          */
-        ShimClient ( string host, uint16_t port, string user, string passwd );
+        ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl );
 
         /**
          * Default destructor f Shim clients.
@@ -296,11 +302,19 @@ namespace scidb4gdal
 
 
         /**
-         * Creates a new SciDB array
+         * Creates a new (temporary) SciDB array
          * @param array metadata of the new array
          * @return status code
          */
-        StatusCode createArray ( SciDBSpatialArray &array );
+        StatusCode createTempArray ( SciDBSpatialArray &array );
+
+        /**
+            *  Copies scidb arrays, used for persisting temporary load arrays
+            * @param src array name of the source array
+        * @param dest array name of the target array
+            * @return status code
+            */
+        StatusCode copyArray ( string src, string dest );
 
         /**
          * Inserts a chunk of data to an existing array
@@ -381,6 +395,11 @@ namespace scidb4gdal
         void releaseSession ( int sessionID );
 
 
+        void login();
+
+        void logout();
+
+
 
     private:
 
@@ -388,9 +407,14 @@ namespace scidb4gdal
         uint16_t    _port;
         string      _user;
         string      _passwd;
+        bool        _ssl;
         CURL       *_curl_handle;
 
         bool _curl_initialized;
+
+        string _auth;
+
+
 
 
     };

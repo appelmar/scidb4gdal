@@ -5,23 +5,34 @@ A GDAL driver for SciDB arrays
 This is a preliminary version of a [GDAL](http://www.gdal.org) driver for SciDB. Spatial reference of arrays is maintained if the SciDB database uses the [scidb4geo plugin](https://github.com/mappl/scidb4geo).
 Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensional arrays to a variety of image formats supported by GDAL. 
 
-The main purpose of the plugin is to use SciDB for complex geospatial analytics and your favorite GIS tool to explore results. 
-
 The driver offers support for reading and writing SciDB arrays. Update access to existing arrays is currently not implemented but planned for future releases.
+
+## News
+- (2015-04-02)
+    - Support for HTTPS connections to Shim
+    - Improved performance for both read and write access
 
 
 ## Getting Started
-Similar to other database drivers for GDAL, we use a connection string as a descriptor for array data sources. 
+Similar to other database drivers for GDAL, we use a connection string as a descriptor for array data sources: 
 
-`"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
+`"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"` 
 
-Notice that the string must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. The following examples demonstrate how you can use gdal_translate to load / read imagery to / from SciDB: 
+Notice that the string must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. Default values for parameters are
 
-- Writing GDAL datasets to SciDB: `gdal_translate -of SciDB sample.tif "SCIDB:array=sample_array_gdal host=http://localhost"`
+    <host>     = https://localhost
+    <port>     = 8083
+    <user>     = scidb
+    <password> = scidb
 
-- Exporting SciDB arrays: `gdal_translate -of GTiff "SCIDB:array=sample_array_gdal host=http://localhost" sample.tif`
 
-- Array metadata: `gdalinfo "SCIDB:array=sample_array_gdal host=http://localhost"`
+The following examples demonstrate how you can use gdal_translate to load / read imagery to / from SciDB: 
+
+- Writing GDAL datasets to SciDB: `gdal_translate -of SciDB sample.tif "SCIDB:array=sample_array_gdal"`
+
+- Exporting SciDB arrays: `gdal_translate -of GTiff "SCIDB:array=sample_array_gdal" sample.tif`
+
+- Array metadata: `gdalinfo "SCIDB:array=sample_array_gdal`
 
 ## Dependencies
 - At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers
