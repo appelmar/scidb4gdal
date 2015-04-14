@@ -53,6 +53,7 @@ The following instructions show you how to compile GDAL with added SciDB driver 
     2. Add call to `GDALRegister_SciDB()` in `GDAL_SRC_DIR/frmts/gdalallregister.cpp` within `#ifdef FRMT_scidb`
     3. Add "scidb" to `GDAL_FORMATS` in `GDAL_SRC_DIR/GDALmake.opt.in`
 5. Build GDAL `./configure && make && make install`. 
+6. Eventually, you might need to run `sudo ldconfig` to make gdal's shared library available.
 
 If you get some missing include file errors, you need to install Boost manually. Either use your distribution's package manager e.g. `sudo apt-get install libboost-dev` or simply copy Boost header files to a standard include directory like `/usr/include`.
 
