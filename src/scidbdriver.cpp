@@ -476,8 +476,8 @@ namespace scidb4gdal
 
 
 
-        for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
-            for ( uint32_t by = 0; by < nBlockY; ++by ) {
+        for ( uint32_t bx = 0; bx < nBlockY; ++bx ) {
+            for ( uint32_t by = 0; by < nBlockX; ++by ) {
 
                 size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
 
@@ -496,15 +496,17 @@ namespace scidb4gdal
                 int xmin = bx *  dimx.chunksize + dimx.low; // TODO: Check whether x, y is correct
                 int xmax = xmin +  dimx.chunksize - 1; // TODO: Check whether x, y is correct
                 if ( xmax > dimx.high ) xmax = dimx.high; // TODO: Check whether x, y is correct
+				if ( xmin > dimx.high ) xmin = dimx.high; // TODO: Check whether x, y is correct
 
                 int ymin = by *  dimy.chunksize + dimy.low; // TODO: Check whether x, y is correct
                 int ymax = ymin + dimy.chunksize - 1; // TODO: Check whether x, y is correct
                 if ( ymax > dimy.high ) ymax = dimy.high; // TODO: Check whether x, y is correct
-
+				if ( ymin > dimy.high ) ymin = dimy.high; // TODO: Check whether x, y is correct
+				
                 // We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
                 for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
                     void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
-
+					
                     // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
                     GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
                     poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
