@@ -400,7 +400,6 @@ namespace scidb4gdal
         void logout();
 
 
-
     private:
 
         string      _host;
@@ -415,7 +414,7 @@ namespace scidb4gdal
         string _auth;
 
 
-
+	void _createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query);
 
     };
 }

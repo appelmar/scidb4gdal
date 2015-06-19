@@ -273,7 +273,9 @@ namespace scidb4gdal
         stringstream ss;
         // EXECUTE QUERY  //////////////////////////// http://localhost:8080/execute_query?id=${s}&query=project(attributes(inArrayName),name,type_id,nullable);&save=dcsv
 
-
+	/*
+	 * Make a request to fetch the attributes of the data set
+	 */
         {
 
             stringstream afl;
@@ -300,7 +302,10 @@ namespace scidb4gdal
             curlEnd();
 
         }
-
+	
+	/**
+	 * Read data from the request and save it at the variable "response"
+	 */
         {
 
             curlBegin();
@@ -376,7 +381,9 @@ namespace scidb4gdal
 
         string response;
 
-
+	/*
+	 * Request
+	 */
         {
             curlBegin();
             stringstream ss;
@@ -400,7 +407,10 @@ namespace scidb4gdal
             curlEnd();
 
         }
-
+	
+	/*
+	 * Get response
+	 */
         {
             curlBegin();
             stringstream ss;
@@ -794,17 +804,28 @@ namespace scidb4gdal
         // Build afl query, e.g. CREATE ARRAY A <x: double, err: double> [i=0:99,10,0, j=0:99,10,0];
         stringstream afl;
         afl << "CREATE TEMP ARRAY " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP;
+	//Append attribute specification
         afl << " <";
-        for ( uint32_t i = 0; i < array.attrs.size() - 1; ++i ) {
-            afl << array.attrs[i].name << ": " << array.attrs[i].typeId << ",";
+        for ( uint32_t i = 0; i < array.attrs.size(); ++i ) {
+            afl << array.attrs[i].name << ": " << array.attrs[i].typeId;
+	    if (i != array.attrs.size() - 1) {
+	      afl << ",";
+	    } else {
+	      afl << ">";
+	    }
         }
-        afl << array.attrs[array.attrs.size() - 1].name << ": " << array.attrs[array.attrs.size() - 1].typeId << ">";
+        
+        //Append dimension spec
         afl << " [";
-        for ( uint32_t i = 0; i < array.dims.size() - 1; ++i ) {
-            afl << array.dims[i].name << "=" << array.dims[i].low << ":" << array.dims[i].high << "," << array.dims[i].chunksize << "," << 0  << ", "; // TODO: Overlap
+        for ( uint32_t i = 0; i < array.dims.size(); ++i ) {
+            afl << array.dims[i].name << "=" << array.dims[i].low << ":" << array.dims[i].high << "," << array.dims[i].chunksize << "," << 0 ; // TODO: Overlap
+            if (i != array.dims.size()-1) {
+	      afl << ", ";
+	    } else {
+	      afl << "]";
+	    }
         }
-        afl << array.dims[array.dims.size() - 1].name << "=" << array.dims[array.dims.size() - 1].low << ":" << array.dims[array.dims.size() - 1].high << "," << array.dims[array.dims.size() - 1].chunksize << "," << 0 ; // TODO: Overlap
-        afl << "]";
+
         //afl << ";";
         string aflquery = afl.str();
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
@@ -816,6 +837,8 @@ namespace scidb4gdal
         ss.str ( "" );
         ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, aflquery.c_str(), 0 );
         if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+        
+        //Set the HTTP options URL and the operations
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
         if ( curlPerform() != CURLE_OK ) {
@@ -937,7 +960,14 @@ namespace scidb4gdal
         struct curl_httppost *lastptr = NULL;
 
         // Load file from buffer instead of file!
-        curl_formadd ( &formpost, &lastptr, CURLFORM_COPYNAME, "file", CURLFORM_BUFFER, SCIDB4GDAL_DEFAULT_UPLOAD_FILENAME, CURLFORM_BUFFERPTR, inChunk, CURLFORM_BUFFERLENGTH, totalSize,  CURLFORM_CONTENTTYPE, "application/octet-stream", CURLFORM_END );
+	// Form HTTP POST, first two pointers next the KVP for the form
+        curl_formadd ( &formpost, &lastptr, 
+		       CURLFORM_COPYNAME, "file", 
+		       CURLFORM_BUFFER, SCIDB4GDAL_DEFAULT_UPLOAD_FILENAME, 
+		       CURLFORM_BUFFERPTR, inChunk, 
+		       CURLFORM_BUFFERLENGTH, totalSize,  
+		       CURLFORM_CONTENTTYPE, "application/octet-stream", 
+		       CURLFORM_END );
 
         curlBegin();
         string remoteFilename = "";
@@ -1021,15 +1051,14 @@ namespace scidb4gdal
             curlEnd();
         }
 
-
+	 /* insert
+	  * insert(
+	  *     redimension(
+	  *         apply(TEMP_ARRAY, array.dims[xidx].name,  (int64)xmin +  ((int64)i % (int64)nx),          array.dims[yidx].name,  (int64)ymin +  (int64)((int64)i / (int64)ny))
+	  *         ,array.name)
+	  *     ,a)
+	*/
         {
-            /*
-             * insert(
-             *     redimension(
-             *         apply(TEMP_ARRAY, array.dims[xidx].name,  (int64)xmin +  ((int64)i % (int64)nx),          array.dims[yidx].name,  (int64)ymin +  (int64)((int64)i / (int64)ny))
-             *         ,array.name)
-             *     ,a)
-            */
             stringstream afl;
             afl << "insert(redimension(apply(" << tempArray << ","; // TODO: Check dimension indices + ordering...
             afl << array.dims[array.getYDimIdx()].name << "," << "int64(" << y_min  << ") + int64(i) % int64(" << ny << ")";
@@ -1059,11 +1088,11 @@ namespace scidb4gdal
         }
 
 
-
+	/*
+	* remove (tempArray);
+	*/
         {
-            /*
-             * remove (tempArray);
-             */
+   
             stringstream afl;
             afl << "remove(" << tempArray << ")";
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
@@ -1107,7 +1136,10 @@ namespace scidb4gdal
 
         stringstream ss, afl;
         string aname = array.attrs[nband ].name;
-
+	
+	//create an output table based on the name of array
+	//min(), max(),avg(),stdev()
+	// and save it as 4 double values
         afl << "aggregate(" << array.name << ",min(" << aname << "),max(" << aname << "),avg(" << aname << "),stdev(" << aname << "))";
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
@@ -1170,10 +1202,11 @@ namespace scidb4gdal
         // There might be less complex queries but this one always succeeds and does not give HTTP 500 SciDB errors
         afl << "aggregate(filter(list('arrays'),name='" << inArrayName << "'),count(name))";
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
-
-        ss.str();
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(int64)";
-        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+	
+	_createSHIMExecuteString(ss, sessionID, afl);
+//         ss.str();
+//         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(int64)";
+//         if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
         curlBegin();
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
@@ -1263,11 +1296,14 @@ namespace scidb4gdal
 
 
         curlBegin();
-        stringstream ss, afl;
+        stringstream ss,afl;
         afl << "remove(" << inArrayName << ")";
+	
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
-        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+        _createSHIMExecuteString(ss, sessionID, afl);
+// 	ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
+// 	if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+// 	
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
         if ( curlPerform() != CURLE_OK ) {
@@ -1281,6 +1317,12 @@ namespace scidb4gdal
 
     }
 
+  void ShimClient::_createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query)
+  {
+      base << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << query.str();
+      if ( _ssl && !_auth.empty() ) base << "&auth=" << _auth; // Add auth parameter if using ssl
+
+  }
 
 
 

@@ -140,7 +140,6 @@ namespace scidb4gdal
 
         eDataType = Utils::scidbTypeIdToGDALType ( _array->attrs[nBand].typeId ); // Data type is mapped from SciDB's attribute data type
 
-
         /* GDAL interprets x dimension as image rows and y dimension as image cols whereas our
          * implementation of spatial reference systems assumes x being easting and y being northing.
          * This makes the following code pretty messy in mixing x and y. */
@@ -200,7 +199,7 @@ namespace scidb4gdal
             int ymin = nBlockXOff * this->nBlockXSize + _array->getYDim().low;
             int ymax = ymin + this->nBlockXSize - 1;
             if ( ymax > _array->getYDim().high ) ymax = _array->getYDim().high;
-
+	    
 
             // Read  and fetch data
             tile.size = nBlockXSize * nBlockYSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // Always allocate full block size
@@ -365,8 +364,6 @@ namespace scidb4gdal
 
     GDALDataset *SciDBDataset::CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData )
     {
-
-
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
@@ -444,22 +441,7 @@ namespace scidb4gdal
         }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
         // Copy data and write to SciDB
-
-
         size_t pixelSize = 0;
         for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
         size_t totalSize = pixelSize *  dimx.chunksize * dimy.chunksize;
@@ -509,7 +491,15 @@ namespace scidb4gdal
 					
                     // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
                     GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
-                    poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+		    
+		    //TODO in 2.0 (released June 2015) this function expects also 'psExtraArg' as additional argument. Here it is passed with NULL
+		    // in order to avoid "make" errors.
+                    poBand->RasterIO ( GF_Read, ymin, xmin, 
+				       1 + ymax - ymin, 1 + xmax - xmin, 
+				       ( void * ) blockBandBuf,  
+				       1 + ymax - ymin, 1 + xmax - xmin, 
+				       Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 
+				       0, 0,NULL);
 
                     /* SciDB load file format is band interleaved by pixel / cell, whereas common
                     GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
