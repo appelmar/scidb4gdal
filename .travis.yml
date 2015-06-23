@@ -1,5 +1,5 @@
 sudo: required
 language: cpp
 compiler: gcc
-install: chmod +x build/prepare_platform.sh && /build/prepare_platform.sh
+install: chmod +x build/prepare_platform.sh && build/prepare_platform.sh
 script: cd gdal-1.11.2 && ./configure && make
