@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/mappl/scidb4gdal.svg?branch=master)](https://travis-ci.org/mappl/scidb4gdal)
 # scidb4gdal
 A GDAL driver for SciDB arrays
 
@@ -8,6 +9,8 @@ Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensi
 The driver offers support for reading and writing SciDB arrays. Update access to existing arrays is currently not implemented but planned for future releases.
 
 ## News
+- (2015-06-23)
+	- Automated builds added, build/prepare_platform.sh might also help you to automatically build GDAL from source including this scidb driver
 - (2015-04-02)
     - Support for HTTPS connections to Shim
     - Improved performance for both read and write access
