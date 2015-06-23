@@ -1,0 +1,4 @@
+language: cpp
+compiler: gcc
+install: cd build && ./prepare_platform.sh
+script: cd build/gdal-1.11.2/ && ./configure && make
