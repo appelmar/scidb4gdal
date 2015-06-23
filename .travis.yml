@@ -1,3 +1,4 @@
+sudo: required
 language: cpp
 compiler: gcc
 install: chmod +x build/prepare_platform.sh && /build/prepare_platform.sh
