@@ -41,6 +41,8 @@ SOFTWARE.
 #include <iomanip>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/assign.hpp>
+#include "shim_client_structs.h"
 
 CPL_C_START
 void GDALRegister_SciDB ( void );
@@ -72,72 +74,15 @@ void GDALRegister_SciDB()
 
 
 
-
-
 namespace scidb4gdal
 {
-
-    struct ConnectionPars {
-
-        string arrayname;
-        string host;
-        int port;
-        string user;
-        string passwd;
-        bool ssl;
-
-        ConnectionPars() : arrayname ( "" ), host ( "https://localhost" ), port ( 8083 ), user ( "scidb" ), passwd ( "scidb" ) {}
-
-        string toString() {
-            stringstream s;
-            s << "array= " << arrayname << " host=" << host << " port=" << port << "  user=" << user << " passwd=" << passwd;
-            return s.str();
-        }
-
-        static ConnectionPars *parseConnectionString ( const string &connstr ) {
-            if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
-                Utils::error ( "This is not a scidb4gdal connection string" );
-            }
-
-            ConnectionPars *out = new ConnectionPars();
-
-            string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
-            vector<string> parts;
-            boost::split ( parts, astr, boost::is_any_of ( ",; " ) ); // Split at whitespace, comma, semicolon
-            for ( vector<string>::iterator it = parts.begin(); it != parts.end(); ++it ) {
-                vector<string> kv;
-                boost::split ( kv, *it, boost::is_any_of ( "=" ) ); // No colon because uf URL
-                if ( kv.size() != 2 ) {
-                    continue;
-                }
-                else {
-                    if ( kv[0].compare ( "host" ) == 0 ) out->host  = ( kv[1] );
-                    else if ( kv[0].compare ( "port" ) == 0 ) out->port = boost::lexical_cast<int> ( kv[1] );
-                    else if ( kv[0].compare ( "array" ) == 0 ) out->arrayname = ( kv[1] );
-                    else if ( kv[0].compare ( "user" ) == 0 ) out->user = ( kv[1] );
-                    else if ( kv[0].compare ( "password" ) == 0 ) out->passwd = ( kv[1] );
-                    else {
-                        continue;
-                    }
-                }
-            }
-            out->ssl = ( out->host.substr ( 0, 5 ).compare ( "https" ) == 0 );
-            return out;
-
-        }
-
-
-    };
-
-
-
 
     SciDBRasterBand::SciDBRasterBand ( SciDBDataset *poDS, SciDBSpatialArray *array, int nBand )
     {
         this->poDS = poDS;
         this->nBand = nBand;
         this->_array = array;
-
+	
         eDataType = Utils::scidbTypeIdToGDALType ( _array->attrs[nBand].typeId ); // Data type is mapped from SciDB's attribute data type
 
         /* GDAL interprets x dimension as image rows and y dimension as image cols whereas our
@@ -367,7 +312,6 @@ namespace scidb4gdal
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
-
 
         ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename );
 
@@ -714,14 +658,19 @@ namespace scidb4gdal
         // 1. parse connection string and extract the following values
         ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
         Utils::debug ( "Using connection parameters: host:" + pars->toString() );
-
-
+	
+//TODO remove
+// 	std::stringstream sstm;
+// 	sstm << "Test 1: " << pars->properties->src_coords[0] << " " << pars->properties->src_coords[1]
+// 	   << " " << pars->properties->src_coords[2] << " " << pars->properties->src_coords[3];
+// 	string result = sstm.str();
+// 	Utils::debug( result );
 
         // 2. Check validity of parameters
         if ( pars->arrayname == "" ) Utils::error ( "No array specified, currently not supported" );
 
         // 3. Create shim client
-        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl );
+        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl, pars->properties);
 
 
 

@@ -33,6 +33,7 @@ SOFTWARE.
 #include <inttypes.h>
 #include <sstream>
 #include <stack>
+#include "shim_client_structs.h"
 
 
 #include "affinetransform.h"
@@ -56,7 +57,6 @@ SOFTWARE.
 
 namespace scidb4gdal
 {
-
     using namespace std;
 
     /**
@@ -230,8 +230,9 @@ namespace scidb4gdal
          * @param user username
          * @param passwd password
          */
-        ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl );
-
+        ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl);
+	
+	ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl,ImageProperties* properties);
         /**
          * Default destructor f Shim clients.
          */
@@ -398,7 +399,7 @@ namespace scidb4gdal
         void login();
 
         void logout();
-
+	void createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query);
 
     private:
 
@@ -407,6 +408,7 @@ namespace scidb4gdal
         string      _user;
         string      _passwd;
         bool        _ssl;
+	ImageProperties *_props;
         CURL       *_curl_handle;
 
         bool _curl_initialized;
@@ -414,7 +416,7 @@ namespace scidb4gdal
         string _auth;
 
 
-	void _createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query);
+	
 
     };
 }

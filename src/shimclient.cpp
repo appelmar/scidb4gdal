@@ -30,14 +30,45 @@ SOFTWARE.
 namespace scidb4gdal
 {
 
-    ShimClient::ShimClient() : _host ( "https://localhost" ), _port ( 8083 ), _user ( "scidb" ), _passwd ( "scidb" ), _ssl ( true ), _curl_handle ( 0 ), _curl_initialized ( false ), _auth ( "" )
+    ShimClient::ShimClient() : 
+      _host ( "https://localhost" ), 
+      _port ( 8083 ), _user ( "scidb" ), 
+      _passwd ( "scidb" ), 
+      _ssl ( true ), 
+      _curl_handle ( 0 ), 
+      _curl_initialized ( false ),
+      _auth ( "" )
     {
         curl_global_init ( CURL_GLOBAL_ALL );
     }
-    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false ) : _host ( host ), _port ( port ), _user ( user ), _passwd ( passwd ), _ssl ( ssl ),  _curl_handle ( 0 ), _curl_initialized ( false ), _auth ( "" )
+    
+    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false) : 
+      _host ( host ), 
+      _port ( port ), 
+      _user ( user ), 
+      _passwd ( passwd ), 
+      _ssl ( ssl ),  
+      _curl_handle ( 0 ), 
+      _curl_initialized ( false ), 
+      _auth ( "" )
     {
         curl_global_init ( CURL_GLOBAL_ALL );
     }
+    
+    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false, ImageProperties *properties = NULL) : 
+      _host ( host ), 
+      _port ( port ), 
+      _user ( user ), 
+      _passwd ( passwd ), 
+      _ssl ( ssl ),  
+      _curl_handle ( 0 ), 
+      _curl_initialized ( false ), 
+      _auth ( "" ),
+      _props(properties)
+    {
+        curl_global_init ( CURL_GLOBAL_ALL );
+    }
+    
     ShimClient::~ShimClient()
     {
         if ( _ssl && !_auth.empty() ) logout();
@@ -596,7 +627,6 @@ namespace scidb4gdal
 
     StatusCode  ShimClient::getArrayDesc ( const string &inArrayName, SciDBSpatialArray &out )
     {
-
         bool exists;
         arrayExists ( inArrayName, exists );
         if ( !exists ) {
@@ -691,8 +721,13 @@ namespace scidb4gdal
     // TODO: Implement Chunk cache!
     StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max )
     {
-
-
+// 	ImageProperties *p = this->_props;
+// 	std::stringstream sstm;
+// 	sstm << "Test 2: " << p->src_coords[0] << " " << p->src_coords[1]
+// 	   << " " << p->src_coords[2] << " " << p->src_coords[3]; 
+// 	string result = sstm.str();
+// 	Utils::debug(result);
+	
         if ( x_min < array.getXDim().low || x_min > array.getXDim().high ||
                 x_max < array.getXDim().low || x_max > array.getXDim().high ||
                 y_min < array.getYDim().low || y_min > array.getYDim().high ||
@@ -1203,7 +1238,7 @@ namespace scidb4gdal
         afl << "aggregate(filter(list('arrays'),name='" << inArrayName << "'),count(name))";
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
 	
-	_createSHIMExecuteString(ss, sessionID, afl);
+	createSHIMExecuteString(ss, sessionID, afl);
 //         ss.str();
 //         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(int64)";
 //         if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
@@ -1300,7 +1335,7 @@ namespace scidb4gdal
         afl << "remove(" << inArrayName << ")";
 	
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
-        _createSHIMExecuteString(ss, sessionID, afl);
+        createSHIMExecuteString(ss, sessionID, afl);
 // 	ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
 // 	if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 // 	
@@ -1317,7 +1352,7 @@ namespace scidb4gdal
 
     }
 
-  void ShimClient::_createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query)
+  void ShimClient::createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query)
   {
       base << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << query.str();
       if ( _ssl && !_auth.empty() ) base << "&auth=" << _auth; // Add auth parameter if using ssl
