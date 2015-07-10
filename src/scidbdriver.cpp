@@ -43,6 +43,7 @@ SOFTWARE.
 #include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
 #include "shim_client_structs.h"
+#include "scidb_structs.h"
 
 CPL_C_START
 void GDALRegister_SciDB ( void );
@@ -120,7 +121,10 @@ namespace scidb4gdal
     // TODO: Add manual caching for efficient non-redundant reads when writing line-oriented file formats
     CPLErr SciDBRasterBand::IReadBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
     {
-        //TODO: Improve error handling
+	std::stringstream stream;
+	stream << "Offsets: " << nBlockXOff << " " << nBlockYOff;
+        Utils::debug(stream.str());
+	//TODO: Improve error handling
         SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
 
         uint32_t tileId = TileCache::getBlockId ( nBlockXOff, nBlockYOff, nBand - 1, nBlockXSize, nBlockXSize, poGDS->GetRasterCount() );
@@ -235,6 +239,7 @@ namespace scidb4gdal
         }*/
 
 
+    
 
 
     SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client ) : _array ( array ), _client ( client )
@@ -312,8 +317,9 @@ namespace scidb4gdal
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
-
-        ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename );
+	
+	SelectProperties* sp = new SelectProperties();
+        ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename, sp );
 
         // Create array metadata structure
         SciDBSpatialArray array;
@@ -656,7 +662,8 @@ namespace scidb4gdal
 
 
         // 1. parse connection string and extract the following values
-        ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
+        SelectProperties *sp = new SelectProperties();
+        ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr, sp );
         Utils::debug ( "Using connection parameters: host:" + pars->toString() );
 	
 //TODO remove
@@ -670,8 +677,8 @@ namespace scidb4gdal
         if ( pars->arrayname == "" ) Utils::error ( "No array specified, currently not supported" );
 
         // 3. Create shim client
-        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl, pars->properties);
-
+        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl, sp);
+	Utils::debug("Selected index: " + boost::lexical_cast<string>(sp->temp_index));
 
 
         SciDBSpatialArray array;
@@ -681,10 +688,10 @@ namespace scidb4gdal
             return NULL;
         }
 
-        if ( array.dims.size() != 2 ) {
-            Utils::error ( "GDAL works with two-dimensional arrays only" );
-            return NULL;
-        }
+//         if ( array.dims.size() != 2 ) {
+//             Utils::error ( "GDAL works with two-dimensional arrays only" );
+//             return NULL;
+//         }
 
 
 

@@ -55,7 +55,7 @@ namespace scidb4gdal
         curl_global_init ( CURL_GLOBAL_ALL );
     }
     
-    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false, ImageProperties *properties = NULL) : 
+    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false, SelectProperties *properties = NULL) : 
       _host ( host ), 
       _port ( port ), 
       _user ( user ), 
@@ -678,18 +678,7 @@ namespace scidb4gdal
 
 
 
-    /**
-     * Helper structure filled while fetching scidb binary stream
-     */
-    struct SingleAttributeChunk {
-        char *memory;
-        size_t size;
 
-        /*
-            template <typename T> T get ( int64_t i ) {
-                return ( ( T * ) memory ) [i]; // No overflow checks!
-            }*/
-    };
 
 
 
@@ -720,13 +709,10 @@ namespace scidb4gdal
     // TODO: This is inefficent for line-oriented formats, every line loads the same chunk repeatedly
     // TODO: Implement Chunk cache!
     StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max )
-    {
-// 	ImageProperties *p = this->_props;
-// 	std::stringstream sstm;
-// 	sstm << "Test 2: " << p->src_coords[0] << " " << p->src_coords[1]
-// 	   << " " << p->src_coords[2] << " " << p->src_coords[3]; 
-// 	string result = sstm.str();
-// 	Utils::debug(result);
+    {	
+	std::stringstream sstm;
+	sstm << "Fire getData in SHIM client with the following image coordinates " << x_min << " " << y_min << " " << x_max << " " << y_max;
+	Utils::debug(sstm.str());
 	
         if ( x_min < array.getXDim().low || x_min > array.getXDim().high ||
                 x_max < array.getXDim().low || x_max > array.getXDim().high ||
