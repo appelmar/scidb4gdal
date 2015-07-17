@@ -55,19 +55,19 @@ namespace scidb4gdal
         curl_global_init ( CURL_GLOBAL_ALL );
     }
     
-    ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false, SelectProperties *properties = NULL) : 
-      _host ( host ), 
-      _port ( port ), 
-      _user ( user ), 
-      _passwd ( passwd ), 
-      _ssl ( ssl ),  
-      _curl_handle ( 0 ), 
-      _curl_initialized ( false ), 
-      _auth ( "" ),
-      _props(properties)
-    {
-        curl_global_init ( CURL_GLOBAL_ALL );
-    }
+//     ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false, SelectProperties *properties = NULL) : 
+//       _host ( host ), 
+//       _port ( port ), 
+//       _user ( user ), 
+//       _passwd ( passwd ), 
+//       _ssl ( ssl ),  
+//       _curl_handle ( 0 ), 
+//       _curl_initialized ( false ), 
+//       _auth ( "" ),
+//       _props(properties)
+//     {
+//         curl_global_init ( CURL_GLOBAL_ALL );
+//     }
     
     ShimClient::~ShimClient()
     {

@@ -80,7 +80,7 @@ namespace scidb4gdal
          */
         ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl);
 	
-	ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl,SelectProperties* properties);
+	//ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl,SelectProperties* properties);
         /**
          * Default destructor f Shim clients.
          */
@@ -256,7 +256,7 @@ namespace scidb4gdal
         string      _user;
         string      _passwd;
         bool        _ssl;
-	SelectProperties *_props;
+	//SelectProperties *_props;
         CURL       *_curl_handle;
 
         bool _curl_initialized;

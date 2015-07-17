@@ -317,9 +317,8 @@ namespace scidb4gdal
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
-	
-	SelectProperties* sp = new SelectProperties();
-        ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename, sp );
+
+        ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename);
 
         // Create array metadata structure
         SciDBSpatialArray array;
@@ -640,7 +639,7 @@ namespace scidb4gdal
         Utils::debug ( "Deleting SciDB arrays from GDAL is currently not allowed..." );
         return CE_None;
     }
-
+  
 
     GDALDataset *SciDBDataset::Open ( GDALOpenInfo *poOpenInfo )
     {
@@ -662,22 +661,49 @@ namespace scidb4gdal
 
 
         // 1. parse connection string and extract the following values
-        SelectProperties *sp = new SelectProperties();
-        ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr, sp );
+        //TODO should be one function at the scidb driver
+        SelectProperties *sp;
+	ConnectionPars *pars;
+	
+	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
+	    Utils::error ( "This is not a scidb4gdal connection string" );
+	}
+	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
+	
+	//1. search for "properties=" in the string
+	string connectionString, propertiesString;
+	string propToken = "properties=";
+	int start = astr.find(propToken);
+	bool found = (start >= 0);
+	    
+	    
+	//if there then split it accordingly and fill the ConnectionPars and the SelectProperties
+	if (found) {
+	  // if we find the 'properties=' in the connection string we treat those string part as
+	  // the database open parameters 
+	  //TODO replace this somehow with the GDAL -oo options
+	  int end = start + propToken.length();
+	  connectionString = astr.substr(0,start-1);
+	  propertiesString = astr.substr(end,astr.length()-1);
+	  
+	  sp = SelectProperties::parsePropertiesString(propertiesString);
+	  //SelectProperties::parsePropertiesString(properties, propertiesString);
+	} else {
+	  connectionString = astr;
+	}
+	pars = ConnectionPars::parseConnectionString(connectionString);
+	
+	
+	
+        //ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
         Utils::debug ( "Using connection parameters: host:" + pars->toString() );
 	
-//TODO remove
-// 	std::stringstream sstm;
-// 	sstm << "Test 1: " << pars->properties->src_coords[0] << " " << pars->properties->src_coords[1]
-// 	   << " " << pars->properties->src_coords[2] << " " << pars->properties->src_coords[3];
-// 	string result = sstm.str();
-// 	Utils::debug( result );
 
         // 2. Check validity of parameters
         if ( pars->arrayname == "" ) Utils::error ( "No array specified, currently not supported" );
 
         // 3. Create shim client
-        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl, sp);
+        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl);
 	Utils::debug("Selected index: " + boost::lexical_cast<string>(sp->temp_index));
 
 

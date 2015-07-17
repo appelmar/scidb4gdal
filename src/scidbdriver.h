@@ -124,6 +124,7 @@ namespace scidb4gdal
 
         // Not yet implemented, important for create, does nothing...
         static CPLErr Delete ( const char *pszName );
+
     };
 
 

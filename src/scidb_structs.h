@@ -43,7 +43,12 @@ namespace scidb4gdal
         string name;
         vector<SciDBAttribute> attrs;
         vector<SciDBDimension> dims;
-
+	
+	/**
+	 * The resulting output will be like the following:
+	 * 'arrayname':<'dimname',min:max,type>['attributename',type,nullable]
+	 * The parts in the brackets can show multiple times.
+	 */
         string toString() {
             stringstream s;
             s << "'" << name << "'" << ":";
@@ -135,7 +140,11 @@ namespace scidb4gdal
         int _x_idx;
         int _y_idx;
 
-
+	/**
+	 * assigns the spatial indices. As default it uses x as the first
+	 * parameter in the dimension array (index 0) and y as the second
+	 * index (1)
+	 */
         void deriveDimensionIndexes() {
             _x_idx = 0;
             _y_idx = 1;
