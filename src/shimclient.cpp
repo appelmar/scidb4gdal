@@ -708,7 +708,7 @@ namespace scidb4gdal
 
     // TODO: This is inefficent for line-oriented formats, every line loads the same chunk repeatedly
     // TODO: Implement Chunk cache!
-    StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max )
+    StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index )
     {	
 	std::stringstream sstm;
 	sstm << "Fire getData in SHIM client with the following image coordinates " << x_min << " " << y_min << " " << x_max << " " << y_max;
@@ -746,12 +746,23 @@ namespace scidb4gdal
         // EXECUTE QUERY  ////////////////////////////
         ss.str();
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID;
-
+	
+	stringstream tslice;
+	
+	if (t_index < 0) {
+	  tslice << array.name;
+	} else {
+	  // if we have a temporal index, we need to slice the data set
+	  //TODO find the temporal dimension id by looking it up in the dimensions of the spatialArray
+	  tslice << "slice(" << array.name << ",t," << t_index << ")";
+	}
+	string arr = tslice.str();
+	
         stringstream afl;
         if ( x_idx > y_idx ) // TODO: need to check performance of differend ordering
-            afl << "transpose(project(between(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
+            afl << "transpose(project(between(" << arr << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
         else
-            afl << "project(between(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
+            afl << "project(between(" << arr << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
 
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
 

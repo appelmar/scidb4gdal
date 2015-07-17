@@ -54,7 +54,7 @@ namespace scidb4gdal
         * Default constructor for creating SciDBDataset instance for a given connectionstring
          * @param connstr string representation of a connection string, e.g. "SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"
          */
-        SciDBDataset ( SciDBSpatialArray array, ShimClient *client );
+        SciDBDataset ( SciDBSpatialArray array, ShimClient *client, SelectProperties *props );
 
         /**
          * Destructor for SciDBDatasets
@@ -124,6 +124,12 @@ namespace scidb4gdal
 
         // Not yet implemented, important for create, does nothing...
         static CPLErr Delete ( const char *pszName );
+	
+    protected:
+	/**
+	 * The selection properties are obtained from the connection string. Mainly used to store the temporal query index (3rd dimension parameter)
+	 */
+	SelectProperties *_query;
 
     };
 

@@ -126,7 +126,8 @@ namespace scidb4gdal
         Utils::debug(stream.str());
 	//TODO: Improve error handling
         SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
-
+	int t_index = poGDS->_query->temp_index;
+	
         uint32_t tileId = TileCache::getBlockId ( nBlockXOff, nBlockYOff, nBand - 1, nBlockXSize, nBlockXSize, poGDS->GetRasterCount() );
 
         ArrayTile tile;
@@ -157,13 +158,13 @@ namespace scidb4gdal
 
             // Last blocks must be treated separately if covering area outside actual array: (0 | 1 | 2 | 3 || 4 | 5 | 6 | 7) vs. (0 | 1 | - | - || 3 | 4 | - | -) for 4x2 block with only 2x2 data
             // TODO: Check whether this works also for nBlockXSize != nBlockYSize
-            if ( ( nBlockXOff + 1 ) *this->nBlockXSize > poGDS->nRasterXSize ) {
+            if ( ( nBlockXOff + 1 ) * this->nBlockXSize > poGDS->nRasterXSize ) { //end of the blocks bigger than the whole image, then fetch next block row
                 // This is a bit of a hack...
                 size_t dataSize = ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // This is smaller than the block size!
                 void *buf = malloc ( dataSize );
 
                 // Write to temporary buffer first
-                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax ); // GDAL bands start with 1, scidb attribute indexes with 0
+                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, t_index ); // GDAL bands start with 1, scidb attribute indexes with 0
                 for ( uint32_t i = 0; i < ( 1 + xmax - xmin ); ++i ) {
                     uint8_t *src  = & ( ( uint8_t * ) buf ) [i * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
                     // TODO: In the following call, check whether this->nBlockXSize must be replaced with this->nBlockYSize for unequally sized chunk dimensions
@@ -172,7 +173,7 @@ namespace scidb4gdal
                 }
                 free ( buf );
             }
-            else poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax ); // GDAL bands start with 1, scidb attribute indexes with 0
+            else poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax, t_index ); // GDAL bands start with 1, scidb attribute indexes with 0
 
             poGDS->_cache.add ( tile ); // Add to cache
 
@@ -242,7 +243,7 @@ namespace scidb4gdal
     
 
 
-    SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client ) : _array ( array ), _client ( client )
+    SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client, SelectProperties *props ) : _array ( array ), _client ( client ), _query(props)
     {
 
 
@@ -687,7 +688,6 @@ namespace scidb4gdal
 	  propertiesString = astr.substr(end,astr.length()-1);
 	  
 	  sp = SelectProperties::parsePropertiesString(propertiesString);
-	  //SelectProperties::parsePropertiesString(properties, propertiesString);
 	} else {
 	  connectionString = astr;
 	}
@@ -713,11 +713,12 @@ namespace scidb4gdal
             Utils::error ( "Cannot fetch array metadata" );
             return NULL;
         }
-
-//         if ( array.dims.size() != 2 ) {
-//             Utils::error ( "GDAL works with two-dimensional arrays only" );
-//             return NULL;
-//         }
+	
+	//TODO check also if temporal index is within time dimension range
+        if ( array.dims.size() > 2  && sp->temp_index < 0) {
+            Utils::error ( "No time statement defined in the connection string. Can't decide which image to fetch in the temporal data set." );
+            return NULL;
+        }
 
 
 
@@ -727,7 +728,7 @@ namespace scidb4gdal
         // Create the dataset
 
         SciDBDataset *poDS;
-        poDS = new SciDBDataset ( array, client );
+        poDS = new SciDBDataset ( array, client, sp );
         return ( poDS );
     }
 
