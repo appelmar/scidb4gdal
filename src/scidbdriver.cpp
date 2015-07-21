@@ -126,6 +126,8 @@ namespace scidb4gdal
         Utils::debug(stream.str());
 	//TODO: Improve error handling
         SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
+	
+	//TODO for interval queries make adaptions here
 	int t_index = poGDS->_query->temp_index;
 	
         uint32_t tileId = TileCache::getBlockId ( nBlockXOff, nBlockYOff, nBand - 1, nBlockXSize, nBlockXSize, poGDS->GetRasterCount() );
@@ -659,8 +661,6 @@ namespace scidb4gdal
             return NULL;
         }
 
-
-
         // 1. parse connection string and extract the following values
         //TODO should be one function at the scidb driver
         SelectProperties *sp;
@@ -689,11 +689,20 @@ namespace scidb4gdal
 	  
 	  sp = SelectProperties::parsePropertiesString(propertiesString);
 	} else {
+	  sp = new SelectProperties();
+	  sp->temp_index = -1;
 	  connectionString = astr;
 	}
 	pars = ConnectionPars::parseConnectionString(connectionString);
 	
-	
+	//check if the temporal index was set (index > 0). if not it might be stated in the open options
+	if (sp->temp_index < 0) {
+	char* t_index_key = "t";
+	  if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
+	    string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions,t_index_key);
+	    sp->temp_index = boost::lexical_cast<int>(value);
+	  } 
+	}
 	
         //ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
         Utils::debug ( "Using connection parameters: host:" + pars->toString() );
@@ -704,8 +713,6 @@ namespace scidb4gdal
 
         // 3. Create shim client
         ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl);
-	Utils::debug("Selected index: " + boost::lexical_cast<string>(sp->temp_index));
-
 
         SciDBSpatialArray array;
         // 4. Request array metadata
@@ -715,11 +722,25 @@ namespace scidb4gdal
         }
 	
 	//TODO check also if temporal index is within time dimension range
-        if ( array.dims.size() > 2  && sp->temp_index < 0) {
-            Utils::error ( "No time statement defined in the connection string. Can't decide which image to fetch in the temporal data set." );
-            return NULL;
-        }
-
+	if (array.dims.size() > 2) {
+	  if ( sp->temp_index < 0) {
+	      Utils::error ( "No time statement defined in the connection string. Can't decide which image to fetch in the temporal data set." );
+	      return NULL;
+	  } else {
+	      //get dimension for time
+	      SciDBDimension *dim;
+	      for (int i = 0; i < array.dims.size(); i++) {
+		  SciDBDimension *cur = &array.dims.at(i);
+		  if (cur->name.compare("t") == 0) {
+		    dim = cur;
+		  }
+	      }
+	      if (sp->temp_index < dim->low || sp->temp_index > dim->high) {
+		  Utils::error ( "Specified temporal index out of bounces." );
+		  return NULL;
+	      }
+	  }
+	}
 
 
         delete pars;

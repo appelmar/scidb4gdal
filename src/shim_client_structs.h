@@ -22,7 +22,7 @@ namespace scidb4gdal {
     
     struct SelectProperties {
 	  float src_coords [4]; //usually image coordinates in the order xmin,ymin,xsize,ysize
-	  int temp_index = -1;
+	  int temp_index;
 	  
 	  static SelectProperties* parsePropertiesString ( const string &propstr ) {
 	      SelectProperties *properties = new SelectProperties();

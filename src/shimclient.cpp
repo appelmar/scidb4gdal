@@ -710,9 +710,9 @@ namespace scidb4gdal
     // TODO: Implement Chunk cache!
     StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index )
     {	
-	std::stringstream sstm;
-	sstm << "Fire getData in SHIM client with the following image coordinates " << x_min << " " << y_min << " " << x_max << " " << y_max;
-	Utils::debug(sstm.str());
+// 	std::stringstream sstm;
+// 	sstm << "Fire getData in SHIM client with the following image coordinates " << x_min << " " << y_min << " " << x_max << " " << y_max;
+// 	Utils::debug(sstm.str());
 	
         if ( x_min < array.getXDim().low || x_min > array.getXDim().high ||
                 x_max < array.getXDim().low || x_max > array.getXDim().high ||
@@ -736,7 +736,7 @@ namespace scidb4gdal
 
         int sessionID = newSession();
 
-
+      
 
         /* Depending on dimension ordering, array must be transposed. Since GDAL assumes latitude / northing dimension
          * to move fastest, an array must be transposed if dimension order is (lat, lon). */
