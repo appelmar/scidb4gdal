@@ -245,7 +245,7 @@ namespace scidb4gdal
     
 
 
-    SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client, SelectProperties *props ) : _array ( array ), _client ( client ), _query(props)
+    SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client, TemporalQueryParameters *props ) : _array ( array ), _client ( client ), _query(props)
     {
 
 
@@ -321,7 +321,11 @@ namespace scidb4gdal
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
 
-        ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename);
+        ConnectionPars *pars = new ConnectionPars();
+	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
+	pars->parseOpeningOptions(info);
+        
+//         parseConnectionString ( pszFilename);
 
         // Create array metadata structure
         SciDBSpatialArray array;
@@ -661,23 +665,32 @@ namespace scidb4gdal
             return NULL;
         }
 
+        
         // 1. parse connection string and extract the following values
         //TODO should be one function at the scidb driver
-        SelectProperties *sp;
-	ConnectionPars *pars;
+        TemporalQueryParameters *sp;
+	ConnectionPars *pars = new ConnectionPars();
 	
 	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
 	    Utils::error ( "This is not a scidb4gdal connection string" );
 	}
 	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
 	
+	//find the array name
+	// check if there are statements at the end like <t,1> meaning that we want to query a specific time
+	// if the statement is not found proceed
+	// if the statement is found, then extract the temporal information out of the "<" ">" statement
+	// check whether or not the temporal query consists of an interval start:end or a single value
+	// if interval... currently not supported
+	// else check if temporal index is in range
+	// if it is then set the index in the selection properties
+	
 	//1. search for "properties=" in the string
 	string connectionString, propertiesString;
 	string propToken = "properties=";
 	int start = astr.find(propToken);
 	bool found = (start >= 0);
-	    
-	    
+	
 	//if there then split it accordingly and fill the ConnectionPars and the SelectProperties
 	if (found) {
 	  // if we find the 'properties=' in the connection string we treat those string part as
@@ -686,14 +699,17 @@ namespace scidb4gdal
 	  int end = start + propToken.length();
 	  connectionString = astr.substr(0,start-1);
 	  propertiesString = astr.substr(end,astr.length()-1);
-	  
-	  sp = SelectProperties::parsePropertiesString(propertiesString);
+	  sp = TemporalQueryParameters::parsePropertiesString(propertiesString);
 	} else {
-	  sp = new SelectProperties();
-	  sp->temp_index = -1;
+	  sp = new TemporalQueryParameters();
 	  connectionString = astr;
 	}
-	pars = ConnectionPars::parseConnectionString(connectionString);
+	
+	
+	//first extract information from connection string and afterwards check for the opening options and overwrite values if double
+	pars->parseConnectionString(connectionString);
+	pars->parseOpeningOptions(poOpenInfo);
+	sp->parseArrayName(pars->arrayname);
 	
 	//check if the temporal index was set (index > 0). if not it might be stated in the open options
 	if (sp->temp_index < 0) {
@@ -703,13 +719,15 @@ namespace scidb4gdal
 	    sp->temp_index = boost::lexical_cast<int>(value);
 	  } 
 	}
-	
+		
         //ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
-        Utils::debug ( "Using connection parameters: host:" + pars->toString() );
-	
+        Utils::debug ( "Using connection parameters:" + pars->toString() );
 
         // 2. Check validity of parameters
-        if ( pars->arrayname == "" ) Utils::error ( "No array specified, currently not supported" );
+        if ( pars->arrayname == "" ) {
+	  Utils::error ( "No array specified, currently not supported" );
+	  return NULL;
+	}
 
         // 3. Create shim client
         ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl);
