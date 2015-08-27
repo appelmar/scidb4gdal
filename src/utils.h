@@ -26,7 +26,7 @@ SOFTWARE.
 #define UTILS_H
 
 #include <cmath>
-
+#include <cfloat>
 
 #define SCIDB4GDAL_DEFAULT_XDIMNAME "x"
 #define SCIDB4GDAL_DEFAULT_YDIMNAME "y"
