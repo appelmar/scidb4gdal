@@ -45,9 +45,12 @@ namespace scidb4gdal
     {
         friend class SciDBRasterBand;
 
+    private:
         SciDBSpatialArray _array; //!< associated array metadata object
         ShimClient *_client; //!< associated shim client metadata object
         TileCache _cache;
+	
+	char** papszMetadata;
 
     public:
         /**
@@ -91,6 +94,19 @@ namespace scidb4gdal
          */
         const char *GetProjectionRef();
 
+	
+	char ** GetMetadata ( const char * pszDomain = "");
+	
+	//CPLErr SetMetadataItem ( const char * pszName, const char * pszValue, const char *  pszDomain = "");
+	
+	//CPLErr SetMetadata ( char **  papszMetadataIn, const char * pszDomain = "");
+	
+	const char * GetMetadataItem (const char * pszName,const char * pszDomain = "");
+	
+	
+	
+	
+	
 
         /**
          * Sets an array's affine transformation for converting image to world coordinates
@@ -124,6 +140,13 @@ namespace scidb4gdal
 
         // Not yet implemented, important for create, does nothing...
         static CPLErr Delete ( const char *pszName );
+	
+	
+    protected:
+      
+      static void gdalMDtoMap(char **strlist, map<string,string> &kv);
+      static  char** mapToGdalMD(map<string,string> &kv);
+	
     };
 
 
@@ -138,6 +161,7 @@ namespace scidb4gdal
         friend class SciDBDataset;
 
         SciDBSpatialArray *_array; //!< associated array metadata object
+        char** papszMetadata;
 
     public:
 
@@ -168,6 +192,18 @@ namespace scidb4gdal
         virtual CPLErr GetStatistics ( int bApproxOK, int bForce, double *pdfMin, double *pdfMax, double *pdfMean, double *pdfStdDev );
 
 
+
+        virtual double GetNoDataValue ( int *pbSuccess = NULL );
+
+        virtual double  GetMinimum ( int *pbSuccess = NULL );
+
+        virtual double  GetMaximum ( int *pbSuccess = NULL );
+
+        virtual double  GetOffset ( int *pbSuccess = NULL );
+
+        virtual double  GetScale ( int *pbSuccess = NULL );
+
+	virtual const char *GetUnitType ();
 
     };
 

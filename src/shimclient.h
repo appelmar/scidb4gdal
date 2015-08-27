@@ -33,6 +33,7 @@ SOFTWARE.
 #include <inttypes.h>
 #include <sstream>
 #include <stack>
+#include <map>
 
 
 #include "affinetransform.h"
@@ -59,6 +60,9 @@ namespace scidb4gdal
 
     using namespace std;
 
+    typedef map<string, string>   MD;
+    typedef map<string, MD>      DomainMD;
+
     /**
      * A structure for storing metadata of a SciDB array attribute
      */
@@ -66,6 +70,7 @@ namespace scidb4gdal
         string name;
         string typeId;
         bool nullable;
+        DomainMD md;
     };
 
     struct SciDBAttributeStats {
@@ -81,6 +86,8 @@ namespace scidb4gdal
         int64_t high;
         uint32_t chunksize;
         string typeId;
+        int64_t start;
+        int64_t length;
 
     };
 
@@ -92,6 +99,7 @@ namespace scidb4gdal
         string name;
         vector<SciDBAttribute> attrs;
         vector<SciDBDimension> dims;
+        DomainMD md;
 
         string toString() {
             stringstream s;
@@ -266,7 +274,7 @@ namespace scidb4gdal
         * @param ymax upper boundary, we assume y to be "northing" which is different from GDAL!
         * @return status code
         */
-        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
+        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, bool use_subarray = true, bool emptycheck = false );
 
 
         /**
@@ -309,11 +317,11 @@ namespace scidb4gdal
         StatusCode createTempArray ( SciDBSpatialArray &array );
 
         /**
-            *  Copies scidb arrays, used for persisting temporary load arrays
-            * @param src array name of the source array
+        *  Copies scidb arrays, used for persisting temporary load arrays
+        * @param src array name of the source array
         * @param dest array name of the target array
-            * @return status code
-            */
+        * @return status code
+        */
         StatusCode copyArray ( string src, string dest );
 
         /**
@@ -351,6 +359,19 @@ namespace scidb4gdal
         * @param out output, true if array already exists in SciDB
         */
         StatusCode arrayExists ( const string &inArrayName, bool &out );
+
+
+
+        StatusCode setArrayMD ( string arrayname, map<string, string> kv, string domain = "" );
+
+        StatusCode getArrayMD ( map<string, string> &kv, string arrayname, string domain = "" );
+
+        StatusCode setAttributeMD ( string arrayname, string attribute, map<string, string> kv, string domain = "" );
+
+        StatusCode getAttributeMD ( map<string, string> &kv, string arrayname, string attribute,  string domain = "" );
+
+
+
 
 
     protected:

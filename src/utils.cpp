@@ -128,6 +128,35 @@ namespace scidb4gdal
 
 
 
+        double defaultNoDataGDAL ( GDALDataType type )
+        {
+            switch ( type ) {
+            case ( GDT_UInt16 ) :
+                return SCIDB4GDAL_DEFAULTNODATA_UINT16;
+            case ( GDT_UInt32 ) :
+                return SCIDB4GDAL_DEFAULTNODATA_UINT32;
+            case ( GDT_Int16 ) :
+                return SCIDB4GDAL_DEFAULTNODATA_INT16;
+            case ( GDT_Int32 ) :
+                return SCIDB4GDAL_DEFAULTNODATA_INT32;
+            case ( GDT_Byte ) :
+                return SCIDB4GDAL_DEFAULTNODATA_UINT8;
+            case ( GDT_Float32 ) :
+                return SCIDB4GDAL_DEFAULTNODATA_FLOAT;
+            case ( GDT_Float64 ) :
+                return SCIDB4GDAL_DEFAULTNODATA_DOUBLE;
+            default:
+                return 0;
+            }
+            return 0;
+        }
+
+        double defaultNoDataSciDB ( const string &typeId )
+        {
+            return defaultNoDataGDAL ( scidbTypeIdToGDALType ( typeId ) );
+        }
+
+
         void sleep ( long int ms )
         {
 #ifdef WIN32
