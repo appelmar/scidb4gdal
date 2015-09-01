@@ -9,6 +9,8 @@ Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensi
 The driver offers support for reading and writing SciDB arrays. Update access to existing arrays is currently not implemented but planned for future releases.
 
 ## News
+- (2015-09-01)
+    - Driver now compiles under Windows
 - (2015-08-27)
 	- Support for empty SciDB cells (will be filled with NoData value) added
 	- Fixed dimension mismatch between GDAL and SciDB
@@ -50,6 +52,7 @@ The following examples demonstrate how you can use gdal_translate to load / read
 
 
 ## Build Instructions
+
 The following instructions show you how to compile GDAL with added SciDB driver on Unix environments.
 
 1. Download GDAL source
@@ -64,17 +67,29 @@ The following instructions show you how to compile GDAL with added SciDB driver 
 
 If you get some missing include file errors, you need to install Boost manually. Either use your distribution's package manager e.g. `sudo apt-get install libboost-dev` or simply copy Boost header files to a standard include directory like `/usr/include`.
 
-Windows build instructions will follow.
-<!--
 
-The following instructions demonstrate how to compile GDAL with added SciDB driver on Windows using Visual Studio.  Detailed information for tweaking windows builds can be found at http://trac.osgeo.org/gdal/wiki/BuildingOnWindows.
 
-We recommend the [OSGeo4W](http://trac.osgeo.org/osgeo4w/) network installer for managing and installing GIS libraries on Windows.
-Before you 
 
-1. Do steps 1 to 4 as above.
-2. Add a corresponding entry to `EXTRAFLAGS` in `GDAL_SRC_DIR/frmts/makefile.vc`
-3. Edit `GDAL_SRC_DIR/nmake.opt` to fit your needs and environment. In particular, you should uncomment references to curl.
-4. Open a command line. Depending on the location you want to install GDAL to, do that as administrator
-5. 
--->
+### Build on Windows
+
+The following instructions demonstrate how to compile GDAL with added SciDB driver on Windows using Visual Studio 2013.  
+Detailed information for tweaking windows builds can be found at http://trac.osgeo.org/gdal/wiki/BuildingOnWindows.
+We recommend the [OSGeo4W](http://trac.osgeo.org/osgeo4w/) network installer for managing and installing external GIS libraries on Windows. 
+In particular this allows you to easily install curl and boost development libraries that are needed to compile this driver.
+ 
+1. Download GDAL source
+2. Clone this repository
+3. Copy the `src` directory of your clone to `GDAL_SRC_DIR/frmts` and rename it `scidb`
+4. Add driver to GDAL source tree (see http://www.gdal.org/gdal_drivertut.html#gdal_drivertut_addingdriver):
+    1. Add `GDALRegister_SciDB()`to `GDAL_SRC_DIR/gcore/gdal_frmts.h`
+    2. Add call to `GDALRegister_SciDB()` in `GDAL_SRC_DIR/frmts/gdalallregister.cpp` within `#ifdef FRMT_scidb`
+    3. Open `GDAL_SRC_DIR/frmts/makefile.vc` and add `-DFRMT_scidb`  within the `!IFDEF CURL_LIB` block
+5. Setup external include and library paths
+    1. Uncomment lines to set `CURL_INC` and `CURL_LIB` in `GDAL_SRC_DIR/nmake.opt`
+    2. Edit link to Boost header directory in `GDAL_SRC_DIR/frmts/scidb/makefile.vc`
+6. Start a command line 
+    1. Change directory to the GDAL source `cd GDAL_SRC_DIR`
+	2. Load Visual studio command line tools e.g. by running `"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\vcvarsx86_amd64.bat"
+` for x64 builds using Visual Studio 2013
+    3. Run nmake e.g. `nmake /f makefile.vc MSVC_VER=1800 WIN64=YES`
+ 

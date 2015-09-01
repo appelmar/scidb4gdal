@@ -133,7 +133,7 @@ namespace scidb4gdal
     {
         if ( _inv == NULL ) {
             double d = det();
-            if ( fabs ( d ) < __DBL_EPSILON__ ) {
+            if ( fabs ( d ) < DBL_EPSILON ) {
                 Utils::error ( "Affine transformation not invertible, det=0" );
             }
             double d1 = 1 / d;
@@ -155,7 +155,7 @@ namespace scidb4gdal
     {
         if ( _inv == NULL ) {
             double d = det();
-            if ( fabs ( d ) < __DBL_EPSILON__ ) {
+            if ( fabs ( d ) < DBL_EPSILON ) {
                 Utils::error ( "Affine transformation not invertible, det=0" );
             }
             double d1 = 1 / d;
@@ -176,7 +176,7 @@ namespace scidb4gdal
     {
         if ( _inv == NULL ) {
             double d = det();
-            if ( fabs ( d ) < __DBL_EPSILON__ ) {
+            if ( fabs ( d ) < DBL_EPSILON ) {
                 Utils::error ( "Affine transformation not invertible, det=0" );
             }
             double d1 = 1 / d;
