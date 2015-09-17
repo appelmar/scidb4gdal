@@ -1,7 +1,7 @@
 
 include ../../GDALmake.opt
 
-OBJ	=	scidbdriver.o shimclient.o utils.o affinetransform.o tilecache.o
+OBJ	=	scidbdriver.o shimclient.o utils.o affinetransform.o tilecache.o TemporalReference.o
 
 CPPFLAGS	:=	$(GDAL_INCLUDE) $(CPPFLAGS) $(CURL_INC)
 

@@ -25,11 +25,14 @@ SOFTWARE.
 #include "shimclient.h"
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
+#include "TemporalReference.h"
+#include "scidb_structs.h"
 
 
 namespace scidb4gdal
 {
-
+    using namespace scidb4geo;
+    
     ShimClient::ShimClient() : 
       _host ( "https://localhost" ), 
       _port ( 8083 ), _user ( "scidb" ), 
@@ -397,17 +400,10 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
-
-
     StatusCode ShimClient::getDimensionDesc ( const string &inArrayName, vector< SciDBDimension> &out )
     {
-
         out.clear();
-
+	
         int sessionID = newSession();
 
         string response;
@@ -517,10 +513,6 @@ namespace scidb4gdal
 
     StatusCode ShimClient::getSRSDesc ( const string &inArrayName, SciDBSpatialReference &out )
     {
-
-
-
-
         int sessionID = newSession();
         string response;
 
@@ -615,17 +607,92 @@ namespace scidb4gdal
         return SUCCESS;
 
     }
+    
+    StatusCode  ShimClient::getTRSDesc (const string &inArrayName, SciDBTemporalReference &out) {
+      int sessionID = newSession();
+        string response;
+
+	//st_gettrs query preparation
+        {
+            curlBegin();
+            stringstream ss;
+            stringstream afl;
+            afl << "project(st_gettrs(" << inArrayName << "),tdim,t0,dt)"; 
+            Utils::debug ( "Performing AFL Query: " +  afl.str() );
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "csv";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            response = "";
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+            if ( curlPerform() != CURLE_OK ) {
+                curlEnd();
+                Utils::warn ( "Cannot find spatial reference information for array '" + inArrayName + "'" );
+                return ERR_SRS_NOSPATIALREFFOUND;
+            };
+            curlEnd();
+        }
+
+	//st_gettrs call
+        {
+            curlBegin();
+            stringstream ss;
+            // READ BYTES  ////////////////////////////
+            ss.str ( "" );
+            ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+
+            response = "";
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+            if ( curlPerform() != CURLE_OK ) {
+                curlEnd();
+                Utils::warn ( "Cannot read temporal reference information for array '" + inArrayName + "'" );
+                return ERR_SRS_NOSPATIALREFFOUND;
+            };
+            curlEnd();
+        }
 
 
+        // Parse CSV
 
+        vector<string> rows;
+        boost::split ( rows, response, boost::is_any_of ( "\n" ) );
+	
+	if (rows.size() > 2) {
+	  string row = rows[1]; //TODO ensure that rows has more than 1 row (more than header)
+	  vector <string> cols;
+	  int cur_start = -1;
+	  for ( uint32_t i = 0; i < row.length(); ++i ) { // Find items between single quotes 'XXX', only works if all SciDB attributes of query result are strings
+	      if ( row[i] == '\'' ) {
+		  if ( cur_start < 0 ) cur_start = i;
+		  else {
+		      cols.push_back ( row.substr ( cur_start + 1, i - cur_start - 1 ) );
+		      cur_start = -1;
 
+		  }
+	      }
+	  }
+	  {
+	      out.tdim = cols[0];
+	      TPoint *p = new TPoint(cols[1]);
+	      TInterval *i = new TInterval(cols[2]);	      
+	      out.setTPoint(p);
+	      out.setTInterval(i);
 
+	  }
+	}
+        releaseSession ( sessionID );
 
+        return SUCCESS;
 
+    }
 
-
-
-    StatusCode  ShimClient::getArrayDesc ( const string &inArrayName, SciDBSpatialArray &out )
+    StatusCode  ShimClient::getArrayDesc ( const string &inArrayName, SciDBSpatioTemporalArray &out )
     {
         bool exists;
         arrayExists ( inArrayName, exists );
@@ -652,22 +719,14 @@ namespace scidb4gdal
             return res;
         }
 
-        /* Get spatial metadata: project(st_getsrs(chicago2),name,xdim,ydim,srtext); If array is not spatially referenced,
-        a default srs instance is used (representing nonspatial) */
-
-        //  try {
         SciDBSpatialReference srs;
-        getSRSDesc ( inArrayName, srs );
-        out.affineTransform = srs.affineTransform;
-        out.xdim = srs.xdim;
-        out.ydim = srs.ydim;
-        out.proj4text = srs.proj4text;
-        out.srtext = srs.srtext;
-//         }
-//         catch ( ... ) { // if spatial reference system retreival failed for whatever reason, ignore it
-//             out.affineTransform = ( new AffineTransform() )->toString();
-//             out.ydim  =  out.xdim  = out.proj4text  = out.srtext = "";
-//         }
+	SciDBTemporalReference trs;
+	/*
+	 * Make calls for metadata. First try to get the spatial reference system, then try to get the temporal rs
+	 */
+        getSRSDesc ( inArrayName, out );
+	getTRSDesc ( inArrayName, out );
+
 
 
 
@@ -702,12 +761,6 @@ namespace scidb4gdal
     }
 
 
-
-
-
-
-    // TODO: This is inefficent for line-oriented formats, every line loads the same chunk repeatedly
-    // TODO: Implement Chunk cache!
     StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index )
     {	
 // 	std::stringstream sstm;
