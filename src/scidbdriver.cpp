@@ -74,7 +74,6 @@ void GDALRegister_SciDB()
 }
 
 
-
 namespace scidb4gdal
 {
 
@@ -323,7 +322,7 @@ namespace scidb4gdal
 
         ConnectionPars *pars = new ConnectionPars();
 	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
-	pars->parseOpeningOptions(info);
+	parseOpeningOptions(info, pars);
         
 //         parseConnectionString ( pszFilename);
 
@@ -606,9 +605,7 @@ namespace scidb4gdal
         FlushCache();
         delete _client;
     }
-
-
-
+    
 
     CPLErr SciDBDataset::GetGeoTransform ( double *padfTransform )
     {
@@ -622,13 +619,11 @@ namespace scidb4gdal
     }
 
 
-
     const char *SciDBDataset::GetProjectionRef()
     {
         return _array.srtext.c_str();
     }
-
-
+    
 
 
     int SciDBDataset::Identify ( GDALOpenInfo *poOpenInfo )
@@ -668,7 +663,7 @@ namespace scidb4gdal
         
         // 1. parse connection string and extract the following values
         //TODO should be one function at the scidb driver
-        TemporalQueryParameters *sp;
+        TemporalQueryParameters *sp = new TemporalQueryParameters();
 	ConnectionPars *pars = new ConnectionPars();
 	
 	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
@@ -676,85 +671,72 @@ namespace scidb4gdal
 	}
 	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
 	
-	//find the array name
-	// check if there are statements at the end like <t,1> meaning that we want to query a specific time
-	// if the statement is not found proceed
-	// if the statement is found, then extract the temporal information out of the "<" ">" statement
-	// check whether or not the temporal query consists of an interval start:end or a single value
-	// if interval... currently not supported
-	// else check if temporal index is in range
-	// if it is then set the index in the selection properties
-	
 	//1. search for "properties=" in the string
 	string connectionString, propertiesString;
-	string propToken = "properties=";
-	int start = astr.find(propToken);
-	bool found = (start >= 0);
 	
-	//if there then split it accordingly and fill the ConnectionPars and the SelectProperties
-	if (found) {
-	  // if we find the 'properties=' in the connection string we treat those string part as
-	  // the database open parameters 
-	  //TODO replace this somehow with the GDAL -oo options
-	  int end = start + propToken.length();
-	  connectionString = astr.substr(0,start-1);
-	  propertiesString = astr.substr(end,astr.length()-1);
-	  sp = TemporalQueryParameters::parsePropertiesString(propertiesString);
-	} else {
-	  sp = new TemporalQueryParameters();
-	  connectionString = astr;
+	if (splitPropertyString(astr, connectionString, propertiesString)){
+	  parsePropertiesString(propertiesString, sp);
 	}
-	
 	
 	//first extract information from connection string and afterwards check for the opening options and overwrite values if double
-	pars->parseConnectionString(connectionString);
-	pars->parseOpeningOptions(poOpenInfo);
-	sp->parseArrayName(pars->arrayname);
+	parseConnectionString(connectionString, pars);
+	parseOpeningOptions(poOpenInfo, pars);
 	
-	//check if the temporal index was set (index > 0). if not it might be stated in the open options
-	if (sp->temp_index < 0) {
-	char* t_index_key = "t";
-	  if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
-	    string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions,t_index_key);
-	    sp->temp_index = boost::lexical_cast<int>(value);
-	  } 
-	}
-		
-        //ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
-        Utils::debug ( "Using connection parameters:" + pars->toString() );
-
-        // 2. Check validity of parameters
+	parseArrayName(pars->arrayname, sp); //array name will be modified if a temporal query is detected (for the ConnectionPars)
+	
+	// 2. Check validity of parameters
         if ( pars->arrayname == "" ) {
 	  Utils::error ( "No array specified, currently not supported" );
 	  return NULL;
 	}
-
+	
+        //ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
+        Utils::debug ( "Using connection parameters:" + pars->toString() );
+	
         // 3. Create shim client
         ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl);
 
-        SciDBSpatialArray array;
+        SciDBSpatioTemporalArray array;
         // 4. Request array metadata
         if ( client->getArrayDesc ( pars->arrayname, array ) != SUCCESS ) {
             Utils::error ( "Cannot fetch array metadata" );
             return NULL;
         }
 	
+		//check if the temporal index was set or if a timestamp was used
+	if (sp->hasTemporalIndex) {
+	  char* t_index_key = new char[1];
+	  t_index_key[0] = 't';
+	  if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
+	    string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions,t_index_key);
+	    sp->temp_index = boost::lexical_cast<int>(value);
+	  } 
+	} else {
+
+	  //convert date to temporal index
+	  TPoint time = TPoint(sp->timestamp);
+	  sp->temp_index = array.indexAtDatetime(time);
+	  sp->hasTemporalIndex = true;
+	}
+	
+	
+	
+	
 	//TODO check also if temporal index is within time dimension range
 	if (array.dims.size() > 2) {
-	  if ( sp->temp_index < 0) {
-	      Utils::error ( "No time statement defined in the connection string. Can't decide which image to fetch in the temporal data set." );
-	      return NULL;
+	  if ( !array.isTemporal() ) {
+	      Utils::debug ( "No time statement defined in the connection string. Can't decide which image to fetch in the temporal data set." );
+// 	      return NULL;
 	  } else {
 	      //get dimension for time
 	      SciDBDimension *dim;
-	      for (int i = 0; i < array.dims.size(); i++) {
-		  SciDBDimension *cur = &array.dims.at(i);
-		  if (cur->name.compare("t") == 0) {
-		    dim = cur;
-		  }
-	      }
+	      dim = &array.dims[array.getTDimIdx()];
+
 	      if (sp->temp_index < dim->low || sp->temp_index > dim->high) {
-		  Utils::error ( "Specified temporal index out of bounces." );
+		  Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(sp->temp_index) +
+		  ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + array.datetimeAtIndex(dim->low).toStringISO() + "), " +
+		    "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + array.datetimeAtIndex(dim->high).toStringISO() + ")"
+		  );
 		  return NULL;
 	      }
 	  }
@@ -770,7 +752,198 @@ namespace scidb4gdal
         poDS = new SciDBDataset ( array, client, sp );
         return ( poDS );
     }
+    
+    bool SciDBDataset::splitPropertyString (string &input, string &constr, string &propstr) {
+      	string propToken = "properties=";
+	int start = input.find(propToken);
+	bool found = (start >= 0);
 
+	//if there then split it accordingly and fill the ConnectionPars and the SelectProperties
+	if (found) {
+	  // if we find the 'properties=' in the connection string we treat those string part as
+	  // the database open parameters 
+	  int end = start + propToken.length();
+	  constr = input.substr(0,start-1);
+	  propstr = input.substr(end,input.length()-1);
+	  
+	} else {
+	  constr = input;
+	}
+	return found;
+    }
 
-
+    void SciDBDataset::parsePropertiesString ( const string &propstr, TemporalQueryParameters* query ) {
+      //mapping between the constant variables and their string representation for using a switch/case statement later
+      std::map<string,Properties> propResolver = map_list_of ("t",T_INDEX);
+      vector<string> parts;
+      boost::split ( parts, propstr, boost::is_any_of ( ";" ) ); // Split at semicolon and comma for refering to a whole KVP
+      //example for filename with properties variable    "src_win:0 0 50 50;..."
+      for ( vector<string>::iterator it = parts.begin(); it != parts.end(); ++it ) {
+	vector<string> kv, c;
+	boost::split ( kv, *it, boost::is_any_of ( ":=" ) ); 
+	if ( kv.size() < 2 ) {
+	  continue;
+	} else {
+	  if(propResolver.find(std::string(kv[0])) != propResolver.end()) {
+	    switch(propResolver[kv[0]]) {
+	      case T_INDEX:
+		query->temp_index = boost::lexical_cast<int>(kv[1]);
+		//TODO maybe we allow also selecting multiple slices (that will later be saved separately as individual files)
+		break;
+	      default:
+		continue;
+		
+	    }
+	  } else {
+	    Utils::debug("unused parameter \""+string(kv[0])+ "\" with value \""+string(kv[1])+"\"");
+	  }
+	}
+      }
+    }
+    
+    void SciDBDataset::parseArrayName (string& array, TemporalQueryParameters* query) {
+      // 	  string array = pars->arrayname;
+      size_t length = array.size();
+      size_t t_start = array.find_first_of('[');
+      size_t t_end = array.find_last_of(']');
+      
+      if (t_start < 0 || t_end < 0) {
+	Utils::error("No or invalid temporal information in array name.");
+	return;
+      }
+      //extract temporal string
+      if ((length-1) == t_end) {
+	string t_expression = array.substr(t_start+1,(t_end-t_start)-1);
+	//remove the temporal part of the array name otherwise it messes up the concrete array name in scidb
+	string temp = array.substr(0,t_start);
+	array = temp;
+	vector<string> kv;
+	
+	boost::split(kv, t_expression, boost::is_any_of(","));
+	if (kv.size() < 2) {
+	  Utils::error("Temporal query not complete. Please state the dimension name and the temporal index / interval");
+	  return;
+	}
+	//first part is the dimension identifier
+	query->dim_name = kv[0];
+	//seceond part is either a temporal index (or temporal index interval) or a timestamp is used (or timestamp interval)
+	string t_interval = kv[1];
+	
+	/* Test with Regex, failed due to gcc version 4.8.4 (4.9 implements regex completely) */
+	// 	    std::smatch match;
+	// 	    
+	// 	    std::regex re("/^[\d]{4}(\/|-)[\d]{2}(\/|-)[\d]{2}(\s|T)[\d]{2}:[\d]{2}:[\d]{2}((\+|-)[0-1][\d]:?(0|3)0)?$/");
+	// 	    if (std::regex_search(t_interval,match,re)) {
+	// 	      ...
+	// 	    }
+	
+	if (t_interval.length() > 0) {
+	  //if string is a timestamp then translate it into the temporal index
+	  if (Utils::validateTimestampString(t_interval)) {
+	    //store timestamp for query when calling scidb
+	    query->timestamp = t_interval;
+	    query->hasTemporalIndex = false;
+	  } else {                                               
+	    //simply extract the temporal index
+	    size_t pos = t_interval.find(":");
+	    if (pos < t_interval.length()) {
+	      //interval
+	      vector<string> attr;
+	      boost::split(attr,t_interval,boost::is_any_of(":"));
+	      query->lower_bound = boost::lexical_cast<int>(attr[0]);
+	      query->upper_bound = boost::lexical_cast<int>(attr[1]);
+	      //TODO for now we parse it correctly, but we will just use the lower_bound... change this later
+	      Utils::debug("Currently interval query is not supported. Using the lower bound instead");
+	      query->temp_index = query->lower_bound;
+	    } else {
+	      //temporal index
+	      query->temp_index = boost::lexical_cast<int>(t_interval);
+	    }
+	    query->hasTemporalIndex = true;
+	  }
+	} else {
+	  Utils::error("No temporal information stated");
+	  return;
+	}
+      }
+    }
+    
+    void SciDBDataset::parseOpeningOptions (GDALOpenInfo *poOpenInfo, ConnectionPars* con) {
+      std::map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL);
+      
+      char** options = poOpenInfo->papszOpenOptions;
+      int count = CSLCount(options);
+      for (int i = 0; i < count; i++) {
+	const char* s = CSLGetField(options,i);
+	char* key;
+	const char* value = CPLParseNameValue(s,&key);
+	
+	if(paramResolver.find(std::string(key)) != paramResolver.end()) {
+	  switch(paramResolver[std::string(key)]) {
+	    case HOST:
+	      con->host = value;
+	      con->ssl = (std::string(value).substr ( 0, 5 ).compare ( "https" ) == 0 );
+	      break;
+	    case USER:
+	      con->user = value;
+	      break;
+	    case PORT:
+	      con->port = boost::lexical_cast<int>(value);
+	      break;
+	    case PASSWORD:
+	      con->passwd = value;
+	      break;
+	    case SSL:
+	      con->ssl = CSLTestBoolean(value);
+	      break;
+	    default:
+	      continue;
+	  }
+	} else {
+	  Utils::debug("unused parameter \""+string(key)+ "\" with value \""+string(value)+"\"");
+	}
+      }
+    }
+    
+    void SciDBDataset::parseConnectionString ( const string &connstr, ConnectionPars *con) {
+      std::map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("array", ARRAY) ("user",USER) ("password", PASSWORD);
+      
+      vector<string> connparts;
+      // Split at whitespace, comma, semicolon
+      boost::split ( connparts, connstr, boost::is_any_of ( "; " ) );
+      for ( vector<string>::iterator it = connparts.begin(); it != connparts.end(); ++it ) {
+	vector<string> kv;
+	// No colon because uf URL
+	boost::split ( kv, *it, boost::is_any_of ( "=" ) );
+	if ( kv.size() != 2 ) {
+	  continue;
+	} else {
+	  if(paramResolver.find(std::string(kv[0])) != paramResolver.end()) {
+	    switch(paramResolver[kv[0]]) {
+	      case HOST:
+		con->host  = ( kv[1] );
+		con->ssl = (kv[1].substr ( 0, 5 ).compare ( "https" ) == 0 );
+		break;
+	      case PORT:
+		con->port = boost::lexical_cast<int> ( kv[1] );
+		break;
+	      case ARRAY:
+		con->arrayname = ( kv[1] );
+		break;
+	      case USER:
+		con->user = ( kv[1] );
+		break;
+	      case PASSWORD:
+		con->passwd = ( kv[1] );
+		break;
+	      default:
+		Utils::debug("haven't found stuff");
+		continue; 
+	    }
+	  } else {
+	    Utils::debug("unused parameter \""+string(kv[0])+ "\" with value \""+string(kv[1])+"\"");
+	  }
+	}
+      }
+    }
 }

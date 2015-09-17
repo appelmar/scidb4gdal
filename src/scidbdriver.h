@@ -29,10 +29,11 @@ SOFTWARE.
 #include "utils.h"
 #include "shimclient.h"
 #include "tilecache.h"
+#include "TemporalReference.h"
 
 namespace scidb4gdal
 {
-
+    using namespace scidb4geo;
 
     class SciDBRasterBand;
     class SciDBDataset;
@@ -71,7 +72,12 @@ namespace scidb4gdal
          * Decides whether a dataset is a SciDB dataset or not, depends on the connection string prefix SCIDB:
          */
         static int Identify ( GDALOpenInfo *poOpenInfo );
-
+	
+	/**
+	 * The tmporal reference that can be obtain from scidb4geo query at the scidb
+	 */
+	TReference *tref;
+	
         /**
          * Returns a pointer to the shim client object
          */
@@ -130,12 +136,19 @@ namespace scidb4gdal
 	 * The selection properties are obtained from the connection string. Mainly used to store the temporal query index (3rd dimension parameter)
 	 */
 	TemporalQueryParameters *_query;
+	
+	/**
+	 * Parse the connection string for the key value pair "properties=..."
+	 * @param propstr The value part of the key value pair "properties=..." 
+	 */ 
+	static void parsePropertiesString ( const string &propstr, TemporalQueryParameters* query );
+	
+	static void parseArrayName (string& array, TemporalQueryParameters* query);
+	static void parseOpeningOptions (GDALOpenInfo *poOpenInfo, ConnectionPars* con);
+	static void parseConnectionString ( const string &connstr, ConnectionPars* con);
+	static bool splitPropertyString (string &input, string &constr, string &propstr);
 
     };
-
-
-
-
 
     /**
     * GDALRasterBand subclass implementing core GDAL functionality for single bands

@@ -25,6 +25,9 @@ SOFTWARE.
 #include "utils.h"
 #include <ctime>
 #include <sstream>
+#include <cctype>
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 namespace scidb4gdal
 {
@@ -152,7 +155,67 @@ namespace scidb4gdal
             return x;
         }
 
-
+	bool validateTimestampString(string &in) {
+	  /*
+	   * comment: use REGEX instead! But gcc 4.84 shipped with Ubuntu 14.04 does not support reg expressions...
+	   * gcc > 4.9 uses it...
+	   */
+	  bool isValid = true;
+	  boost::algorithm::trim(in);
+	  //check date String
+	  //year
+	  if (!(isdigit(in[0]) && isdigit(in[1]) && isdigit(in[2]) && isdigit(in[3]) )) {
+	    Utils::debug("malformed year");
+	    return false;
+	  }
+	  //month
+	  if (!(isdigit(in[5]) && isdigit(in[6]))) {
+	    Utils::debug("malformed month");
+	    return false;
+	  }
+	  //days
+	  if (!(isdigit(in[8]) && isdigit(in[9]))) {
+	    Utils::debug("malformed day");
+	    return false;
+	  }
+	  
+	  if (!((in[4] == '-' && in[7] == '-') || ( in[4] == '/' && in[7] == '/'))) {
+	    Utils::debug("malformed date divider");
+	    return false;
+	  }
+	  
+	  //check length if end then stop
+	  if (in.size() == 10) return isValid;
+	  
+	  //if contains T at position 10 check the time string
+	  if (in[10] != 'T') {
+	    Utils::debug("malformed date divider");
+	    return false;
+	  }
+	  
+	  //hours
+	  if (!(isdigit(in[11]) && isdigit(in[12]))) {
+	    Utils::debug("malformed hour");
+	    return false;
+	  }
+	  //minutes
+	  if (!(isdigit(in[14]) && isdigit(in[15]))) {
+	    Utils::debug("malformed minute");
+	    return false;
+	  }
+	  //seconds
+	  if (!(isdigit(in[17]) && isdigit(in[18]))) {
+	    Utils::debug("malformed seconds");
+	    return false;
+	  }
+	  
+	  if (!boost::algorithm::contains(in.substr(13,1), ":") || !boost::algorithm::contains(in.substr(16,1), ":")) {
+	    Utils::debug("malformed time divider");
+	    return false;
+	  }
+	  
+	  return isValid;
+      }
 
 
 

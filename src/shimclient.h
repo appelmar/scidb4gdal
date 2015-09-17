@@ -94,7 +94,7 @@ namespace scidb4gdal
          * @param out metadata of an array as SciDBSpatialArray instance, spatial reference information can be missing if not found
          * @return status code
          */
-        StatusCode getArrayDesc ( const string &inArrayName, SciDBSpatialArray &out );
+        StatusCode getArrayDesc ( const string &inArrayName, SciDBSpatioTemporalArray &out );
 
         /**
          * Gets a list of all spatially referenced arrays, currently not needed!
@@ -231,6 +231,15 @@ namespace scidb4gdal
         * @see SciDBSpatialReference
         */
         StatusCode getSRSDesc ( const string &inArrayName, SciDBSpatialReference &out );
+	
+	/**
+        * Gets metadata of an array's temporal reference if available. Otherwise, result contains default values representing no reference.
+        * @param inArrayName name of existing array
+        * @param out temporal reference description
+        * @return status code
+        * @see SciDBSTemporalReference
+        */
+	StatusCode getTRSDesc (const string &inArrayName, SciDBTemporalReference &out);
 
         /**
          * Creates a new shim session and returns its ID
