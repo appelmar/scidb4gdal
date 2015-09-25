@@ -23,9 +23,12 @@ The driver offers support for reading and writing SciDB arrays. Update access to
 
 
 ## Getting Started
-Similar to other database drivers for GDAL, we use a connection string as a descriptor for array data sources: 
+Similar to other database drivers for GDAL, we use a connection string as a descriptor for array data sources and as an alternative we utilize GDALs opening option handling: 
 
 `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>] [properties=t=<temporal_index>]"` 
+or
+`"gdal_translate -oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password>" ... "SCIDB:array=img[t,2015-02-01T00:00:00]" img.tif"`
+
 
 Notice that the string must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. Default values for parameters are
 

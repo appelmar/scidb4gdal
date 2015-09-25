@@ -766,7 +766,7 @@ namespace scidb4gdal
     }
 
 
-    StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index , bool use_subarray, bool emptycheck )
+    StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index, bool use_subarray, bool emptycheck)
 
     {	
 // 	std::stringstream sstm;

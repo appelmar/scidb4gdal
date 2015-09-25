@@ -111,6 +111,8 @@ namespace scidb4gdal
         //TODO: Improve error handling
         SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
 
+	//TODO parse the temporal index from query string...
+	int32_t t_index = poGDS->_query->temp_index;
         uint32_t tileId = TileCache::getBlockId ( nBlockXOff, nBlockYOff, nBand - 1, nBlockXSize, nBlockYSize, poGDS->GetRasterCount() );
 
 	
@@ -214,7 +216,8 @@ namespace scidb4gdal
                 void *buf = malloc ( dataSize );
 
                 // Write to temporary buffer first
-                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
+		//TODO  t_index is set as zero for compiler testing... this must be changed
+                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, t_index, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
                 for ( uint32_t i = 0; i < ( 1 + ymax - ymin ); ++i ) {
                     uint8_t *src  = & ( ( uint8_t * ) buf ) [i * ( 1 + xmax - xmin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
                     uint8_t *dest = & ( ( uint8_t * ) tile.data ) [i * this->nBlockXSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
@@ -224,7 +227,7 @@ namespace scidb4gdal
             }
             else {
                 // This is the most efficient!
-                poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
+                poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax, t_index, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
             }
         }
 
@@ -538,7 +541,7 @@ namespace scidb4gdal
                     // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
                     GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
                     //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
-                    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+                    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
 
 
                     /* SciDB load file format is band interleaved by pixel / cell, whereas common

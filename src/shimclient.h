@@ -57,9 +57,6 @@ namespace scidb4gdal
 {
     using namespace std;
     
-    typedef map<string, string>   MD;
-    typedef map<string, MD>      DomainMD;
-
     /**
         DomainMD md;
         int64_t start;
@@ -124,7 +121,7 @@ namespace scidb4gdal
 	* @param t_index the temporal index at which data was stored, if no 3rd dimension specified it will be -1 and will be ignored.
         * @return status code
         */
-        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index );
+        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index, bool use_subarray = true, bool emptycheck = false);
 
 
         /**
