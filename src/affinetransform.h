@@ -23,17 +23,20 @@ SOFTWARE.
 -----------------------------------------------------------------------------*/
 
 
+
 #ifndef AFFINE_TRANSFORM_H
 #define AFFINE_TRANSFORM_H
 
 
 #include <sstream>
 #include <string>
+#include "utils.h"
 
 namespace scidb4gdal
 {
 
     using namespace std;
+
 
     /**
      * Affine transformations are used to map array integer coordinates to world SRS coordinates.
@@ -44,6 +47,16 @@ namespace scidb4gdal
     class AffineTransform
     {
     public:
+
+        struct double2 {
+            double2() : x ( 0 ), y ( 0 ) {}
+            double2 ( double x, double y ) {
+                this->x = x;
+                this->y = y;
+            }
+            double x;
+            double y;
+        };
 
         /**
          * Default constructor, creates an identity transformation
@@ -70,6 +83,10 @@ namespace scidb4gdal
          */
         AffineTransform ( const string &astr );
 
+        /**
+         * Default destructor
+         */
+        ~AffineTransform ( );
 
 
 
@@ -85,11 +102,45 @@ namespace scidb4gdal
 
 
         /**
-         * Checks whether an affine transformation is the identity functions
+          * Inverse transformation
+          */
+        AffineTransform *_inv;
+
+
+        /**
+         * Checks whether an affine transformation is the identity function
          */
         bool isIdentity();
 
+        /**
+          * Applies transformation to given pointer
+          */
+        double2 f ( const double2 &v );
+
+        /**
+              * Applies transformation to given pointer
+              */
+        void f ( const double2 &v_in, double2 &v_out );
+
+        void f ( double2 &v );
+
+
+        /**
+          * Applies inverse transformation to a given point
+          */
+        double2 fInv ( const double2 &v );
+
+        void fInv ( const double2 &v_in, double2 &v_out );
+
+        void fInv ( double2 &v );
+
+        /**
+              * Computes the determinant of the linear transformation matrix (without translation)
+              */
+        double det();
     };
+
+
 
 
 }

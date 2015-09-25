@@ -1,7 +1,7 @@
 
-OBJ	=	scidbdriver.o shimclient.o utils.o affinetransform.o tilecache.o
-
-EXTRAFLAGS = -I../../ogr
+OBJ	=	scidbdriver.obj shimclient.obj utils.obj affinetransform.obj tilecache.obj
+BOOST_INC = -IC:\OSGeo4W64\include\boost-1_56
+EXTRAFLAGS = -DHAVE_CURL $(CURL_CFLAGS) $(CURL_INC) $(BOOST_INC)
 
 GDAL_ROOT	=	..\..
 
@@ -12,4 +12,4 @@ default:	$(OBJ)
 
 clean:
 	-del *.obj
-
+	-del *.dll

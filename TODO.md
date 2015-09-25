@@ -1,7 +1,6 @@
 #TODO
-* Null value handling, scidb binary read takes one more byte per element
-* Check performance
-* Implement insertion into an existing arrays, including higher dimensional arrays
-* Add trimming, slicing and maybe other queries, trimming changes offset of spatial reference!
+* Performance for uploads can be improved by reducing the number of redimension operations.
+* Insertion into an existing (including higher dimensional) arrays 
+* Implement test cases
 
 
