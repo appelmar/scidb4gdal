@@ -121,7 +121,7 @@ namespace scidb4gdal
 	* @param t_index the temporal index at which data was stored, if no 3rd dimension specified it will be -1 and will be ignored.
         * @return status code
         */
-        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index, bool use_subarray = true, bool emptycheck = false);
+        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index, bool use_subarray = true, bool emptycheck = true);
 
 
         /**

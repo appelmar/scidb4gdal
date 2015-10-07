@@ -215,6 +215,7 @@ namespace scidb4gdal
                 size_t dataSize = ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // This is smaller than the block size!
                 void *buf = malloc ( dataSize );
 
+		
                 // Write to temporary buffer first
 		//TODO  t_index is set as zero for compiler testing... this must be changed
                 poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, t_index, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
@@ -363,12 +364,20 @@ namespace scidb4gdal
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
-
+  
         ConnectionPars *pars = new ConnectionPars();
-	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
-	parseOpeningOptions(info, pars);
+	//TODO Use create options (-co)
+// 	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
+	string connstr = pszFilename;
+	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
+	    Utils::error ( "This is not a scidb4gdal connection string" );
+	}
+	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
+	
+// 	parseOpeningOptions(info, pars);
         
-//         parseConnectionString ( pszFilename);
+        parseConnectionString ( astr, pars);
+
 
         // Create array metadata structure
         SciDBSpatialArray array;

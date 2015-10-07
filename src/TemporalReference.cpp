@@ -620,17 +620,21 @@ namespace scidb4geo
             dif._td = t._pt - _t0->_pt;
         }
 
-
+	
         double result;
-
+	
+	//TODO check if difference == 0 conditions are necessary
         double ym;
-        if ( ( _dt->_yd * 12 + _dt->_md ) == 0 ) ym = NAN;
+//         if ( ( _dt->_yd * 12 + _dt->_md ) == 0 ) ym = NAN;
+	if ( ( _dt->_yd * 12 + _dt->_md ) == 0 ) ym = 0;
         else ym = ( dif._yd * 12 + dif._md ) / ( _dt->_yd * 12 + _dt->_md );
         double d;
-        if ( _dt->_dd.days() == 0 ) d = NAN;
+//         if ( _dt->_dd.days() == 0 ) d = NAN;
+	if ( _dt->_dd.days() == 0 ) d = 0;
         else d = dif._dd.days() / _dt->_dd.days();
         double tt;
-        if ( _dt->_td.total_seconds() == 0 ) tt = NAN;
+//         if ( _dt->_td.total_seconds() == 0 ) tt = NAN;
+	if ( _dt->_td.total_seconds() == 0) tt = 0;
         else tt = dif._td.total_seconds() / _dt->_td.total_seconds(); // TODO: Fractional seconds?
 
         if ( _r < DAY ) result =  ym;

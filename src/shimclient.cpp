@@ -822,14 +822,14 @@ namespace scidb4gdal
             if ( use_subarray ) {
                 if ( emptycheck ) {
                     afl << "(merge(";
-                    afl << "project(subarray(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
+                    afl << "project(subarray(" << arr << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
                         << array.getYDim().name << "=" << 0  << ":" << y_max - y_min  << "," << array.getYDim().chunksize << "," << 0 << ","
                         << array.getXDim().name << "=" << 0  << ":" << x_max - x_min  << "," << array.getXDim().chunksize << "," << 0 << "],"
                         << Utils::defaultNoDataSciDB ( array.attrs[nband].typeId ) << ")))";
                 }
                 else {
-                    afl << "(project(subarray(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
+                    afl << "(project(subarray(" << arr << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
                 }
             }
             else { // Between
@@ -837,7 +837,7 @@ namespace scidb4gdal
                 if ( emptycheck ) {
 
                     afl << "(merge(";
-                    afl << "project(between(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
+                    afl << "project(between(" << arr << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
                         << array.getYDim().name << "=" << array.getYDim().start  << ":" << array.getYDim().start + array.getYDim().length - 1 << "," << array.getYDim().chunksize << "," << 0 << ","
                         << array.getXDim().name << "=" << array.getXDim().start  << ":" << array.getXDim().start + array.getXDim().length - 1 << "," << array.getXDim().chunksize << "," << 0 << "],"
@@ -845,7 +845,7 @@ namespace scidb4gdal
                 }
 
                 else {
-                    afl << "(project(between(" << array.name << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
+                    afl << "(project(between(" << arr << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
                 }
 
 
@@ -859,7 +859,7 @@ namespace scidb4gdal
 
                 if ( emptycheck ) {
                     afl << "transpose(merge(";
-                    afl << "project(subarray(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
+                    afl << "project(subarray(" << arr << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
                         << array.getXDim().name << "=" << 0  << ":" << x_max - x_min  << "," << array.getXDim().chunksize << "," << 0 << ","
                         << array.getYDim().name << "=" << 0  << ":" << y_max - y_min  << "," << array.getYDim().chunksize << "," << 0 << "],"
@@ -867,21 +867,21 @@ namespace scidb4gdal
 
                 }
                 else {
-                    afl << "transpose(project(subarray(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << "))";
+                    afl << "transpose(project(subarray(" << arr << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << "))";
                 }
             }
             else {
                 if ( emptycheck ) {
 
                     afl << "transpose(merge(";
-                    afl << "project(between(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
+                    afl << "project(between(" << arr << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
                         << array.getXDim().name << "=" << array.getXDim().start  << ":" << array.getXDim().start + array.getXDim().length - 1 << "," << array.getXDim().chunksize << "," << 0 << ","
                         << array.getYDim().name << "=" << array.getYDim().start  << ":" << array.getYDim().start + array.getYDim().length - 1 << "," << array.getYDim().chunksize << "," << 0 << "],"
                         << 0 << ")," << x_min << "," << y_min << "," << x_max << "," << y_max << ")))";
                 }
                 else {
-                    afl << "transpose(project(between(" << array.name << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << "))";
+                    afl << "transpose(project(between(" << arr << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << "))";
 
                 }
 
@@ -1358,10 +1358,10 @@ namespace scidb4gdal
         afl << "aggregate(filter(list('arrays'),name='" << inArrayName << "'),count(name))";
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
 	
-	createSHIMExecuteString(ss, sessionID, afl);
-//         ss.str();
-//         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(int64)";
-//         if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+// 	createSHIMExecuteString(ss, sessionID, afl);
+        ss.str();
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(int64)";
+        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 
         curlBegin();
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
