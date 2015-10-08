@@ -2,4 +2,4 @@ sudo: required
 language: cpp
 compiler: gcc
 install: chmod +x build/prepare_platform.sh && build/prepare_platform.sh
-script: cd gdal-2.0.1 && ./configure --with-geotiff=yes --without-ogr --without-grib  --with-pcraster=no  --with-geos=no --with-pg=no --with-png=no --with-sqlite3=no  && make
+script: cd gdal-2.0.1 && ./configure && make
