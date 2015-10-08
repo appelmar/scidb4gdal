@@ -29,3 +29,5 @@
 
 # KDE4 files
 *.kdev4
+/.project
+/doc/

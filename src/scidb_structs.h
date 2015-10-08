@@ -12,7 +12,10 @@ namespace scidb4gdal
 {
     using namespace std;
     using namespace scidb4geo;
-
+    
+    typedef map<string, string>   MD;
+    typedef map<string, MD>      DomainMD;
+    
     /**
      * A structure for storing metadata of a SciDB array attribute
      */
@@ -20,6 +23,7 @@ namespace scidb4gdal
         string name;
         string typeId;
         bool nullable;
+	DomainMD md;
     };
 
     struct SciDBAttributeStats {
@@ -35,6 +39,8 @@ namespace scidb4gdal
         int64_t high;
         uint32_t chunksize;
         string typeId;
+	int64_t start;
+	int64_t length;
 
     };
 
@@ -46,6 +52,7 @@ namespace scidb4gdal
         string name;
         vector<SciDBAttribute> attrs;
         vector<SciDBDimension> dims;
+	DomainMD md;
 	
 	/**
 	 * The resulting output will be like the following:

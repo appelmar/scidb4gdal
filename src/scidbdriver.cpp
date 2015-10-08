@@ -23,17 +23,6 @@ SOFTWARE.
 -----------------------------------------------------------------------------*/
 
 
-// TODO:
-// * Add different modes for handling chunks as different images
-// * Add query params like trimming, projecting, ..
-// * Add minimum chunk size (e.g. 1 MB), min(1MB, image size)
-// * Test writing for image size < chunk size
-// * Add chunksize and overlap parameter in connection string for array creation
-// * Insert to existing array
-// * (!!!) Define and implement test cases!
-// * (!!!) Improved error handling, e.g. for writing to already existing arrays or including removal of temporary (load) arrays
-
-
 #include "scidbdriver.h"
 #include "shimclient.h"
 
@@ -42,6 +31,7 @@ SOFTWARE.
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
+#include <limits>
 #include "shim_client_structs.h"
 #include "scidb_structs.h"
 
@@ -85,13 +75,10 @@ namespace scidb4gdal
 	
         eDataType = Utils::scidbTypeIdToGDALType ( _array->attrs[nBand].typeId ); // Data type is mapped from SciDB's attribute data type
 
-        /* GDAL interprets x dimension as image rows and y dimension as image cols whereas our
-         * implementation of spatial reference systems assumes x being easting and y being northing.
-         * This makes the following code pretty messy in mixing x and y. */
-        uint32_t nImgYSize ( 1 + _array->getXDim().high - _array->getXDim().low );
-        uint32_t nImgXSize ( 1 + _array->getYDim().high - _array->getYDim().low );
-        nBlockYSize = ( _array->getXDim().chunksize < nImgYSize ) ? _array->getXDim().chunksize : nImgYSize;
-        nBlockXSize = ( _array->getYDim().chunksize < nImgXSize ) ? _array->getYDim().chunksize : nImgXSize;
+        uint32_t nImgYSize ( 1 + _array->getYDim().high - _array->getYDim().low );
+        uint32_t nImgXSize ( 1 + _array->getXDim().high - _array->getXDim().low );
+        nBlockYSize = ( _array->getYDim().chunksize < nImgYSize ) ? _array->getYDim().chunksize : nImgYSize;
+        nBlockXSize = ( _array->getXDim().chunksize < nImgXSize ) ? _array->getXDim().chunksize : nImgXSize;
     }
 
 
@@ -117,19 +104,18 @@ namespace scidb4gdal
     }
 
 
-    // TODO: Add manual caching for efficient non-redundant reads when writing line-oriented file formats
+
     CPLErr SciDBRasterBand::IReadBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
     {
-	std::stringstream stream;
-	stream << "Offsets: " << nBlockXOff << " " << nBlockYOff;
-        Utils::debug(stream.str());
-	//TODO: Improve error handling
+
+        //TODO: Improve error handling
         SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
+
+	//TODO parse the temporal index from query string...
+	int32_t t_index = poGDS->_query->temp_index;
+        uint32_t tileId = TileCache::getBlockId ( nBlockXOff, nBlockYOff, nBand - 1, nBlockXSize, nBlockYSize, poGDS->GetRasterCount() );
+
 	
-	//TODO for interval queries make adaptions here
-	int t_index = poGDS->_query->temp_index;
-	
-        uint32_t tileId = TileCache::getBlockId ( nBlockXOff, nBlockYOff, nBand - 1, nBlockXSize, nBlockXSize, poGDS->GetRasterCount() );
 
         ArrayTile tile;
         tile.id = tileId;
@@ -138,47 +124,119 @@ namespace scidb4gdal
         if ( poGDS->_cache.has ( tileId ) ) {
             tile = *poGDS->_cache.get ( tileId );
         }
-
         else {
-            /* GDAL interprets x dimension as image rows and y dimension as image cols whereas our
-            * implementation of spatial reference systems assumes x being easting and y being northing.
-            * This makes the following code pretty messy in mixing x and y. */
-            int xmin = nBlockYOff * this->nBlockYSize + _array->getXDim().low;
-            int xmax = xmin + this->nBlockYSize - 1;
+
+            int xmin = nBlockXOff * this->nBlockXSize + _array->getXDim().low;
+            int xmax = xmin + this->nBlockXSize - 1;
             if ( xmax > _array->getXDim().high ) xmax = _array->getXDim().high;
 
-            int ymin = nBlockXOff * this->nBlockXSize + _array->getYDim().low;
-            int ymax = ymin + this->nBlockXSize - 1;
+            int ymin = nBlockYOff * this->nBlockYSize + _array->getYDim().low;
+            int ymax = ymin + this->nBlockYSize - 1;
             if ( ymax > _array->getYDim().high ) ymax = _array->getYDim().high;
 	    
 
             // Read  and fetch data
+            bool use_subarray = ! ( ( xmin % ( int ) _array->getXDim().chunksize == 0 ) && ( ymin % ( int ) _array->getYDim().chunksize == 0 ) );
+
             tile.size = nBlockXSize * nBlockYSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // Always allocate full block size
             tile.data = malloc ( tile.size ); // will be freed automatically by cache
 
 
-            // Last blocks must be treated separately if covering area outside actual array: (0 | 1 | 2 | 3 || 4 | 5 | 6 | 7) vs. (0 | 1 | - | - || 3 | 4 | - | -) for 4x2 block with only 2x2 data
-            // TODO: Check whether this works also for nBlockXSize != nBlockYSize
-            if ( ( nBlockXOff + 1 ) * this->nBlockXSize > poGDS->nRasterXSize ) { //end of the blocks bigger than the whole image, then fetch next block row
+
+//      // TODO: Check which chunks are overlapped
+//      int xchunk_1 = floor((double)xmin / (double)_array->getXDim().chunksize);
+//      int xchunk_2 = floor((double)xmax / (double)_array->getXDim().chunksize);
+//      int ychunk_1 = floor((double)ymin / (double)_array->getYDim().chunksize);
+//      int ychunk_2 = floor((double)ymax / (double)_array->getYDim().chunksize);
+//
+//      int xchunk_n = xchunk_2 - xchunk_1 + 1;  // Number of visited chunks in x direction
+//      int ychunk_n = ychunk_2 - ychunk_1 + 1; // Number of visited chunks in y direction
+//
+//      stringstream sd;
+//      sd << "(" << xmin << "," <<  xmax << "," << ymin << "," << ymax << ")(" <<  xchunk_1 << "," << xchunk_2 << "," << ychunk_1 << "," << ychunk_2 << ")";
+//      Utils::debug(sd.str());
+
+
+//      if (xchunk_n != 1 || ychunk_n != 1) {
+//        /* Requested block covers multiple SciDB chunks --> result is only "row-major" in individual chunks
+//         * Need to iterate over all covered chunks */
+//        stringstream ss;
+//        ss << "Block request covers " << xchunk_n * ychunk_n << " SciDB chunks -> Fetch data chunk-wise (might be slow).";
+//        Utils::debug(ss.str());
+//        // TODO: Switch inner and outer loop depending on order of x and y in SciDB array, is that neccessary?
+//        size_t dataSize = ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // This might be smaller than the block size!
+//        void *buf = malloc ( dataSize );
+//        int iy=0;
+//        for (int icy=0; icy<ychunk_n; ++icy)
+//        {
+//      int ix=0;
+//      int ychunk_low  = MAX(ymin,(ychunk_1+icy)   * (int)_array->getYDim().chunksize);
+//      int ychunk_high = MIN(ymax,(ychunk_1+icy+1) * (int)_array->getYDim().chunksize - 1);
+//      for (int icx=0; icx<xchunk_n; ++icx)
+//      {
+//        int xchunk_low  = MAX(xmin,(xchunk_1+icx)   * (int)_array->getXDim().chunksize);
+//        int xchunk_high = MIN(xmax,(xchunk_1+icx+1) * (int)_array->getXDim().chunksize - 1);
+//
+//        stringstream ss;
+//        ss << "Fetching data " << "[(" << xchunk_low << "," <<  xchunk_high << "),(" << ychunk_low << "," << ychunk_high << ")]";
+//        Utils::debug(ss.str());
+//
+//
+//        poGDS->getClient()->getData ( *_array, nBand - 1, buf, xchunk_low, ychunk_low, xchunk_high, ychunk_high );
+//
+//        ss.str("");
+//        ss << "ix,iy" << "[(" << ix << "," <<  iy << ")], attribute " << nBand - 1 << " expecting " <<  ( 1 + xchunk_high - xchunk_low ) *  ( 1 + xchunk_high - xchunk_low ) << "cells";
+//        Utils::debug(ss.str());
+//
+//        for ( uint32_t i = 0; i < ( 1 + ychunk_high - ychunk_low ); ++i ) {
+//           /* ss.str("");
+//            ss << " Writing " << ( 1 + xchunk_high - xchunk_low ) << " elements for attribute " << nBand - 1 << " from buf[" << i <<  ",0] to tile.data[" << (i+iy)  <<  "," << ix << "]";
+//            Utils::debug(ss.str());
+//           */
+//           uint8_t *src  = & ( ( uint8_t * ) buf ) [i * ( 1 + xchunk_high - xchunk_low ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
+//           uint8_t *dest = & ( ( uint8_t * ) tile.data ) [((i+iy) * this->nBlockXSize + ix)* Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
+//           memcpy ( dest, src, ( 1 + xchunk_high - xchunk_low ) *Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ) );
+//        }
+//        ix += 1 + xchunk_high - xchunk_low;
+//
+//
+//      }
+//      iy+= 1 + ychunk_high - ychunk_low;
+//        }
+//        free ( buf );
+//
+//      }
+
+
+
+
+            if ( ( nBlockXOff + 1 ) * this->nBlockXSize > poGDS->nRasterXSize ) {
                 // This is a bit of a hack...
                 size_t dataSize = ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // This is smaller than the block size!
                 void *buf = malloc ( dataSize );
 
+		
                 // Write to temporary buffer first
-                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, t_index ); // GDAL bands start with 1, scidb attribute indexes with 0
-                for ( uint32_t i = 0; i < ( 1 + xmax - xmin ); ++i ) {
-                    uint8_t *src  = & ( ( uint8_t * ) buf ) [i * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
-                    // TODO: In the following call, check whether this->nBlockXSize must be replaced with this->nBlockYSize for unequally sized chunk dimensions
+		//TODO  t_index is set as zero for compiler testing... this must be changed
+                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, t_index, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
+                for ( uint32_t i = 0; i < ( 1 + ymax - ymin ); ++i ) {
+                    uint8_t *src  = & ( ( uint8_t * ) buf ) [i * ( 1 + xmax - xmin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
                     uint8_t *dest = & ( ( uint8_t * ) tile.data ) [i * this->nBlockXSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
-                    memcpy ( dest, src, ( 1 + ymax - ymin ) *Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ) );
+                    memcpy ( dest, src, ( 1 + xmax - xmin ) *Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ) );
                 }
                 free ( buf );
             }
-            else poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax, t_index ); // GDAL bands start with 1, scidb attribute indexes with 0
-
-            poGDS->_cache.add ( tile ); // Add to cache
-
+            else {
+                // This is the most efficient!
+                poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax, t_index, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
+            }
         }
+
+
+        poGDS->_cache.add ( tile ); // Add to cache
+
+
+
 
         // Copy from tile.data to pImage
         memcpy ( pImage, tile.data, tile.size );
@@ -187,58 +245,87 @@ namespace scidb4gdal
     }
 
 
-    /*
-
-        CPLErr SciDBRasterBand::IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
-        {
-            //TODO: Improve error handling
-
-            SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
 
 
-            // 1. Compute array bounds from block offsets
-            int xmin = nBlockYOff * this->nBlockYSize + _array->getXDim().low;
-            int xmax = xmin + this->nBlockYSize - 1;
-            if ( xmax > _array->getXDim().high ) xmax = _array->getXDim().high;
-
-            int ymin = nBlockXOff * this->nBlockXSize + _array->getYDim().low;
-            int ymax = ymin + this->nBlockXSize - 1;
-            if ( ymax > _array->getYDim().high ) ymax = _array->getYDim().high;
-
-
-
-            // Last blocks must be treated separately if covering area outside actual array: (0 | 1 | 2 | 3 || 4 | 5 | 6 | 7) vs. (0 | 1 | - | - || 3 | 4 | - | -) for 4x2 block with only 2x2 data
-            bool xOuter = ( nBlockXOff + 1 ) * this->nBlockXSize > poGDS->nRasterXSize; // or >= ???
-            if ( xOuter ) {
-                // This is a bit of a hack...
-                size_t pixelSize = 0;
-                uint32_t nx = ( 1 + xmax - xmin );
-                uint32_t ny = ( 1 + ymax - ymin );
-                for ( uint16_t i = 0; i < _array->attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( _array->attrs[i].typeId );
-                size_t dataSize = pixelSize *  nx * ny;
-                void *buf = malloc ( dataSize );
-
-                stringstream v;
-                v << "Write to bounds: x=(" << xmin << "," << xmax << ") y=(" << ymin << "," << ymax << ") nx=" << nx << " ny=" << ny << " BLOCKSIZE X " << this->nBlockXSize << " BLOCKSIZE Y " << this->nBlockYSize;
-                Utils::debug ( v.str() );
-
-                // Write to temporary buffer first
-                for ( uint32_t i = 0; i < nx; ++i ) {
-                    // TODO: In the following call, check whether this->nBlockXSize must be replaced with this->nBlockYSize for unequally sized chunk dimensions
-                    uint8_t *src  = & ( ( uint8_t * ) pImage ) [i * this->nBlockXSize * pixelSize];
-                    uint8_t *dest  = & ( ( uint8_t * ) buf ) [i * ny * pixelSize];
-                    memcpy ( dest, src, ny * pixelSize );
-                }
-                // Write from buf instead of pImage
-                poGDS->getClient()->insertData ( *_array, buf, xmin, ymin, xmax, ymax );
-
-                free ( buf );
-            }
-            else poGDS->getClient()->insertData ( *_array, pImage, xmin, ymin, xmax, ymax );
+    double SciDBRasterBand::GetNoDataValue ( int *pbSuccess )
+    {
+        string key = "NODATA";
+        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
+        if ( md.find ( key ) == md.end() ) {
+            if ( pbSuccess != NULL ) *pbSuccess = false;
+            return Utils::defaultNoDataGDAL ( this->GetRasterDataType() );
+        }
+        if ( pbSuccess != NULL ) *pbSuccess = true;
+        return boost::lexical_cast<double> ( md[key] );
+    }
 
 
-            return CE_None;
-        }*/
+    double SciDBRasterBand::GetMaximum ( int *pbSuccess )
+    {
+        string key = "MAX";
+        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
+        if ( md.find ( key ) == md.end() ) {
+            if ( pbSuccess != NULL ) *pbSuccess = false;
+            return DBL_MAX;
+
+        }
+        if ( pbSuccess != NULL ) *pbSuccess = true;
+        return boost::lexical_cast<double> ( md[key] );
+    }
+
+
+    double SciDBRasterBand::GetMinimum ( int *pbSuccess )
+    {
+        string key = "MIN";
+        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
+        if ( md.find ( key ) == md.end() ) {
+            if ( pbSuccess != NULL ) *pbSuccess = false;
+            return DBL_MAX;
+
+        }
+        if ( pbSuccess != NULL ) *pbSuccess = true;
+        return boost::lexical_cast<double> ( md[key] );
+
+    }
+
+
+    double SciDBRasterBand::GetOffset ( int *pbSuccess )
+    {
+        string key = "OFFSET";
+        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
+        if ( md.find ( key ) == md.end() ) {
+            if ( pbSuccess != NULL ) *pbSuccess = false;
+            return 0;
+
+        }
+        if ( pbSuccess != NULL ) *pbSuccess = true;
+        return boost::lexical_cast<double> ( md[key] );
+    }
+
+    double SciDBRasterBand::GetScale ( int *pbSuccess )
+    {
+        string key = "SCALE";
+        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
+        if ( md.find ( key ) == md.end() ) {
+
+            if ( pbSuccess != NULL ) *pbSuccess = false;
+            return 1;
+
+        }
+        if ( pbSuccess != NULL ) *pbSuccess = true;
+        return boost::lexical_cast<double> ( md[key] );
+    }
+
+
+    const char *SciDBRasterBand::GetUnitType()
+    {
+        string key = "UNIT";
+        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
+        if ( md.find ( key ) == md.end() ) {
+            return "";
+        }
+        return md[key].c_str();
+    }
 
 
     
@@ -247,12 +334,9 @@ namespace scidb4gdal
     SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client, TemporalQueryParameters *props ) : _array ( array ), _client ( client ), _query(props)
     {
 
+        this->nRasterXSize = 1 + _array.getXDim().high - _array.getXDim().low ;
+        this->nRasterYSize = 1 + _array.getYDim().high - _array.getYDim().low ;
 
-        /* GDAL interprets x dimension as image rows and y dimension as image cols whereas our
-         * implementation of spatial reference systems assumes x being easting and y being northing.
-         * This makes the following code pretty messy in mixing x and y. */
-        this->nRasterYSize = 1 + _array.getXDim().high - _array.getXDim().low ;
-        this->nRasterXSize = 1 + _array.getYDim().high - _array.getYDim().low ;
 
 
         // Create GDAL Bands
@@ -262,6 +346,8 @@ namespace scidb4gdal
 
         this->SetDescription ( _array.toString().c_str() );
 
+        // Set Metadata
+        //this->SetMetadataItem("NODATA_VALUES", "0", "");
 
 
         // TODO: Overviews?
@@ -272,59 +358,26 @@ namespace scidb4gdal
     }
 
 
-    /*
-        CPLErr SciDBDataset::SetProjection ( const char *wkt )
-        {
-            _array.srtext = wkt;
-            OGRSpatialReference srs ( wkt );
-            srs.AutoIdentifyEPSG();
-            _array.auth_name = srs.GetAuthorityName ( NULL );
-            _array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
-            char *proj4;
-            srs.exportToProj4 ( &proj4 );
-            _array.proj4text.assign ( proj4 );
-            CPLFree ( proj4 );
-
-            _array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
-            _array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
-
-
-            // Only perform database update, if affine transformation has already been set
-            if ( !_array.affineTransform.isIdentity() ) {
-                _client->updateSRS ( _array );
-            }
-
-            return CE_None;
-        }
-
-
-        CPLErr SciDBDataset::SetGeoTransform ( double *padfTransform )
-        {
-
-            AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
-            _array.affineTransform = a;
-
-            // Only perform database update, if srs has already been set
-            if ( !_array.srtext.empty() ) {
-                _client->updateSRS ( _array );
-
-            }
-            return CE_None;
-        }*/
-
-
 
     GDALDataset *SciDBDataset::CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData )
     {
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
-
+  
         ConnectionPars *pars = new ConnectionPars();
-	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
-	parseOpeningOptions(info, pars);
+	//TODO Use create options (-co)
+// 	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
+	string connstr = pszFilename;
+	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
+	    Utils::error ( "This is not a scidb4gdal connection string" );
+	}
+	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
+	
+// 	parseOpeningOptions(info, pars);
         
-//         parseConnectionString ( pszFilename);
+        parseConnectionString ( astr, pars);
+
 
         // Create array metadata structure
         SciDBSpatialArray array;
@@ -340,6 +393,7 @@ namespace scidb4gdal
             stringstream aname;
             pixelsize += Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
             aname << "band" << i + 1;
+            //aname << poSrcDS->GetRasterBand ( i + 1 )->GetDescription();
             a.name = aname.str();
             attrs.push_back ( a );
         }
@@ -360,7 +414,7 @@ namespace scidb4gdal
 
         SciDBDimension dimx;
         dimx.low = 0;
-        dimx.high = nYSize - 1;
+        dimx.high = nXSize - 1;
         dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
         // dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_X;
         dimx.chunksize = blocksize;
@@ -368,34 +422,84 @@ namespace scidb4gdal
 
         SciDBDimension dimy;
         dimy.low = 0;
-        dimy.high = nXSize - 1;
+        dimy.high = nYSize - 1;
         dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
         //dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y;
         dimy.chunksize = blocksize;
         dimy.typeId = "int64";
 
 
-        dims.push_back ( dimx );
+        // This order is more efficient as it fits row major image format (does not require transposing during downloads)
         dims.push_back ( dimy );
+        dims.push_back ( dimx );
 
         array.dims = dims;
 
 
 
 
+        Utils::debug ( "Reading metadata from source dataset" );
+
+        // Get Metadata // TODO: Add domains
+        map<string, string> kv;
+        gdalMDtoMap ( poSrcDS->GetMetadata(), kv );
+        array.md.insert ( pair<string, MD> ( "", kv ) );
+
+
+        for ( int i = 0; i < nBands; ++i ) {
+            map<string, string> kv2;
+            //  gdalMDtoMap(  poSrcDS->GetRasterBand ( i + 1 )->GetMetadata(), kv2);
+            stringstream s;
+            double v;
+            int *ret = NULL;
+            v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( ret );
+            if ( ret != NULL && *ret != 0 ) {
+                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+                kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
+            }
+            s.str ( "" );
+            v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( ret ) ;
+            if ( ret != NULL && *ret != 0 ) {
+                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+                kv2.insert ( pair<string, string> ( "OFFSET", s.str() ) );
+                s.str ( "" );
+            }
+            s.str ( "" );
+            v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( ret ) ;
+            if ( ret != NULL && *ret != 0 ) {
+                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+                kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
+                s.str ( "" );
+            }
+            s.str ( "" );
+            v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( ret );
+            if ( ret != NULL && *ret != 0 ) {
+                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+                kv2.insert ( pair<string, string> ( "MIN", s.str() ) );
+            }
+            s.str ( "" );
+            v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( ret );
+            if ( ret != NULL && *ret != 0 ) {
+                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+                kv2.insert ( pair<string, string> ( "MAX", s.str() ) );
+            }
+            s.str ( "" );
+            s <<  std::setprecision ( numeric_limits< double >::digits10 ) << poSrcDS->GetRasterBand ( i + 1 )->GetUnitType() ;
+            kv2.insert ( pair<string, string> ( "UNIT", s.str() ) );
+
+
+            array.attrs[i].md.insert ( pair<string, MD> ( "", kv2 ) );
+        }
+
 
         // Create shim client
         ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl );
-
-
 
         // Create array in SciDB
         if ( client->createTempArray ( array ) != SUCCESS ) {
             Utils::error ( "Could not create temporary SciDB array" );
             return NULL;
         }
-
-
         // Copy data and write to SciDB
         size_t pixelSize = 0;
         for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
@@ -413,8 +517,8 @@ namespace scidb4gdal
 
 
 
-        for ( uint32_t bx = 0; bx < nBlockY; ++bx ) {
-            for ( uint32_t by = 0; by < nBlockX; ++by ) {
+        for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
+            for ( uint32_t by = 0; by < nBlockY; ++by ) {
 
                 size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
 
@@ -428,33 +532,26 @@ namespace scidb4gdal
                     return NULL;
                 }
 
-
                 // 1. Compute array bounds from block offsets
-                int xmin = bx *  dimx.chunksize + dimx.low; // TODO: Check whether x, y is correct
-                int xmax = xmin +  dimx.chunksize - 1; // TODO: Check whether x, y is correct
-                if ( xmax > dimx.high ) xmax = dimx.high; // TODO: Check whether x, y is correct
-				if ( xmin > dimx.high ) xmin = dimx.high; // TODO: Check whether x, y is correct
+                int xmin = bx *  dimx.chunksize + dimx.low;
+                int xmax = xmin +  dimx.chunksize - 1;
+                if ( xmax > dimx.high ) xmax = dimx.high;
+                if ( xmin > dimx.high ) xmin = dimx.high;
 
-                int ymin = by *  dimy.chunksize + dimy.low; // TODO: Check whether x, y is correct
-                int ymax = ymin + dimy.chunksize - 1; // TODO: Check whether x, y is correct
-                if ( ymax > dimy.high ) ymax = dimy.high; // TODO: Check whether x, y is correct
-				if ( ymin > dimy.high ) ymin = dimy.high; // TODO: Check whether x, y is correct
-				
+                int ymin = by *  dimy.chunksize + dimy.low;
+                int ymax = ymin + dimy.chunksize - 1;
+                if ( ymax > dimy.high ) ymax = dimy.high;
+                if ( ymin > dimy.high ) ymin = dimy.high;
+
                 // We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
                 for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
                     void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
-					
+
                     // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
                     GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
-		    
-		    //TODO in 2.0 (released June 2015) this function expects also 'psExtraArg' as additional argument. Here it is passed with NULL
-		    // in order to avoid "make" errors.
-                    poBand->RasterIO ( GF_Read, ymin, xmin, 
-				       1 + ymax - ymin, 1 + xmax - xmin, 
-				       ( void * ) blockBandBuf,  
-				       1 + ymax - ymin, 1 + xmax - xmin, 
-				       Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 
-				       0, 0,NULL);
+                    //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+                    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
+
 
                     /* SciDB load file format is band interleaved by pixel / cell, whereas common
                     GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
@@ -519,9 +616,28 @@ namespace scidb4gdal
 
 
 
+        Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
+
+        // Set Metadata in databse
+        for ( DomainMD::iterator it = array.md.begin(); it != array.md.end(); ++it ) {
+            client->setArrayMD ( array.name, it->second, it->first );
+        }
+
+
+
+        for ( int i = 0; i < nBands; ++i ) {
+            for ( DomainMD::iterator it = array.attrs[i].md.begin(); it != array.attrs[i].md.end(); ++it ) {
+                client->setAttributeMD ( array.name, array.attrs[i].name, it->second, it->first );
+            }
+        }
+
+
+
 
 
         pfnProgress ( 1.0, NULL, pProgressData );
+
+
 
 
         delete client;
@@ -532,70 +648,33 @@ namespace scidb4gdal
 
 
 
-    /*
-        GDALDataset *SciDBDataset::Create ( const char *pszFilename, int nXSize, int nYSize, int nBands, GDALDataType eType, char   **papszParmList )
-        {
+    void SciDBDataset::gdalMDtoMap ( char **strlist, map<string, string> &kv )
+    {
+        kv.clear();
 
-            ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename );
-
-            // Create array metadata structure
-            SciDBSpatialArray array;
-            array.name = pars->arrayname;
-
-            // Attributes
-            vector<SciDBAttribute> attrs;
-            for ( int i = 0; i < nBands; ++i ) {
-                SciDBAttribute a;
-                a.nullable = false; // TODO
-                a.typeId = Utils::gdalTypeToSciDBTypeId ( eType ); // All attribtues must have the same data type
-                stringstream aname;
-                aname << "band" << i + 1;
-                a.name = aname.str();
-                attrs.push_back ( a );
+        int i = 0;
+        char *it = strlist[0];
+        while ( it != NULL ) {
+            string s ( strlist[i] );
+            size_t p = string::npos;
+            p = ( s.find ( '=' ) != string::npos ) ? s.find ( '=' ) : p;
+            p = ( s.find ( ':' ) != string::npos ) ? s.find ( ':' ) : p;
+            if ( p != string::npos ) {
+                kv.insert ( pair<string, string> ( s.substr ( 0, p ), s.substr ( p + 1, s.length() - p - 1 ) ) );
             }
-            array.attrs = attrs;
+            it = strlist[++i];
 
+        }
+    }
 
-
-            // Dimensions
-
-            vector<SciDBDimension> dims;
-
-            SciDBDimension dimx;
-            dimx.low = 0;
-            dimx.high = nYSize - 1;
-            dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
-            dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_X;
-            dimx.typeId = "int64";
-
-            SciDBDimension dimy;
-            dimy.low = 0;
-            dimy.high = nXSize - 1;
-            dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
-            dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y;
-            dimy.typeId = "int64";
-
-            // TODO: Check order
-            dims.push_back ( dimx );
-            dims.push_back ( dimy );
-
-            array.dims = dims;
-
-            // Spatial reference is handled automatically by GDAL calling SetGeoTransform() and SetProjection()
-
-
-            // Create shim client
-            ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd );
-
-
-            // Create array in SciDB
-            client->createArray ( array );
-
-
-            delete client;
-            return ( GDALDataset * ) GDALOpen ( pszFilename, GA_Update );
-        }*/
-
+    char **SciDBDataset::mapToGdalMD ( map< string, string > &kv )
+    {
+        CPLStringList out;
+        for ( map<string, string>::iterator it = kv.begin(); it != kv.end(); ++it ) {
+            out.AddNameValue ( it->first.c_str(), it->second.c_str() );
+        }
+        return out.List();
+    }
 
 
 
@@ -609,10 +688,15 @@ namespace scidb4gdal
 
     CPLErr SciDBDataset::GetGeoTransform ( double *padfTransform )
     {
-        padfTransform[0] = _array.affineTransform._x0;
+        // If array dimensions do not start at 0, change transformation parameters accordingly
+        AffineTransform::double2 p0 ( _array.getXDim().low, _array.getYDim().low );
+        _array.affineTransform.f ( p0 );
+        // padfTransform[0] = _array.affineTransform._x0;
+        padfTransform[0] = p0.x;
         padfTransform[1] = _array.affineTransform._a11;
         padfTransform[2] = _array.affineTransform._a12;
-        padfTransform[3] = _array.affineTransform._y0;
+        //padfTransform[3] = _array.affineTransform._y0;
+        padfTransform[3] = p0.y;
         padfTransform[4] = _array.affineTransform._a21;
         padfTransform[5] = _array.affineTransform._a22;
         return CE_None;
@@ -625,6 +709,49 @@ namespace scidb4gdal
     }
     
 
+
+    char **SciDBDataset::GetMetadata ( const char *pszDomain )
+    {
+        map <string, string> kv;
+        if ( pszDomain == NULL ) {
+            _client->getArrayMD ( kv, _array.name, "" );
+        }
+        else {
+            _client->getArrayMD ( kv, _array.name, pszDomain );
+        }
+        return mapToGdalMD ( kv );
+    }
+
+
+    const char *SciDBDataset::GetMetadataItem ( const char *pszName, const char *pszDomain )
+    {
+        map <string, string> kv;
+        if ( pszDomain == NULL ) {
+            _client->getArrayMD ( kv, _array.name, "" );
+        }
+        else {
+            _client->getArrayMD ( kv, _array.name, pszDomain );
+        }
+        if ( kv.find ( pszName ) == kv.end() ) return NULL;
+        return kv.find ( pszName )->second.c_str();
+
+    }
+
+//     CPLErr SciDBDataset::SetMetadata ( char   **papszMetadataIn, const char *pszDomain )
+//     {
+//         map <string, string> kv;
+//         gdalMDtoMap ( papszMetadataIn, kv );
+//         _client->setArrayMD ( _array.name, kv, pszDomain );
+//         return CE_None;
+//     }
+//
+//     CPLErr SciDBDataset::SetMetadataItem ( const char *pszName, const char *pszValue, const char *pszDomain )
+//     {
+//         map <string, string> kv;
+//         kv.insert ( pair<string, string> ( pszName, pszValue ) );
+//         _client->setArrayMD ( _array.name, kv, pszDomain );
+//         return CE_None;
+//     }
 
     int SciDBDataset::Identify ( GDALOpenInfo *poOpenInfo )
     {

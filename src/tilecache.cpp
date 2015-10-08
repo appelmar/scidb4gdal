@@ -47,9 +47,7 @@ namespace scidb4gdal
 
     void TileCache::remove ( uint32_t id )
     {
-//  stringstream ss;
-//  ss << "Removing tile " << id << " from local tile cache";
-//  Utils::debug(ss.str());
+
         map<uint32_t, ArrayTile>::iterator it = _cache.find ( id );
         if ( it != _cache.end() ) {
             ArrayTile temp = it->second;
@@ -74,11 +72,6 @@ namespace scidb4gdal
         // Assert that chunk has not been cached already
         if ( has ( c.id ) ) return;
 
-
-//  stringstream ss;
-//  ss << "Adding tile " << c.id << " to local tile cache";
-//  Utils::debug(ss.str());
-
         // Check whether enough memory, if not, delete front (oldest) element
         while ( freeSpace() < c.size ) {
             if ( _q.empty() ) {
@@ -95,9 +88,7 @@ namespace scidb4gdal
 
     ArrayTile *TileCache::get ( uint32_t id )
     {
-//  stringstream ss;
-//  ss << "Fetching tile " << id << " from local tile cache";
-//  Utils::debug(ss.str());
+
         if ( has ( id ) )
             return &_cache[id];
         return NULL;

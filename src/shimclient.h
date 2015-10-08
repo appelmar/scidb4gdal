@@ -33,6 +33,7 @@ SOFTWARE.
 #include <inttypes.h>
 #include <sstream>
 #include <stack>
+#include <map>
 #include "shim_client_structs.h"
 #include "scidb_structs.h"
 
@@ -57,6 +58,10 @@ namespace scidb4gdal
     using namespace std;
     
     /**
+        DomainMD md;
+        int64_t start;
+        int64_t length;
+        DomainMD md;
      * Basic Shim client class
      */
     class ShimClient
@@ -116,7 +121,7 @@ namespace scidb4gdal
 	* @param t_index the temporal index at which data was stored, if no 3rd dimension specified it will be -1 and will be ignored.
         * @return status code
         */
-        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index );
+        StatusCode getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index, bool use_subarray = true, bool emptycheck = true);
 
 
         /**
@@ -159,11 +164,11 @@ namespace scidb4gdal
         StatusCode createTempArray ( SciDBSpatialArray &array );
 
         /**
-            *  Copies scidb arrays, used for persisting temporary load arrays
-            * @param src array name of the source array
+        *  Copies scidb arrays, used for persisting temporary load arrays
+        * @param src array name of the source array
         * @param dest array name of the target array
-            * @return status code
-            */
+        * @return status code
+        */
         StatusCode copyArray ( string src, string dest );
 
         /**
@@ -201,6 +206,19 @@ namespace scidb4gdal
         * @param out output, true if array already exists in SciDB
         */
         StatusCode arrayExists ( const string &inArrayName, bool &out );
+
+
+
+        StatusCode setArrayMD ( string arrayname, map<string, string> kv, string domain = "" );
+
+        StatusCode getArrayMD ( map<string, string> &kv, string arrayname, string domain = "" );
+
+        StatusCode setAttributeMD ( string arrayname, string attribute, map<string, string> kv, string domain = "" );
+
+        StatusCode getAttributeMD ( map<string, string> &kv, string arrayname, string attribute,  string domain = "" );
+
+
+
 
 
     protected:
