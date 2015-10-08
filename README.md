@@ -27,7 +27,7 @@ The second strategy was introduced as opening options parameter for the GDAL fun
 
 Examples for connection strings:
 - file name based: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
-- 
+
 - opening option based: `-oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password> -oo "ssl=true"`
 
 Notice that the file name for SciDB must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. Default values for parameters, if additional information is provided, are the following:
