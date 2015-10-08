@@ -30,7 +30,10 @@ SOFTWARE.
 #include <iomanip>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/assign.hpp>
 #include <limits>
+#include "shim_client_structs.h"
+#include "scidb_structs.h"
 
 CPL_C_START
 void GDALRegister_SciDB ( void );
@@ -61,75 +64,16 @@ void GDALRegister_SciDB()
 }
 
 
-
-
-
 namespace scidb4gdal
 {
-
-    struct ConnectionPars {
-
-        string arrayname;
-        string host;
-        int port;
-        string user;
-        string passwd;
-        bool ssl;
-
-        ConnectionPars() : arrayname ( "" ), host ( "https://localhost" ), port ( 8083 ), user ( "scidb" ), passwd ( "scidb" ) {}
-
-        string toString() {
-            stringstream s;
-            s << "array= " << arrayname << " host=" << host << " port=" << port << "  user=" << user << " passwd=" << passwd;
-            return s.str();
-        }
-
-        static ConnectionPars *parseConnectionString ( const string &connstr ) {
-            if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
-                Utils::error ( "This is not a scidb4gdal connection string" );
-            }
-
-            ConnectionPars *out = new ConnectionPars();
-
-            string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
-            vector<string> parts;
-            boost::split ( parts, astr, boost::is_any_of ( ",; " ) ); // Split at whitespace, comma, semicolon
-            for ( vector<string>::iterator it = parts.begin(); it != parts.end(); ++it ) {
-                vector<string> kv;
-                boost::split ( kv, *it, boost::is_any_of ( "=" ) ); // No colon because uf URL
-                if ( kv.size() != 2 ) {
-                    continue;
-                }
-                else {
-                    if ( kv[0].compare ( "host" ) == 0 ) out->host  = ( kv[1] );
-                    else if ( kv[0].compare ( "port" ) == 0 ) out->port = boost::lexical_cast<int> ( kv[1] );
-                    else if ( kv[0].compare ( "array" ) == 0 ) out->arrayname = ( kv[1] );
-                    else if ( kv[0].compare ( "user" ) == 0 ) out->user = ( kv[1] );
-                    else if ( kv[0].compare ( "password" ) == 0 ) out->passwd = ( kv[1] );
-                    else {
-                        continue;
-                    }
-                }
-            }
-            out->ssl = ( out->host.substr ( 0, 5 ).compare ( "https" ) == 0 );
-            return out;
-
-        }
-
-
-    };
-
-
-
 
     SciDBRasterBand::SciDBRasterBand ( SciDBDataset *poDS, SciDBSpatialArray *array, int nBand )
     {
         this->poDS = poDS;
         this->nBand = nBand;
         this->_array = array;
-
+	
         eDataType = Utils::scidbTypeIdToGDALType ( _array->attrs[nBand].typeId ); // Data type is mapped from SciDB's attribute data type
-
 
         uint32_t nImgYSize ( 1 + _array->getYDim().high - _array->getYDim().low );
         uint32_t nImgXSize ( 1 + _array->getXDim().high - _array->getXDim().low );
@@ -167,8 +111,11 @@ namespace scidb4gdal
         //TODO: Improve error handling
         SciDBDataset *poGDS = ( SciDBDataset * ) poDS;
 
+	//TODO parse the temporal index from query string...
+	int32_t t_index = poGDS->_query->temp_index;
         uint32_t tileId = TileCache::getBlockId ( nBlockXOff, nBlockYOff, nBand - 1, nBlockXSize, nBlockYSize, poGDS->GetRasterCount() );
 
+	
 
         ArrayTile tile;
         tile.id = tileId;
@@ -186,8 +133,9 @@ namespace scidb4gdal
             int ymin = nBlockYOff * this->nBlockYSize + _array->getYDim().low;
             int ymax = ymin + this->nBlockYSize - 1;
             if ( ymax > _array->getYDim().high ) ymax = _array->getYDim().high;
+	    
 
-
+            // Read  and fetch data
             bool use_subarray = ! ( ( xmin % ( int ) _array->getXDim().chunksize == 0 ) && ( ymin % ( int ) _array->getYDim().chunksize == 0 ) );
 
             tile.size = nBlockXSize * nBlockYSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // Always allocate full block size
@@ -267,8 +215,10 @@ namespace scidb4gdal
                 size_t dataSize = ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // This is smaller than the block size!
                 void *buf = malloc ( dataSize );
 
+		
                 // Write to temporary buffer first
-                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
+		//TODO  t_index is set as zero for compiler testing... this must be changed
+                poGDS->getClient()->getData ( *_array, nBand - 1, buf, xmin, ymin, xmax, ymax, t_index, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
                 for ( uint32_t i = 0; i < ( 1 + ymax - ymin ); ++i ) {
                     uint8_t *src  = & ( ( uint8_t * ) buf ) [i * ( 1 + xmax - xmin ) * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
                     uint8_t *dest = & ( ( uint8_t * ) tile.data ) [i * this->nBlockXSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId )];
@@ -278,7 +228,7 @@ namespace scidb4gdal
             }
             else {
                 // This is the most efficient!
-                poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
+                poGDS->getClient()->getData ( *_array, nBand - 1, tile.data, xmin, ymin, xmax, ymax, t_index, use_subarray ); // GDAL bands start with 1, scidb attribute indexes with 0
             }
         }
 
@@ -378,9 +328,10 @@ namespace scidb4gdal
     }
 
 
+    
 
 
-    SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client ) : _array ( array ), _client ( client )
+    SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client, TemporalQueryParameters *props ) : _array ( array ), _client ( client ), _query(props)
     {
 
         this->nRasterXSize = 1 + _array.getXDim().high - _array.getXDim().low ;
@@ -410,14 +361,23 @@ namespace scidb4gdal
 
     GDALDataset *SciDBDataset::CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData )
     {
-
-
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
+  
+        ConnectionPars *pars = new ConnectionPars();
+	//TODO Use create options (-co)
+// 	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
+	string connstr = pszFilename;
+	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
+	    Utils::error ( "This is not a scidb4gdal connection string" );
+	}
+	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
+	
+// 	parseOpeningOptions(info, pars);
+        
+        parseConnectionString ( astr, pars);
 
-
-        ConnectionPars *pars = ConnectionPars::parseConnectionString ( pszFilename );
 
         // Create array metadata structure
         SciDBSpatialArray array;
@@ -532,30 +492,15 @@ namespace scidb4gdal
         }
 
 
-
-
-
-
         // Create shim client
         ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl );
-
-
 
         // Create array in SciDB
         if ( client->createTempArray ( array ) != SUCCESS ) {
             Utils::error ( "Could not create temporary SciDB array" );
             return NULL;
         }
-
-
-
-
-
-
-
         // Copy data and write to SciDB
-
-
         size_t pixelSize = 0;
         for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
         size_t totalSize = pixelSize *  dimx.chunksize * dimy.chunksize;
@@ -605,7 +550,7 @@ namespace scidb4gdal
                     // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
                     GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
                     //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
-                    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+                    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
 
 
                     /* SciDB load file format is band interleaved by pixel / cell, whereas common
@@ -739,9 +684,7 @@ namespace scidb4gdal
         FlushCache();
         delete _client;
     }
-
-
-
+    
 
     CPLErr SciDBDataset::GetGeoTransform ( double *padfTransform )
     {
@@ -760,12 +703,11 @@ namespace scidb4gdal
     }
 
 
-
     const char *SciDBDataset::GetProjectionRef()
     {
         return _array.srtext.c_str();
     }
-
+    
 
 
     char **SciDBDataset::GetMetadata ( const char *pszDomain )
@@ -811,7 +753,6 @@ namespace scidb4gdal
 //         return CE_None;
 //     }
 
-
     int SciDBDataset::Identify ( GDALOpenInfo *poOpenInfo )
     {
         if ( poOpenInfo->pszFilename == NULL || !EQUALN ( poOpenInfo->pszFilename, "SCIDB:", 6 ) ) {
@@ -827,7 +768,7 @@ namespace scidb4gdal
         Utils::debug ( "Deleting SciDB arrays from GDAL is currently not allowed..." );
         return CE_None;
     }
-
+  
 
     GDALDataset *SciDBDataset::Open ( GDALOpenInfo *poOpenInfo )
     {
@@ -846,34 +787,87 @@ namespace scidb4gdal
             return NULL;
         }
 
-
-
+        
         // 1. parse connection string and extract the following values
-        ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
-        Utils::debug ( "Using connection parameters: host:" + pars->toString() );
-
-
-
-        // 2. Check validity of parameters
-        if ( pars->arrayname == "" ) Utils::error ( "No array specified, currently not supported" );
-
+        //TODO should be one function at the scidb driver
+        TemporalQueryParameters *sp = new TemporalQueryParameters();
+	ConnectionPars *pars = new ConnectionPars();
+	
+	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
+	    Utils::error ( "This is not a scidb4gdal connection string" );
+	}
+	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
+	
+	//1. search for "properties=" in the string
+	string connectionString, propertiesString;
+	
+	if (splitPropertyString(astr, connectionString, propertiesString)){
+	  parsePropertiesString(propertiesString, sp);
+	}
+	
+	//first extract information from connection string and afterwards check for the opening options and overwrite values if double
+	parseConnectionString(connectionString, pars);
+	parseOpeningOptions(poOpenInfo, pars);
+	
+	parseArrayName(pars->arrayname, sp); //array name will be modified if a temporal query is detected (for the ConnectionPars)
+	
+	// 2. Check validity of parameters
+        if ( pars->arrayname == "" ) {
+	  Utils::error ( "No array specified, currently not supported" );
+	  return NULL;
+	}
+	
+        //ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
+        Utils::debug ( "Using connection parameters:" + pars->toString() );
+	
         // 3. Create shim client
-        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl );
+        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl);
 
-
-
-        SciDBSpatialArray array;
+        SciDBSpatioTemporalArray array;
         // 4. Request array metadata
         if ( client->getArrayDesc ( pars->arrayname, array ) != SUCCESS ) {
             Utils::error ( "Cannot fetch array metadata" );
             return NULL;
         }
+	
+		//check if the temporal index was set or if a timestamp was used
+	if (sp->hasTemporalIndex) {
+	  char* t_index_key = new char[1];
+	  t_index_key[0] = 't';
+	  if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
+	    string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions,t_index_key);
+	    sp->temp_index = boost::lexical_cast<int>(value);
+	  } 
+	} else {
 
-        if ( array.dims.size() != 2 ) {
-            Utils::error ( "GDAL works with two-dimensional arrays only" );
-            return NULL;
-        }
+	  //convert date to temporal index
+	  TPoint time = TPoint(sp->timestamp);
+	  sp->temp_index = array.indexAtDatetime(time);
+	  sp->hasTemporalIndex = true;
+	}
+	
+	
+	
+	
+	//TODO check also if temporal index is within time dimension range
+	if (array.dims.size() > 2) {
+	  if ( !array.isTemporal() ) {
+	      Utils::debug ( "No time statement defined in the connection string. Can't decide which image to fetch in the temporal data set." );
+// 	      return NULL;
+	  } else {
+	      //get dimension for time
+	      SciDBDimension *dim;
+	      dim = &array.dims[array.getTDimIdx()];
 
+	      if (sp->temp_index < dim->low || sp->temp_index > dim->high) {
+		  Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(sp->temp_index) +
+		  ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + array.datetimeAtIndex(dim->low).toStringISO() + "), " +
+		    "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + array.datetimeAtIndex(dim->high).toStringISO() + ")"
+		  );
+		  return NULL;
+	      }
+	  }
+	}
 
 
         delete pars;
@@ -882,11 +876,201 @@ namespace scidb4gdal
         // Create the dataset
 
         SciDBDataset *poDS;
-
-        poDS = new SciDBDataset ( array, client );
+        poDS = new SciDBDataset ( array, client, sp );
         return ( poDS );
     }
+    
+    bool SciDBDataset::splitPropertyString (string &input, string &constr, string &propstr) {
+      	string propToken = "properties=";
+	int start = input.find(propToken);
+	bool found = (start >= 0);
 
+	//if there then split it accordingly and fill the ConnectionPars and the SelectProperties
+	if (found) {
+	  // if we find the 'properties=' in the connection string we treat those string part as
+	  // the database open parameters 
+	  int end = start + propToken.length();
+	  constr = input.substr(0,start-1);
+	  propstr = input.substr(end,input.length()-1);
+	  
+	} else {
+	  constr = input;
+	}
+	return found;
+    }
 
-
+    void SciDBDataset::parsePropertiesString ( const string &propstr, TemporalQueryParameters* query ) {
+      //mapping between the constant variables and their string representation for using a switch/case statement later
+      std::map<string,Properties> propResolver = map_list_of ("t",T_INDEX);
+      vector<string> parts;
+      boost::split ( parts, propstr, boost::is_any_of ( ";" ) ); // Split at semicolon and comma for refering to a whole KVP
+      //example for filename with properties variable    "src_win:0 0 50 50;..."
+      for ( vector<string>::iterator it = parts.begin(); it != parts.end(); ++it ) {
+	vector<string> kv, c;
+	boost::split ( kv, *it, boost::is_any_of ( ":=" ) ); 
+	if ( kv.size() < 2 ) {
+	  continue;
+	} else {
+	  if(propResolver.find(std::string(kv[0])) != propResolver.end()) {
+	    switch(propResolver[kv[0]]) {
+	      case T_INDEX:
+		query->temp_index = boost::lexical_cast<int>(kv[1]);
+		//TODO maybe we allow also selecting multiple slices (that will later be saved separately as individual files)
+		break;
+	      default:
+		continue;
+		
+	    }
+	  } else {
+	    Utils::debug("unused parameter \""+string(kv[0])+ "\" with value \""+string(kv[1])+"\"");
+	  }
+	}
+      }
+    }
+    
+    void SciDBDataset::parseArrayName (string& array, TemporalQueryParameters* query) {
+      // 	  string array = pars->arrayname;
+      size_t length = array.size();
+      size_t t_start = array.find_first_of('[');
+      size_t t_end = array.find_last_of(']');
+      
+      if (t_start < 0 || t_end < 0) {
+	Utils::error("No or invalid temporal information in array name.");
+	return;
+      }
+      //extract temporal string
+      if ((length-1) == t_end) {
+	string t_expression = array.substr(t_start+1,(t_end-t_start)-1);
+	//remove the temporal part of the array name otherwise it messes up the concrete array name in scidb
+	string temp = array.substr(0,t_start);
+	array = temp;
+	vector<string> kv;
+	
+	boost::split(kv, t_expression, boost::is_any_of(","));
+	if (kv.size() < 2) {
+	  Utils::error("Temporal query not complete. Please state the dimension name and the temporal index / interval");
+	  return;
+	}
+	//first part is the dimension identifier
+	query->dim_name = kv[0];
+	//seceond part is either a temporal index (or temporal index interval) or a timestamp is used (or timestamp interval)
+	string t_interval = kv[1];
+	
+	/* Test with Regex, failed due to gcc version 4.8.4 (4.9 implements regex completely) */
+	// 	    std::smatch match;
+	// 	    
+	// 	    std::regex re("/^[\d]{4}(\/|-)[\d]{2}(\/|-)[\d]{2}(\s|T)[\d]{2}:[\d]{2}:[\d]{2}((\+|-)[0-1][\d]:?(0|3)0)?$/");
+	// 	    if (std::regex_search(t_interval,match,re)) {
+	// 	      ...
+	// 	    }
+	
+	if (t_interval.length() > 0) {
+	  //if string is a timestamp then translate it into the temporal index
+	  if (Utils::validateTimestampString(t_interval)) {
+	    //store timestamp for query when calling scidb
+	    query->timestamp = t_interval;
+	    query->hasTemporalIndex = false;
+	  } else {                                               
+	    //simply extract the temporal index
+	    size_t pos = t_interval.find(":");
+	    if (pos < t_interval.length()) {
+	      //interval
+	      vector<string> attr;
+	      boost::split(attr,t_interval,boost::is_any_of(":"));
+	      query->lower_bound = boost::lexical_cast<int>(attr[0]);
+	      query->upper_bound = boost::lexical_cast<int>(attr[1]);
+	      //TODO for now we parse it correctly, but we will just use the lower_bound... change this later
+	      Utils::debug("Currently interval query is not supported. Using the lower bound instead");
+	      query->temp_index = query->lower_bound;
+	    } else {
+	      //temporal index
+	      query->temp_index = boost::lexical_cast<int>(t_interval);
+	    }
+	    query->hasTemporalIndex = true;
+	  }
+	} else {
+	  Utils::error("No temporal information stated");
+	  return;
+	}
+      }
+    }
+    
+    void SciDBDataset::parseOpeningOptions (GDALOpenInfo *poOpenInfo, ConnectionPars* con) {
+      std::map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL);
+      
+      char** options = poOpenInfo->papszOpenOptions;
+      int count = CSLCount(options);
+      for (int i = 0; i < count; i++) {
+	const char* s = CSLGetField(options,i);
+	char* key;
+	const char* value = CPLParseNameValue(s,&key);
+	
+	if(paramResolver.find(std::string(key)) != paramResolver.end()) {
+	  switch(paramResolver[std::string(key)]) {
+	    case HOST:
+	      con->host = value;
+	      con->ssl = (std::string(value).substr ( 0, 5 ).compare ( "https" ) == 0 );
+	      break;
+	    case USER:
+	      con->user = value;
+	      break;
+	    case PORT:
+	      con->port = boost::lexical_cast<int>(value);
+	      break;
+	    case PASSWORD:
+	      con->passwd = value;
+	      break;
+	    case SSL:
+	      con->ssl = CSLTestBoolean(value);
+	      break;
+	    default:
+	      continue;
+	  }
+	} else {
+	  Utils::debug("unused parameter \""+string(key)+ "\" with value \""+string(value)+"\"");
+	}
+      }
+    }
+    
+    void SciDBDataset::parseConnectionString ( const string &connstr, ConnectionPars *con) {
+      std::map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("array", ARRAY) ("user",USER) ("password", PASSWORD);
+      
+      vector<string> connparts;
+      // Split at whitespace, comma, semicolon
+      boost::split ( connparts, connstr, boost::is_any_of ( "; " ) );
+      for ( vector<string>::iterator it = connparts.begin(); it != connparts.end(); ++it ) {
+	vector<string> kv;
+	// No colon because uf URL
+	boost::split ( kv, *it, boost::is_any_of ( "=" ) );
+	if ( kv.size() != 2 ) {
+	  continue;
+	} else {
+	  if(paramResolver.find(std::string(kv[0])) != paramResolver.end()) {
+	    switch(paramResolver[kv[0]]) {
+	      case HOST:
+		con->host  = ( kv[1] );
+		con->ssl = (kv[1].substr ( 0, 5 ).compare ( "https" ) == 0 );
+		break;
+	      case PORT:
+		con->port = boost::lexical_cast<int> ( kv[1] );
+		break;
+	      case ARRAY:
+		con->arrayname = ( kv[1] );
+		break;
+	      case USER:
+		con->user = ( kv[1] );
+		break;
+	      case PASSWORD:
+		con->passwd = ( kv[1] );
+		break;
+	      default:
+		Utils::debug("haven't found stuff");
+		continue; 
+	    }
+	  } else {
+	    Utils::debug("unused parameter \""+string(kv[0])+ "\" with value \""+string(kv[1])+"\"");
+	  }
+	}
+      }
+    }
 }

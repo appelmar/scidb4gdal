@@ -180,6 +180,11 @@ namespace scidb4gdal
          * @param x integer number
          */
         uint32_t nextPow2 ( uint32_t x );
+	
+	/**
+	* 	Function to validate the time string that is passed
+	*/
+	bool validateTimestampString(string &in);
 
     }
 

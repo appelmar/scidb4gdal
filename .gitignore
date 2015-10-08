@@ -26,3 +26,8 @@
 *.exe
 *.out
 *.app
+
+# KDE4 files
+*.kdev4
+/.project
+/doc/
