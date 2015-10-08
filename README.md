@@ -21,15 +21,14 @@ The driver offers support for reading and writing SciDB arrays. Update access to
     - Support for HTTPS connections to Shim
     - Improved performance for both read and write access
 
-
-## Getting Started
 ## Getting Started
 Similar to other database drivers for GDAL, we need to access a database in order to perform queries. Therefore two strategies can be utilized to do so. The first strategy was introduced by the early database drivers. They used a connection string to access the database. Typically the connection string was passed as the file name.
 The second strategy was introduced as opening options parameter for the GDAL functions with GDAL version 2.0.
 
 Examples for connection strings:
-`"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"` as file name,
-`-oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password> -oo "ssl=true"` as opening option parameter
+- file name based: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
+- 
+- opening option based: `-oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password> -oo "ssl=true"`
 
 Notice that the file name for SciDB must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. Default values for parameters, if additional information is provided, are the following:
 
@@ -48,11 +47,11 @@ As a solution we allow three different methods:
 
 To address the temporal component the identifier "t" is used in most cases. "t" requires either an integer value (temporal index) or a valid timestamp string according to ISO 8601. The latter is currently only supported in the "suffix" strategy.
 
-When using "gdal_tranlate" to access spatio-temporally references imagery in SciDB note that exactly one image will be returned. With this in mind the temporal request is limited to search with one time component, meaning that no interval query is currently supported. The temporal query will return the temporally nearest image that is found in the data base.
+When using "gdal_translate" to access spatio-temporally references imagery in SciDB note that exactly one image will be returned. With this in mind the temporal request is limited to search with one time component, meaning that no interval query is currently supported. The temporal query will return the temporally nearest image that is found in the data base.
 
 The following examples demonstrate how you can use gdal_translate to load / read imagery to / from SciDB: 
 
-- Array metadata: `gdalinfo "SCIDB:array=sample_array_gdal`
+- Array metadata: `gdalinfo "SCIDB:array=sample_array_gdal"`
 
 - Exporting SciDB arrays: `gdal_translate [-oo ...] -of GTiff "SCIDB:array=sample_array[t,1] [...]" sample.tif`
 
@@ -62,11 +61,9 @@ In terms of loading spatial imagery into SciDB, we currently support simple uplo
 
 ## Dependencies
 - At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers
-- ST plugin for SciDB [ST plugin] (https://github.com/mappl/scidb4geo)
+- [ST plugin] (https://github.com/mappl/scidb4geo) for SciDB
 - We use [cURL](http://curl.haxx.se/) to interface with SciDB's web service shim
 - Some [Boost](http://www.boost.org) header-only libraries (no external libraries required for linking) for string functions
-
-
 
 
 ## Build Instructions
@@ -84,8 +81,6 @@ The following instructions show you how to compile GDAL with added SciDB driver 
 6. Eventually, you might need to run `sudo ldconfig` to make GDAL's shared library available.
 
 If you get some missing include file errors, you need to install Boost manually. Either use your distribution's package manager e.g. `sudo apt-get install libboost-dev` or simply copy Boost header files to a standard include directory like `/usr/include`.
-
-
 
 
 ### Build on Windows
