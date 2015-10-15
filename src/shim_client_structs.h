@@ -20,7 +20,7 @@ namespace scidb4gdal {
     T_INDEX
   };
   
-  struct TemporalQueryParameters {
+  struct QueryParameters {
     int temp_index;
     int lower_bound;
     int upper_bound;
@@ -28,7 +28,7 @@ namespace scidb4gdal {
     string timestamp;
     bool hasTemporalIndex;
     
-    TemporalQueryParameters(): temp_index(-1) {}
+    QueryParameters(): temp_index(-1) {}
   };
   
   /**

@@ -58,7 +58,7 @@ namespace scidb4gdal
         * Default constructor for creating SciDBDataset instance for a given connectionstring
          * @param connstr string representation of a connection string, e.g. "SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"
          */
-        SciDBDataset ( SciDBSpatialArray array, ShimClient *client, TemporalQueryParameters *props );
+        SciDBDataset ( SciDBSpatialArray array, ShimClient *client, QueryParameters *props );
 
         /**
          * Destructor for SciDBDatasets
@@ -158,18 +158,18 @@ namespace scidb4gdal
 	/**
 	 * The selection properties are obtained from the connection string. Mainly used to store the temporal query index (3rd dimension parameter)
 	 */
-	TemporalQueryParameters *_query;
+	QueryParameters *_query;
 	
 	/**
 	 * Parse the connection string for the key value pair "properties=..."
 	 * @param propstr The value part of the key value pair "properties=..." 
 	 */ 
-	static void parsePropertiesString ( const string &propstr, TemporalQueryParameters* query );
-	
-	static void parseArrayName (string& array, TemporalQueryParameters* query);
-	static void parseOpeningOptions (GDALOpenInfo *poOpenInfo, ConnectionPars* con);
-	static void parseConnectionString ( const string &connstr, ConnectionPars* con);
-	static bool splitPropertyString (string &input, string &constr, string &propstr);
+// 	static void parsePropertiesString ( const string &propstr, QueryParameters* query );
+// 	
+// 	static void parseArrayName (string& array, QueryParameters* query);
+// 	static void parseOpeningOptions (GDALOpenInfo *poOpenInfo, ConnectionPars* con);
+	//static void parseConnectionString ( const string &connstr, ConnectionPars* con);
+// 	static bool splitPropertyString (string &input, string &constr, string &propstr);
 
     };
 
