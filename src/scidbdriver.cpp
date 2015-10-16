@@ -366,286 +366,299 @@ namespace scidb4gdal
         int  nBands = poSrcDS->GetRasterCount();
         int  nXSize = poSrcDS->GetRasterXSize();
         int  nYSize = poSrcDS->GetRasterYSize();
-	ParameterParser pp = ParameterParser();
-        ConnectionPars *pars = new ConnectionPars();
-	//TODO Use create options (-co)
-// 	GDALOpenInfo* info = new GDALOpenInfo(pszFilename,0);
-	string connstr = pszFilename;
-	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
-	    Utils::error ( "This is not a scidb4gdal connection string" );
-	}
-	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
 	
-// 	parseOpeningOptions(info, pars);
-        
-        pp.parseConnectionString ( astr, pars);
-
-
-        // Create array metadata structure
-        SciDBSpatialArray array;
-        array.name = pars->arrayname;
-
-        // Attributes
-        size_t pixelsize = 0; // size in bytes of one pixel, i.e. sum of attribute sizes
-        vector<SciDBAttribute> attrs;
-        for ( int i = 0; i < nBands; ++i ) {
-            SciDBAttribute a;
-            a.nullable = false; // TODO
-            a.typeId = Utils::gdalTypeToSciDBTypeId ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() ); // All attribtues must have the same data type
-            stringstream aname;
-            pixelsize += Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
-            aname << "band" << i + 1;
-            //aname << poSrcDS->GetRasterBand ( i + 1 )->GetDescription();
-            a.name = aname.str();
-            attrs.push_back ( a );
-        }
-        array.attrs = attrs;
-
-
-
-        // Dimensions
-
-        vector<SciDBDimension> dims;
-
-
-        // Derive chunksize from attribute sizes
-        uint32_t blocksize = Utils::nextPow2 ( ( uint32_t ) sqrt ( ( ( ( double ) ( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 ) ) / ( ( double ) ( pixelsize ) ) ) ) ) / 2;
-        stringstream ss;
-        ss << "Using chunksize " << blocksize << "x" << blocksize << " --> " << ( int ) ( ( ( double ) ( blocksize * blocksize * pixelsize ) ) / ( ( double ) 1024.0 ) ) << " kilobytes";
-        Utils::debug ( ss.str() );
-
-        SciDBDimension dimx;
-        dimx.low = 0;
-        dimx.high = nXSize - 1;
-        dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
-        // dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_X;
-        dimx.chunksize = blocksize;
-        dimx.typeId = "int64";
-
-        SciDBDimension dimy;
-        dimy.low = 0;
-        dimy.high = nYSize - 1;
-        dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
-        //dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y;
-        dimy.chunksize = blocksize;
-        dimy.typeId = "int64";
-
-
-        // This order is more efficient as it fits row major image format (does not require transposing during downloads)
-        dims.push_back ( dimy );
-        dims.push_back ( dimx );
-
-        array.dims = dims;
-
-
-
-
-        Utils::debug ( "Reading metadata from source dataset" );
-
-        // Get Metadata // TODO: Add domains
-        map<string, string> kv;
-        gdalMDtoMap ( poSrcDS->GetMetadata(), kv );
-        array.md.insert ( pair<string, MD> ( "", kv ) );
-
-
-        for ( int i = 0; i < nBands; ++i ) {
-            map<string, string> kv2;
-            //  gdalMDtoMap(  poSrcDS->GetRasterBand ( i + 1 )->GetMetadata(), kv2);
-            stringstream s;
-            double v;
-            int *ret = NULL;
-            v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( ret );
-            if ( ret != NULL && *ret != 0 ) {
-                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-                kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
-            }
-            s.str ( "" );
-            v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( ret ) ;
-            if ( ret != NULL && *ret != 0 ) {
-                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-                kv2.insert ( pair<string, string> ( "OFFSET", s.str() ) );
-                s.str ( "" );
-            }
-            s.str ( "" );
-            v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( ret ) ;
-            if ( ret != NULL && *ret != 0 ) {
-                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-                kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
-                s.str ( "" );
-            }
-            s.str ( "" );
-            v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( ret );
-            if ( ret != NULL && *ret != 0 ) {
-                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-                kv2.insert ( pair<string, string> ( "MIN", s.str() ) );
-            }
-            s.str ( "" );
-            v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( ret );
-            if ( ret != NULL && *ret != 0 ) {
-                s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-                kv2.insert ( pair<string, string> ( "MAX", s.str() ) );
-            }
-            s.str ( "" );
-            s <<  std::setprecision ( numeric_limits< double >::digits10 ) << poSrcDS->GetRasterBand ( i + 1 )->GetUnitType() ;
-            kv2.insert ( pair<string, string> ( "UNIT", s.str() ) );
+	
+	try {
+	  string connstr = pszFilename;
+	  ParameterParser pp = ParameterParser(connstr, papszOptions, SCIDB_CREATE);
+	  //TODO Use create options (-co)
+
+	  ConnectionParameters *con_pars;
+	  CreationParameters *create_pars;
+	  con_pars = &pp.getConnectionParameter();
+	  create_pars = &pp.getCreationParameter();
+	    
+	  // 2. Check validity of connection parameters
+	  if ( !con_pars->isComplete()) {
+	    throw con_pars->error_code;
+	  } else {
+	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
+	  }
+	  
+	  // Create array metadata structure
+	  SciDBSpatialArray array;
+	  array.name = con_pars->arrayname;
+
+	  // Attributes
+	  size_t pixelsize = 0; // size in bytes of one pixel, i.e. sum of attribute sizes
+	  vector<SciDBAttribute> attrs;
+	  for ( int i = 0; i < nBands; ++i ) {
+	      SciDBAttribute a;
+	      a.nullable = false; // TODO
+	      a.typeId = Utils::gdalTypeToSciDBTypeId ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() ); // All attribtues must have the same data type
+	      stringstream aname;
+	      pixelsize += Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
+	      aname << "band" << i + 1;
+	      //aname << poSrcDS->GetRasterBand ( i + 1 )->GetDescription();
+	      a.name = aname.str();
+	      attrs.push_back ( a );
+	  }
+	  array.attrs = attrs;
+
+
+
+	  // Dimensions
+
+	  vector<SciDBDimension> dims;
+
+
+	  // Derive chunksize from attribute sizes
+	  uint32_t blocksize = Utils::nextPow2 ( ( uint32_t ) sqrt ( ( ( ( double ) ( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 ) ) / ( ( double ) ( pixelsize ) ) ) ) ) / 2;
+	  stringstream ss;
+	  ss << "Using chunksize " << blocksize << "x" << blocksize << " --> " << ( int ) ( ( ( double ) ( blocksize * blocksize * pixelsize ) ) / ( ( double ) 1024.0 ) ) << " kilobytes";
+	  Utils::debug ( ss.str() );
+
+	  SciDBDimension dimx;
+	  dimx.low = 0;
+	  dimx.high = nXSize - 1;
+	  dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
+	  // dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_X;
+	  dimx.chunksize = blocksize;
+	  dimx.typeId = "int64";
+
+	  SciDBDimension dimy;
+	  dimy.low = 0;
+	  dimy.high = nYSize - 1;
+	  dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
+	  //dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y;
+	  dimy.chunksize = blocksize;
+	  dimy.typeId = "int64";
+
+
+	  // This order is more efficient as it fits row major image format (does not require transposing during downloads)
+	  dims.push_back ( dimy );
+	  dims.push_back ( dimx );
+
+	  array.dims = dims;
+
+
+
+
+	  Utils::debug ( "Reading metadata from source dataset" );
+
+	  // Get Metadata // TODO: Add domains
+	  map<string, string> kv;
+	  gdalMDtoMap ( poSrcDS->GetMetadata(), kv );
+	  array.md.insert ( pair<string, MD> ( "", kv ) );
+
+
+	  for ( int i = 0; i < nBands; ++i ) {
+	      map<string, string> kv2;
+	      //  gdalMDtoMap(  poSrcDS->GetRasterBand ( i + 1 )->GetMetadata(), kv2);
+	      stringstream s;
+	      double v;
+	      int *ret = NULL;
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( ret );
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( ret ) ;
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "OFFSET", s.str() ) );
+		  s.str ( "" );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( ret ) ;
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
+		  s.str ( "" );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( ret );
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "MIN", s.str() ) );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( ret );
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "MAX", s.str() ) );
+	      }
+	      s.str ( "" );
+	      s <<  std::setprecision ( numeric_limits< double >::digits10 ) << poSrcDS->GetRasterBand ( i + 1 )->GetUnitType() ;
+	      kv2.insert ( pair<string, string> ( "UNIT", s.str() ) );
 
 
-            array.attrs[i].md.insert ( pair<string, MD> ( "", kv2 ) );
-        }
+	      array.attrs[i].md.insert ( pair<string, MD> ( "", kv2 ) );
+	  }
 
 
-        // Create shim client
-        ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl );
+	  // Create shim client
+	  ShimClient *client = new ShimClient (con_pars);
 
-        // Create array in SciDB
-        if ( client->createTempArray ( array ) != SUCCESS ) {
-            Utils::error ( "Could not create temporary SciDB array" );
-            return NULL;
-        }
-        // Copy data and write to SciDB
-        size_t pixelSize = 0;
-        for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
-        size_t totalSize = pixelSize *  dimx.chunksize * dimy.chunksize;
+	  // Create array in SciDB
+	  if ( client->createTempArray ( array ) != SUCCESS ) {
+	      Utils::error ( "Could not create temporary SciDB array" );
+	      return NULL;
+	  }
+	  // Copy data and write to SciDB
+	  size_t pixelSize = 0;
+	  for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
+	  size_t totalSize = pixelSize *  dimx.chunksize * dimy.chunksize;
 
-        uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
+	  uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
 
 
-        uint32_t nBlockX = ( uint32_t ) ( nXSize / dimx.chunksize );
-        if ( nXSize % dimx.chunksize != 0 ) ++nBlockX;
+	  uint32_t nBlockX = ( uint32_t ) ( nXSize / dimx.chunksize );
+	  if ( nXSize % dimx.chunksize != 0 ) ++nBlockX;
 
-        uint32_t nBlockY = ( uint32_t ) ( nYSize / dimy.chunksize );
-        if ( nYSize % dimy.chunksize != 0 ) ++nBlockY;
+	  uint32_t nBlockY = ( uint32_t ) ( nYSize / dimy.chunksize );
+	  if ( nYSize % dimy.chunksize != 0 ) ++nBlockY;
 
 
 
 
-        for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
-            for ( uint32_t by = 0; by < nBlockY; ++by ) {
+	  for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
+	      for ( uint32_t by = 0; by < nBlockY; ++by ) {
 
-                size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
+		  size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
 
 
 
-                if ( !pfnProgress ( ( ( double ) ( bx * nBlockY + by ) ) / ( ( double ) ( nBlockX * nBlockY ) ), NULL, pProgressData ) ) {
-                    Utils::debug ( "Interruption by user requested, trying to clean up" );
-                    // Clean up intermediate arrays
-                    client->removeArray ( array.name );
-                    Utils::error ( "TERMINATED BY USER" );
-                    return NULL;
-                }
+		  if ( !pfnProgress ( ( ( double ) ( bx * nBlockY + by ) ) / ( ( double ) ( nBlockX * nBlockY ) ), NULL, pProgressData ) ) {
+		      Utils::debug ( "Interruption by user requested, trying to clean up" );
+		      // Clean up intermediate arrays
+		      client->removeArray ( array.name );
+		      Utils::error ( "TERMINATED BY USER" );
+		      return NULL;
+		  }
 
-                // 1. Compute array bounds from block offsets
-                int xmin = bx *  dimx.chunksize + dimx.low;
-                int xmax = xmin +  dimx.chunksize - 1;
-                if ( xmax > dimx.high ) xmax = dimx.high;
-                if ( xmin > dimx.high ) xmin = dimx.high;
+		  // 1. Compute array bounds from block offsets
+		  int xmin = bx *  dimx.chunksize + dimx.low;
+		  int xmax = xmin +  dimx.chunksize - 1;
+		  if ( xmax > dimx.high ) xmax = dimx.high;
+		  if ( xmin > dimx.high ) xmin = dimx.high;
 
-                int ymin = by *  dimy.chunksize + dimy.low;
-                int ymax = ymin + dimy.chunksize - 1;
-                if ( ymax > dimy.high ) ymax = dimy.high;
-                if ( ymin > dimy.high ) ymin = dimy.high;
+		  int ymin = by *  dimy.chunksize + dimy.low;
+		  int ymax = ymin + dimy.chunksize - 1;
+		  if ( ymax > dimy.high ) ymax = dimy.high;
+		  if ( ymin > dimy.high ) ymin = dimy.high;
 
-                // We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
-                for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
-                    void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+		  // We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
+		  for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
+		      void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
 
-                    // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
-                    GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
-                    //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
-                    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
+		      // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
+		      GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
+		      //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+		      poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
 
 
-                    /* SciDB load file format is band interleaved by pixel / cell, whereas common
-                    GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
-                    manually. */
+		      /* SciDB load file format is band interleaved by pixel / cell, whereas common
+		      GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
+		      manually. */
 
-                    // Variable (unknown) data types and band numbers make this somewhat ugly
-                    for ( int i = 0; i < ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ); ++i ) {
-                        memcpy ( & ( ( char * ) bandInterleavedChunk ) [i * pixelSize + bandOffset], & ( ( char * ) blockBandBuf ) [i * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId )], Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
-                    }
-                    free ( blockBandBuf );
-                    bandOffset += Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId );
+		      // Variable (unknown) data types and band numbers make this somewhat ugly
+		      for ( int i = 0; i < ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ); ++i ) {
+			  memcpy ( & ( ( char * ) bandInterleavedChunk ) [i * pixelSize + bandOffset], & ( ( char * ) blockBandBuf ) [i * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId )], Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+		      }
+		      free ( blockBandBuf );
+		      bandOffset += Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId );
 
-                }
+		  }
 
-                if ( client->insertData ( array, bandInterleavedChunk, xmin, ymin, xmax, ymax ) != SUCCESS ) {
-                    Utils::error ( "Copying data to SciDB array failed, trying to recover initial state..." );
-                    if ( client->removeArray ( array.name ) != SUCCESS ) {
-                        Utils::error ( "Recovery faild, could not delete array '" + array.name + "'. Please do this manually in SciDB" );
-                    }
-                    return NULL;
-                }
-            }
-        }
+		  if ( client->insertData ( array, bandInterleavedChunk, xmin, ymin, xmax, ymax ) != SUCCESS ) {
+		      Utils::error ( "Copying data to SciDB array failed, trying to recover initial state..." );
+		      if ( client->removeArray ( array.name ) != SUCCESS ) {
+			  Utils::error ( "Recovery faild, could not delete array '" + array.name + "'. Please do this manually in SciDB" );
+		      }
+		      return NULL;
+		  }
+	      }
+	  }
 
 
 
-        free ( bandInterleavedChunk );
+	  free ( bandInterleavedChunk );
 
-        Utils::debug ( "Persisting temporary array '" + array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP + "'" );
-        client->copyArray ( array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP, array.name );
+	  Utils::debug ( "Persisting temporary array '" + array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP + "'" );
+	  client->copyArray ( array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP, array.name );
 
-        Utils::debug ( "Removing temporary array '" + array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP + "'" );
-        client->removeArray ( array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP );
+	  Utils::debug ( "Removing temporary array '" + array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP + "'" );
+	  client->removeArray ( array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP );
 
 
 
-        // Set Spatial reference
-        double padfTransform[6];
-        string wkt ( poSrcDS->GetProjectionRef() );
-        if ( wkt != "" && poSrcDS->GetGeoTransform ( padfTransform ) == CE_None ) {
-            AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
+	  // Set Spatial reference
+	  double padfTransform[6];
+	  string wkt ( poSrcDS->GetProjectionRef() );
+	  if ( wkt != "" && poSrcDS->GetGeoTransform ( padfTransform ) == CE_None ) {
+	      AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
 
-            array.affineTransform = a;
+	      array.affineTransform = a;
 
-            array.srtext = wkt;
-            OGRSpatialReference srs ( wkt.c_str() );
-            srs.AutoIdentifyEPSG();
-            array.auth_name = srs.GetAuthorityName ( NULL );
-            array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
-            char *proj4;
-            srs.exportToProj4 ( &proj4 );
-            array.proj4text.assign ( proj4 );
-            CPLFree ( proj4 );
+	      array.srtext = wkt;
+	      OGRSpatialReference srs ( wkt.c_str() );
+	      srs.AutoIdentifyEPSG();
+	      array.auth_name = srs.GetAuthorityName ( NULL );
+	      array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
+	      char *proj4;
+	      srs.exportToProj4 ( &proj4 );
+	      array.proj4text.assign ( proj4 );
+	      CPLFree ( proj4 );
 
-            array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
-            array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
+	      array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+	      array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
 
 
 
-            client->updateSRS ( array );
-        }
+	      client->updateSRS ( array );
+	  }
 
 
 
-        Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
+	  Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
 
-        // Set Metadata in databse
-        for ( DomainMD::iterator it = array.md.begin(); it != array.md.end(); ++it ) {
-            client->setArrayMD ( array.name, it->second, it->first );
-        }
+	  // Set Metadata in databse
+	  for ( DomainMD::iterator it = array.md.begin(); it != array.md.end(); ++it ) {
+	      client->setArrayMD ( array.name, it->second, it->first );
+	  }
 
 
 
-        for ( int i = 0; i < nBands; ++i ) {
-            for ( DomainMD::iterator it = array.attrs[i].md.begin(); it != array.attrs[i].md.end(); ++it ) {
-                client->setAttributeMD ( array.name, array.attrs[i].name, it->second, it->first );
-            }
-        }
+	  for ( int i = 0; i < nBands; ++i ) {
+	      for ( DomainMD::iterator it = array.attrs[i].md.begin(); it != array.attrs[i].md.end(); ++it ) {
+		  client->setAttributeMD ( array.name, array.attrs[i].name, it->second, it->first );
+	      }
+	  }
 
 
 
 
 
-        pfnProgress ( 1.0, NULL, pProgressData );
+	  pfnProgress ( 1.0, NULL, pProgressData );
 
 
 
 
-        delete client;
+	  delete client;
 
-        return ( GDALDataset * ) GDALOpen ( pszFilename, GA_ReadOnly );
-
+	  return ( GDALDataset * ) GDALOpen ( pszFilename, GA_ReadOnly );
+	} catch (int e) {
+	    switch (e) {
+	      case SCIDB_PARSING_ERROR:  
+		Utils::error ( "This is not a scidb4gdal connection string" );
+		break;
+	      case ERROR_NO_ARRAYNAME:
+		Utils::error ("No array name stated.");
+		break;
+	    }
+	}
     }
 
 
@@ -793,64 +806,44 @@ namespace scidb4gdal
 	  
 
 	  // 1. parse connection string and extract the following values
-	  //TODO should be one function at the scidb driver
-	  QueryParameters *sp;
-	  ConnectionPars *pars;
+	  QueryParameters *query_pars;
+	  ConnectionParameters *con_pars;
 
-	    sp = pp.getQueryParameter();
-	    pars = pp.getConnectionParameter();
+	  query_pars = &pp.getQueryParameter();
+	  con_pars = &pp.getConnectionParameter();
 	    
-  // 	if ( connstr.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
-  // 	    Utils::error ( "This is not a scidb4gdal connection string" );
-  // 	}
-  // 	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
-	  
-	  //1. search for "properties=" in the string
-  // 	string connectionString, propertiesString;
-  // 	
-  // 	if (pp.splitPropertyString(astr, connectionString, propertiesString)){
-  // 	  pp.parsePropertiesString(propertiesString, sp);
-  // 	}
-  // 	
-  // 	//first extract information from connection string and afterwards check for the opening options and overwrite values if double
-  // 	pp.parseConnectionString(connectionString, pars);
-  // 	pp.parseOpeningOptions(poOpenInfo->papszOpenOptions, pars);
-  // 	
-  // 	pp.parseArrayName(pars->arrayname, sp); //array name will be modified if a temporal query is detected (for the ConnectionPars)
-  // 	
-	  // 2. Check validity of parameters
-	  if ( pars->arrayname == "" ) {
-	    Utils::error ( "No array specified, currently not supported" );
-	    return NULL;
+	  // 2. Check validity of connection parameters
+	  if ( !con_pars->isComplete()) {
+	    throw con_pars->error_code;
+	  } else {
+	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
 	  }
-	  
-	  //ConnectionPars *pars = ConnectionPars::parseConnectionString ( connstr );
-	  Utils::debug ( "Using connection parameters: " + pars->toString() );
-	  
-	  // 3. Create shim client
-	  ShimClient *client = new ShimClient ( pars->host, pars->port, pars->user, pars->passwd, pars->ssl);
 
+	  // 3. Create shim client
+// 	  ShimClient *client = new ShimClient ( con_pars->host, con_pars->port, con_pars->user, con_pars->passwd, con_pars->ssl);
+	  ShimClient *client = new ShimClient (con_pars);
+	  
 	  SciDBSpatioTemporalArray array;
 	  // 4. Request array metadata
-	  if ( client->getArrayDesc ( pars->arrayname, array ) != SUCCESS ) {
+	  if ( client->getArrayDesc ( con_pars->arrayname, array ) != SUCCESS ) {
 	      Utils::error ( "Cannot fetch array metadata" );
 	      return NULL;
 	  }
 	  
 		  //check if the temporal index was set or if a timestamp was used
-	  if (sp->hasTemporalIndex) {
+	  if (query_pars->hasTemporalIndex) {
 	    char* t_index_key = new char[1];
 	    t_index_key[0] = 't';
 	    if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
 	      string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions,t_index_key);
-	      sp->temp_index = boost::lexical_cast<int>(value);
+	      query_pars->temp_index = boost::lexical_cast<int>(value);
 	    } 
 	  } else {
 
 	    //convert date to temporal index
-	    TPoint time = TPoint(sp->timestamp);
-	    sp->temp_index = array.indexAtDatetime(time);
-	    sp->hasTemporalIndex = true;
+	    TPoint time = TPoint(query_pars->timestamp);
+	    query_pars->temp_index = array.indexAtDatetime(time);
+	    query_pars->hasTemporalIndex = true;
 	  }
 	  
 	  
@@ -866,8 +859,8 @@ namespace scidb4gdal
 		SciDBDimension *dim;
 		dim = &array.dims[array.getTDimIdx()];
 
-		if (sp->temp_index < dim->low || sp->temp_index > dim->high) {
-		    Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(sp->temp_index) +
+		if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
+		    Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
 		    ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + array.datetimeAtIndex(dim->low).toStringISO() + "), " +
 		      "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + array.datetimeAtIndex(dim->high).toStringISO() + ")"
 		    );
@@ -877,19 +870,25 @@ namespace scidb4gdal
 	  }
 
 
-	  delete pars;
+	  delete con_pars;
 
 
 	  // Create the dataset
 
 	  SciDBDataset *poDS;
-	  poDS = new SciDBDataset ( array, client, sp );
+	  poDS = new SciDBDataset ( array, client, query_pars );
 	  return ( poDS );
 	} catch (int e) {
-	  if (e == SCIDB_PARSING_ERROR) {
-	    Utils::error ( "This is not a scidb4gdal connection string" );
-	    return NULL;
+	  switch (e) {
+	    case SCIDB_PARSING_ERROR:  
+	      Utils::error ( "This is not a scidb4gdal connection string" );
+	      break;
+	    case ERROR_NO_ARRAYNAME:
+	      Utils::error ("No array name stated.");
+	      break;
 	  }
+	  
+	  return NULL;
 	}
     }
     

@@ -59,6 +59,20 @@ namespace scidb4gdal
         curl_global_init ( CURL_GLOBAL_ALL );
     }
     
+    ShimClient::ShimClient(ConnectionParameters* con)
+    {
+      _host = con->host; 
+      _port = con->port; 
+      _user = con->user; 
+      _passwd = con->passwd; 
+      _ssl = con->ssl;  
+      _curl_handle = 0; 
+      _curl_initialized = false; 
+      _auth = "";
+      curl_global_init ( CURL_GLOBAL_ALL );
+    }
+
+    
 //     ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false, SelectProperties *properties = NULL) : 
 //       _host ( host ), 
 //       _port ( port ), 

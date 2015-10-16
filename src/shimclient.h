@@ -85,6 +85,8 @@ namespace scidb4gdal
          */
         ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl);
 	
+	ShimClient (ConnectionParameters *con);
+	
 	//ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl,SelectProperties* properties);
         /**
          * Default destructor f Shim clients.

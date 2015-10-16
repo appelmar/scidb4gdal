@@ -1,6 +1,7 @@
 
 #ifndef SHIM_CLIENT_STRUCTS_H
 # define SHIM_CLIENT_STRUCTS_H
+#define ERROR_NO_ARRAYNAME 1002
 
 # include "utils.h"
 # include <boost/algorithm/string.hpp>
@@ -12,12 +13,23 @@ using namespace boost::assign;
 
 namespace scidb4gdal {
   
+  /**
+   * Enum for allowed parameter keys in the connection string for switch-case statement when parsing
+   */
   enum ConStringParameter {
     HOST, ARRAY, PORT,USER, PASSWORD, SSL
   };
   
+  /**
+   * Enum for a switch-case statement when parsing the properties part of a connection string
+   */
   enum Properties {
-    T_INDEX
+    T_INDEX, TRS, TIMESTAMP
+  };
+  
+  struct CreationParameters {
+    string trs;
+    string timestamp;
   };
   
   struct QueryParameters {
@@ -35,7 +47,7 @@ namespace scidb4gdal {
    * Structure to pass and store all the connection parameters defined in the connection string that
    * was passed to a gdal function using the filename
    */
-  struct ConnectionPars {
+  struct ConnectionParameters {
     
     string arrayname;
     string host;
@@ -43,15 +55,25 @@ namespace scidb4gdal {
     string user;
     string passwd;
     bool ssl;
+    int error_code;
     
     
-    ConnectionPars() : arrayname ( "" ), host ( "https://localhost" ), port ( 8083 ), user ( "scidb" ), passwd ( "scidb" ) {}
+    ConnectionParameters() : arrayname ( "" ), host ( "https://localhost" ), port ( 8083 ), user ( "scidb" ), passwd ( "scidb" ) {}
     
     string toString() {
       stringstream s;
       s << "array= " << arrayname << " host=" << host << " port=" << port << "  user=" << user << " passwd=" << passwd;
       return s.str();
-    }
+    };
+    
+    bool isComplete() {
+      if (arrayname == "") {
+	error_code = ERROR_NO_ARRAYNAME;
+	return false;
+      }
+      
+      return true;
+    };
   };
   
   /**
