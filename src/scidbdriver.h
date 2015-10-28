@@ -31,6 +31,8 @@ SOFTWARE.
 #include "tilecache.h"
 #include "TemporalReference.h"
 
+#define SCIDB_AUTOCLEANUP_FAILED 2001
+
 namespace scidb4gdal
 {
     using namespace scidb4geo;
@@ -152,6 +154,11 @@ namespace scidb4gdal
       
       static void gdalMDtoMap(char **strlist, map<string,string> &kv);
       static  char** mapToGdalMD(map<string,string> &kv);
+      
+      /**
+       * This function will be used to extract the meta data of the source dataset to the SciDB array representation
+       */
+      static void copyMetadataToSciDBArray(GDALDataset* poSrcDS, SciDBSpatialArray &array);
 	
 	
     protected:

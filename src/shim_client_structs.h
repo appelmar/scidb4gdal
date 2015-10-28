@@ -27,12 +27,16 @@ namespace scidb4gdal {
     T_INDEX, TRS, TIMESTAMP
   };
   
-  struct CreationParameters {
+  struct Parameters {
+    
+  };
+  
+  struct CreationParameters :  Parameters{
     string trs;
     string timestamp;
   };
   
-  struct QueryParameters {
+  struct QueryParameters :  Parameters {
     int temp_index;
     int lower_bound;
     int upper_bound;
@@ -47,7 +51,7 @@ namespace scidb4gdal {
    * Structure to pass and store all the connection parameters defined in the connection string that
    * was passed to a gdal function using the filename
    */
-  struct ConnectionParameters {
+  struct ConnectionParameters :  Parameters {
     
     string arrayname;
     string host;

@@ -7,6 +7,8 @@
 
 namespace scidb4gdal
 {
+  
+  
     using namespace std;
     
     ParameterParser::ParameterParser(string scidbFile, char** optionKVP,  SciDBOperation op) :
@@ -99,7 +101,7 @@ namespace scidb4gdal
     
     void ParameterParser::parseCreateOptions(){
       map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL);
-      map<string,Properties> propResolver = map_list_of ("trs",TRS) ("timestamp",TIMESTAMP);
+      map<string,Properties> propResolver = map_list_of ("trs",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP);
       int count = CSLCount(_options);
       for (int i = 0; i < count; i++) {
 	const char* s = CSLGetField(_options,i);
@@ -261,15 +263,15 @@ namespace scidb4gdal
       }
     }
     
-    ConnectionParameters& ParameterParser::getConnectionParameter() {
+    ConnectionParameters& ParameterParser::getConnectionParameters() {
       return *_con;
     }
     
-    QueryParameters& ParameterParser::getQueryParameter(){
+    QueryParameters& ParameterParser::getQueryParameters(){
       return *_query;
     }
     
-    CreationParameters& ParameterParser::getCreationParameter(){
+    CreationParameters& ParameterParser::getCreationParameters(){
       return *_create;
     }
 

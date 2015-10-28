@@ -219,8 +219,9 @@ namespace scidb4gdal
 
         StatusCode getAttributeMD ( map<string, string> &kv, string arrayname, string attribute,  string domain = "" );
 
-
-
+	void setCreateParameters(CreationParameters &par);
+	void setConnectionParameters(ConnectionParameters &par);
+	void setQueryParameters(QueryParameters &par);
 
 
     protected:
@@ -286,12 +287,14 @@ namespace scidb4gdal
         string      _user;
         string      _passwd;
         bool        _ssl;
-	//SelectProperties *_props;
         CURL       *_curl_handle;
 
         bool _curl_initialized;
 
         string _auth;
+	ConnectionParameters *_conp;
+	CreationParameters *_cp;
+	QueryParameters *_qp;
     };
 }
 

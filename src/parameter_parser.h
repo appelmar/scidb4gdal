@@ -17,9 +17,9 @@ namespace scidb4gdal
       public:
 	ParameterParser(string scidbFile, char** optionKVP, SciDBOperation op  = SCIDB_OPEN);
 	bool isValid();
-	ConnectionParameters& getConnectionParameter();
-	QueryParameters& getQueryParameter();
-	CreationParameters& getCreationParameter();
+	ConnectionParameters& getConnectionParameters();
+	QueryParameters& getQueryParameters();
+	CreationParameters& getCreationParameters();
       protected:
 	bool init();
 	void validate();

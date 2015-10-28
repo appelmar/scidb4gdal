@@ -1694,7 +1694,21 @@ namespace scidb4gdal
     }
 
 
+    void ShimClient::setCreateParameters(CreationParameters &par)
+    {
+      _cp = &par;
+      Utils::debug("Setting temporal parameters. TRS: "+_cp->trs+" and t:"+_cp->timestamp);
+    }
 
+    void ShimClient::setConnectionParameters(ConnectionParameters& par)
+    {
+	_conp = &par;
+    }
+
+    void ShimClient::setQueryParameters(QueryParameters& par)
+    {
+	_qp = &par;
+    }
 
 
 

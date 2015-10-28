@@ -25,7 +25,10 @@ namespace scidb4gdal
         bool nullable;
 	DomainMD md;
     };
-
+    
+    /**
+     * A structure to store the statistical values for a band
+     */
     struct SciDBAttributeStats {
         double min, max, mean, stdev;
     };
@@ -34,13 +37,33 @@ namespace scidb4gdal
     * A structure for storing metadata of a SciDB array dimension
     */
     struct SciDBDimension {
+	/**
+	 * name of the dimension
+	 */
         string name;
+	
+	/**
+	 * lowest value for this axis
+	 */
         int64_t low;
+	
+	/**
+	 * highest value for this axis
+	 */
         int64_t high;
+	
+	/**
+	 * The intended chunksize for this Dimension
+	 */
         uint32_t chunksize;
+	
+	/**
+	 * GDAL type specification as string
+	 */
         string typeId;
-	int64_t start;
-	int64_t length;
+	
+	int64_t start; //TODO used?
+	int64_t length; //TODO used?
 
     };
 
