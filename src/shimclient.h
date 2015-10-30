@@ -58,10 +58,6 @@ namespace scidb4gdal
     using namespace std;
     
     /**
-        DomainMD md;
-        int64_t start;
-        int64_t length;
-        DomainMD md;
      * Basic Shim client class
      */
     class ShimClient
@@ -222,7 +218,6 @@ namespace scidb4gdal
 	void setCreateParameters(CreationParameters &par);
 	void setConnectionParameters(ConnectionParameters &par);
 	void setQueryParameters(QueryParameters &par);
-
 
     protected:
 

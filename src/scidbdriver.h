@@ -162,8 +162,9 @@ namespace scidb4gdal
        * This function will be used to extract the meta data from the source dataset and copy this information
        * to the target SciDBArray.
        */
-      static void copyMetadataToSciDBArray(GDALDataset* poSrcDS, SciDBSpatialArray &array);
-	
+      static void copyMetadataToSciDBArray(GDALDataset* poSrcDS, SciDBArray &array);
+      
+      static void uploadImageIntoTempArray(ShimClient *client, SciDBSpatialArray &array, GDALDataset *poSrcDS, GDALProgressFunc pfnProgress, void *pProgressData);
 	
     protected:
 	/**

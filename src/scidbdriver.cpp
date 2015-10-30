@@ -364,10 +364,7 @@ namespace scidb4gdal
     GDALDataset *SciDBDataset::CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData )
     {
         int  nBands = poSrcDS->GetRasterCount();
-        int  nXSize = poSrcDS->GetRasterXSize();
-        int  nYSize = poSrcDS->GetRasterYSize();
-	
-	
+
 	try {
 	  //1. Parse Options and connection string
 	  string connstr = pszFilename;
@@ -384,7 +381,7 @@ namespace scidb4gdal
 	  } else {
 	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
 	  }
-	  
+
 	  //3. create client and set parameters
 	  ShimClient *client = new ShimClient (con_pars); //connection parameters are set
 	  
@@ -393,96 +390,24 @@ namespace scidb4gdal
 	  
 	  //4. Collect metadata from source data and store in SciDBSpatialArray
 	  //TODO decide if we need to create a SArray or a STArray
-	  SciDBSpatialArray array;
-	  array.name = con_pars->arrayname;
+	  SciDBArray tarray;
+	  tarray.name = con_pars->arrayname;
 
-	  copyMetadataToSciDBArray(poSrcDS, array);
-	  Utils::debug("Testing metadata copy: "+array.toString());
+	  copyMetadataToSciDBArray(poSrcDS, tarray);
+	  Utils::debug("Testing metadata copy: "+tarray.toString());
 	  
-	  // Create array in SciDB
+	  SciDBSpatialArray array = SciDBSpatialArray(tarray);
+	  Utils::debug("Now array as spatial: "+array.toString());
+	  return NULL;
+	  //stop here for development test
+	  
+	  // Create array in SciDB using just the image pixel. This image will be integrated into a ST series or into a S array
 	  if ( client->createTempArray ( array ) != SUCCESS ) {
 	      throw SCIDB_CREATE_TEMP_ARRAY_FAILED;
 	  }
 	  
 	  // Copy data and write to SciDB
-	  size_t pixelSize = 0;
-	  for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
-	  size_t totalSize = pixelSize *  array.getXDim().chunksize * array.getYDim().chunksize;
-	  
-	  uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
-
-	  
-	  uint32_t nBlockX = ( uint32_t ) ( nXSize / array.getXDim().chunksize );
-	  if ( nXSize % array.getXDim().chunksize != 0 ) ++nBlockX;
-
-	  uint32_t nBlockY = ( uint32_t ) ( nYSize / array.getYDim().chunksize );
-	  if ( nYSize % array.getYDim().chunksize != 0 ) ++nBlockY;
-
-
-
-
-	  for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
-	      for ( uint32_t by = 0; by < nBlockY; ++by ) {
-
-		  size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
-
-
-
-		  if ( !pfnProgress ( ( ( double ) ( bx * nBlockY + by ) ) / ( ( double ) ( nBlockX * nBlockY ) ), NULL, pProgressData ) ) {
-		      Utils::debug ( "Interruption by user requested, trying to clean up" );
-		      // Clean up intermediate arrays
-		      client->removeArray ( array.name );
-		      throw SCIDB_TERMINATED_BY_USER;
-		  }
-
-		  // 1. Compute array bounds from block offsets
-		  int xmin = bx *  array.getXDim().chunksize + array.getXDim().low;
-		  int xmax = xmin +  array.getXDim().chunksize - 1;
-		  if ( xmax > array.getXDim().high ) xmax = array.getXDim().high;
-		  if ( xmin > array.getXDim().high ) xmin = array.getXDim().high;
-
-		  int ymin = by *  array.getYDim().chunksize + array.getYDim().low;
-		  int ymax = ymin + array.getYDim().chunksize - 1;
-		  if ( ymax > array.getYDim().high ) ymax = array.getYDim().high;
-		  if ( ymin > array.getYDim().high ) ymin = array.getYDim().high;
-
-		  // We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
-		  for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
-		      void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
-
-		      // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
-		      GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
-		      //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
-		      poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
-
-
-		      /* SciDB load file format is band interleaved by pixel / cell, whereas common
-		      GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
-		      manually. */
-
-		      // Variable (unknown) data types and band numbers make this somewhat ugly
-		      for ( int i = 0; i < ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ); ++i ) {
-			  memcpy ( & ( ( char * ) bandInterleavedChunk ) [i * pixelSize + bandOffset], & ( ( char * ) blockBandBuf ) [i * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId )], Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
-		      }
-		      free ( blockBandBuf );
-		      bandOffset += Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId );
-
-		  }
-
-		  if ( client->insertData ( array, bandInterleavedChunk, xmin, ymin, xmax, ymax ) != SUCCESS ) {
-		      Utils::debug ( "Copying data to SciDB array failed, trying to recover initial state..." );
-		      if ( client->removeArray ( array.name ) != SUCCESS ) {
-			throw SCIDB_AUTOCLEANUP_FAILED;
-		      } else {
-			throw SCIDB_AUTOCLEANUP_SUCCESS;
-		      } 
-		  }
-	      }
-	  }
-
-
-
-	  free ( bandInterleavedChunk );
+	  uploadImageIntoTempArray(client, array, poSrcDS,pfnProgress, pProgressData);
 
 	  Utils::debug ( "Persisting temporary array '" + array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP + "'" );
 	  client->copyArray ( array.name + SCIDB4GDAL_ARRAYSUFFIX_TEMP, array.name );
@@ -730,11 +655,9 @@ namespace scidb4gdal
 	    throw con_pars->error_code;
 	  } else {
 	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
-	    //Utils::debug ("Using query parameters: "+query_pars->toString());
 	  }
 
 	  // 3. Create shim client
-// 	  ShimClient *client = new ShimClient ( con_pars->host, con_pars->port, con_pars->user, con_pars->passwd, con_pars->ssl);
 	  ShimClient *client = new ShimClient (con_pars);
 	  
 	  SciDBSpatioTemporalArray array;
@@ -807,7 +730,7 @@ namespace scidb4gdal
     }
     
     
-    void SciDBDataset::copyMetadataToSciDBArray(GDALDataset* poSrcDS, SciDBSpatialArray& array)
+    void SciDBDataset::copyMetadataToSciDBArray(GDALDataset* poSrcDS, SciDBArray& array)
     {
       // Attributes
 	  size_t pixelsize = 0; // size in bytes of one pixel, i.e. sum of attribute sizes
@@ -918,7 +841,93 @@ namespace scidb4gdal
 	  }
     }
 
-    
+    void SciDBDataset::uploadImageIntoTempArray(ShimClient *client, SciDBSpatialArray& array, GDALDataset *poSrcDS, GDALProgressFunc pfnProgress, void* pProgressData)
+    {
+	int  nBands = poSrcDS->GetRasterCount();
+	int  nXSize = poSrcDS->GetRasterXSize();
+        int  nYSize = poSrcDS->GetRasterYSize();
+	
+	size_t pixelSize = 0;
+	for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
+	
+	size_t totalSize = pixelSize *  array.getXDim().chunksize * array.getYDim().chunksize;
+	
+	uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
+
+	
+	uint32_t nBlockX = ( uint32_t ) ( nXSize / array.getXDim().chunksize );
+	if ( nXSize % array.getXDim().chunksize != 0 ) ++nBlockX;
+
+	uint32_t nBlockY = ( uint32_t ) ( nYSize / array.getYDim().chunksize );
+	if ( nYSize % array.getYDim().chunksize != 0 ) ++nBlockY;
+
+
+
+	//upload array in chunks
+	for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
+	    for ( uint32_t by = 0; by < nBlockY; ++by ) {
+
+		size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
+
+
+
+		if ( !pfnProgress ( ( ( double ) ( bx * nBlockY + by ) ) / ( ( double ) ( nBlockX * nBlockY ) ), NULL, pProgressData ) ) {
+		    Utils::debug ( "Interruption by user requested, trying to clean up" );
+		    // Clean up intermediate arrays
+		    client->removeArray ( array.name );
+		    throw SCIDB_TERMINATED_BY_USER;
+		}
+
+		// 1. Compute array bounds from block offsets
+		int xmin = bx *  array.getXDim().chunksize + array.getXDim().low;
+		int xmax = xmin +  array.getXDim().chunksize - 1;
+		if ( xmax > array.getXDim().high ) xmax = array.getXDim().high;
+		if ( xmin > array.getXDim().high ) xmin = array.getXDim().high;
+
+		int ymin = by *  array.getYDim().chunksize + array.getYDim().low;
+		int ymax = ymin + array.getYDim().chunksize - 1;
+		if ( ymax > array.getYDim().high ) ymax = array.getYDim().high;
+		if ( ymin > array.getYDim().high ) ymin = array.getYDim().high;
+
+		// We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
+		for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
+		    void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+
+		    // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
+		    GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
+		    //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+		    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
+
+
+		    /* SciDB load file format is band interleaved by pixel / cell, whereas common
+		    GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
+		    manually. */
+
+		    // Variable (unknown) data types and band numbers make this somewhat ugly
+		    for ( int i = 0; i < ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ); ++i ) {
+			memcpy ( & ( ( char * ) bandInterleavedChunk ) [i * pixelSize + bandOffset], & ( ( char * ) blockBandBuf ) [i * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId )], Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+		    }
+		    free ( blockBandBuf );
+		    bandOffset += Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId );
+
+		}
+
+		if ( client->insertData ( array, bandInterleavedChunk, xmin, ymin, xmax, ymax ) != SUCCESS ) {
+		    Utils::debug ( "Copying data to SciDB array failed, trying to recover initial state..." );
+		    if ( client->removeArray ( array.name ) != SUCCESS ) {
+		      throw SCIDB_AUTOCLEANUP_FAILED;
+		    } else {
+		      throw SCIDB_AUTOCLEANUP_SUCCESS;
+		    } 
+		}
+	    }
+	}
+
+
+
+	free ( bandInterleavedChunk );
+    }
+
     
     
     

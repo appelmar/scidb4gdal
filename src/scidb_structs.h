@@ -234,10 +234,23 @@ namespace scidb4gdal
     };
     
     /**
-     * A structure for storing metadata of a spatially referenced SciDB array
+     * A structure for storing metadata of a spatially referenced SciDB array.
+     * 
+     * If no SpatialReference is sepcified, then the SpatialArray will be a simple cartesian reference system.
      */
     struct SciDBSpatialArray : public virtual SciDBArray, public SciDBSpatialReference {
         SciDBSpatialArray() : _x_idx ( -1 ), _y_idx ( -1 ) {}
+        
+        SciDBSpatialArray(SciDBArray &parent, SciDBSpatialReference *sr = NULL){
+	  attrs = parent.attrs;
+	  dims = parent.dims;
+	  md = parent.md;
+	  name = parent.name;
+	  
+	  if (sr != NULL) {
+	    //TODO copy the Reference
+	  }
+	}
 	
 	int _x_idx, _y_idx;
 	
