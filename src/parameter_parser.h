@@ -11,6 +11,15 @@ namespace scidb4gdal
       SCIDB_OPEN, SCIDB_CREATE
   } SciDBOperation;
   
+  template <typename T>
+  struct Resolver  {
+      map<string, T> mapping;
+      
+      public:
+	  bool contains (string key);
+	  T getKey (string s);
+  };
+  
     using namespace std;
     
     class ParameterParser {
@@ -39,6 +48,12 @@ namespace scidb4gdal
 	string _properties_string;
 	bool _isValid;
 	SciDBOperation _operation;
+	Resolver<ConStringParameter> _conKeyResolver; 
+	Resolver<Properties> _propKeyResolver;
+	Resolver<CreationType> _creationTypeResolver;
+	void assignConectionParameter(string key, string value);
+	void assignCreateParameter(string key, string value);
+	void assignQueryParameter(string key, string value);
     };
 }
 

@@ -369,31 +369,31 @@ namespace scidb4gdal
 	
 	
 	try {
+	  //1. Parse Options and connection string
 	  string connstr = pszFilename;
 	  ParameterParser pp = ParameterParser(connstr, papszOptions, SCIDB_CREATE); //connstr is the file name, papszOptions are the -co options
 	  
-	  //1. Parse Options and connection string to create SHIMClient
 	  ConnectionParameters *con_pars;
 	  CreationParameters *create_pars;
 	  con_pars = &pp.getConnectionParameters();
 	  create_pars = &pp.getCreationParameters();
 
-	  ShimClient *client = new ShimClient (con_pars);
-	  client->setCreateParameters(*create_pars);
-	  
 	  // 2. Check validity of connection parameters
 	  if ( !con_pars->isComplete()) {
 	    throw con_pars->error_code;
 	  } else {
 	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
 	  }
-
 	  
-	  // Create array metadata structure
+	  //3. create client and set parameters
+	  ShimClient *client = new ShimClient (con_pars); //connection parameters are set
+	  
+	  //TODO maybe remove this later
+	  client->setCreateParameters(*create_pars); //create parameters regarding time
+	  
+	  //4. Collect metadata from source data and store in SciDBSpatialArray
 	  //TODO decide if we need to create a SArray or a STArray
 	  SciDBSpatialArray array;
-	  
-	  
 	  array.name = con_pars->arrayname;
 
 	  copyMetadataToSciDBArray(poSrcDS, array);
@@ -401,9 +401,9 @@ namespace scidb4gdal
 	  
 	  // Create array in SciDB
 	  if ( client->createTempArray ( array ) != SUCCESS ) {
-	      Utils::error ( "Could not create temporary SciDB array" );
-	      return NULL;
+	      throw SCIDB_CREATE_TEMP_ARRAY_FAILED;
 	  }
+	  
 	  // Copy data and write to SciDB
 	  size_t pixelSize = 0;
 	  for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
@@ -432,8 +432,7 @@ namespace scidb4gdal
 		      Utils::debug ( "Interruption by user requested, trying to clean up" );
 		      // Clean up intermediate arrays
 		      client->removeArray ( array.name );
-		      Utils::error ( "TERMINATED BY USER" );
-		      return NULL;
+		      throw SCIDB_TERMINATED_BY_USER;
 		  }
 
 		  // 1. Compute array bounds from block offsets
@@ -474,8 +473,9 @@ namespace scidb4gdal
 		      Utils::debug ( "Copying data to SciDB array failed, trying to recover initial state..." );
 		      if ( client->removeArray ( array.name ) != SUCCESS ) {
 			throw SCIDB_AUTOCLEANUP_FAILED;
-		      }
-		      return NULL;
+		      } else {
+			throw SCIDB_AUTOCLEANUP_SUCCESS;
+		      } 
 		  }
 	      }
 	  }
@@ -557,6 +557,18 @@ namespace scidb4gdal
 		break;
 	      case SCIDB_AUTOCLEANUP_FAILED:
 		Utils::error ( "Recovery failed, could not delete array. Please do this manually in SciDB" );
+		break;
+	      case SCIDB_TERMINATED_BY_USER:
+		Utils::error ( "TERMINATED BY USER" );
+		break;
+	      case SCIDB_AUTOCLEANUP_SUCCESS:
+		Utils::debug ("Progress terminated. Successfully deleted temporary array in SciDB.");
+		break;
+	      case SCIDB_CREATE_TEMP_ARRAY_FAILED:
+		Utils::error ( "Could not create temporary SciDB array" );
+		break;
+	      default:
+		Utils::error("Uncaught error: "+boost::lexical_cast<string>(e));
 		break;
 	    }
 	}
@@ -718,6 +730,7 @@ namespace scidb4gdal
 	    throw con_pars->error_code;
 	  } else {
 	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
+	    //Utils::debug ("Using query parameters: "+query_pars->toString());
 	  }
 
 	  // 3. Create shim client

@@ -24,16 +24,21 @@ namespace scidb4gdal {
    * Enum for a switch-case statement when parsing the properties part of a connection string
    */
   enum Properties {
-    T_INDEX, TRS, TIMESTAMP
+    T_INDEX, TRS, TIMESTAMP, TYPE
+  };
+  
+  enum CreationType {
+    S_ARRAY, ST_ARRAY, ST_SERIES
   };
   
   struct Parameters {
     
   };
   
-  struct CreationParameters :  Parameters{
+  struct CreationParameters :  Parameters {
     string trs;
     string timestamp;
+    CreationType type;
   };
   
   struct QueryParameters :  Parameters {

@@ -136,6 +136,9 @@ namespace scidb4gdal
       *  A structure for storing temporal reference of a SciDB array
       */
     struct SciDBTemporalReference: public TReference {
+	/**
+	 * The assigned name of the temporal axis.
+	 */
 	string tdim;
 	 
 	SciDBTemporalReference(): TReference() {}
@@ -152,6 +155,12 @@ namespace scidb4gdal
 	}
 	bool isTemporal() {
 	    return ( tdim != "" && _t0 != NULL && _dt != NULL);
+	}
+	
+	void createTRS (string const &t0, string const &dt) {
+	    _t0 = new TPoint(t0);
+	    _dt = new TInterval(dt);
+	    _r = _dt->_resolution;
 	}
 	
 	void setTPoint(TPoint *point) {
@@ -172,17 +181,30 @@ namespace scidb4gdal
 	}
     };
 
+    /**
+     * This array is the representation of a SciDB array with a temporal reference that manages the
+     * correct addressing of the temporal dimension in SciDB, e.g. naming and alike.
+     */
     struct SciDBTemporalArray: public virtual SciDBArray, public SciDBTemporalReference {
 	
 	SciDBTemporalArray(): _t_idx (-1), SciDBTemporalReference() {}
 	
+	/**
+	 * The index pointing to the temporal dimension
+	 */
 	int _t_idx;
 	
+	/**
+	 * Returns the designated temporal dimension of the SciDB dataset.
+	 */
 	SciDBDimension getTDim() {
             if ( _t_idx < 0 ) deriveTemporalDimensionIndex();
             return dims[_t_idx];
         }
-
+	
+	/**
+	 * Returns the index in SciDBArray's dimension list that represents the temporal dimension.
+	 */
         int getTDimIdx() {
             if ( _t_idx < 0 ) deriveTemporalDimensionIndex();
             return _t_idx;

@@ -11,9 +11,27 @@ namespace scidb4gdal
   
     using namespace std;
     
+    template<typename T>
+    bool Resolver<T>::contains(string key)
+    {
+	return mapping.find(key) != mapping.end();
+    }
+    
+    template<typename T>
+    T Resolver<T>::getKey(string s)
+    {
+	return mapping[s];
+    }
+
+    
     ParameterParser::ParameterParser(string scidbFile, char** optionKVP,  SciDBOperation op) :
       _operation (op)
     {
+      //set the resolver
+      _creationTypeResolver.mapping = map_list_of("S",S_ARRAY) ("ST",ST_ARRAY) ("STS",ST_SERIES);
+      _propKeyResolver.mapping = map_list_of ("trs",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX);
+      _conKeyResolver.mapping = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL)("array",ARRAY);
+      
       _scidb_filename = scidbFile;
       _options = optionKVP;
       if (!init()) {
@@ -22,8 +40,6 @@ namespace scidb4gdal
     }
     
     void ParameterParser::parseConnectionString () {
-      map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("array", ARRAY) ("user",USER) ("password", PASSWORD);
-      
       vector<string> connparts;
       // Split at whitespace, comma, semicolon
       boost::split ( connparts, _connection_string, boost::is_any_of ( "; " ) );
@@ -34,28 +50,9 @@ namespace scidb4gdal
 	if ( kv.size() != 2 ) {
 	  continue;
 	} else {
-	  if(paramResolver.find(string(kv[0])) != paramResolver.end()) {
-	    switch(paramResolver[kv[0]]) {
-	      case HOST:
-		_con->host  = ( kv[1] );
-		_con->ssl = (kv[1].substr ( 0, 5 ).compare ( "https" ) == 0 );
-		break;
-	      case PORT:
-		_con->port = boost::lexical_cast<int> ( kv[1] );
-		break;
-	      case ARRAY:
-		_con->arrayname = ( kv[1] );
-		break;
-	      case USER:
-		_con->user = ( kv[1] );
-		break;
-	      case PASSWORD:
-		_con->passwd = ( kv[1] );
-		break;
-	      default:
-		Utils::debug("haven't found stuff");
-		continue; 
-	    }
+	  
+	  if(_conKeyResolver.contains(string(kv[0]))) {
+	    assignConectionParameter(kv[0],kv[1]);
 	  } else {
 	    Utils::debug("unused parameter \""+string(kv[0])+ "\" with value \""+string(kv[1])+"\"");
 	  }
@@ -64,81 +61,37 @@ namespace scidb4gdal
    }
    
    void ParameterParser::parseOpeningOptions () {
-      map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL);
-
       int count = CSLCount(_options);
       for (int i = 0; i < count; i++) {
 	const char* s = CSLGetField(_options,i);
 	char* key;
 	const char* value = CPLParseNameValue(s,&key);
 	
-	if(paramResolver.find(std::string(key)) != paramResolver.end()) {
-	  switch(paramResolver[std::string(key)]) {
-	    case HOST:
-	      _con->host = value;
-	      _con->ssl = (std::string(value).substr ( 0, 5 ).compare ( "https" ) == 0 );
-	      break;
-	    case USER:
-	      _con->user = value;
-	      break;
-	    case PORT:
-	      _con->port = boost::lexical_cast<int>(value);
-	      break;
-	    case PASSWORD:
-	      _con->passwd = value;
-	      break;
-	    case SSL:
-	      _con->ssl = CSLTestBoolean(value);
-	      break;
-	    default:
-	      continue;
-	  }
+	if(_conKeyResolver.contains(std::string(key))) {
+	  assignConectionParameter(std::string(key),value);
 	} else {
-	  Utils::debug("unused parameter \""+string(key)+ "\" with value \""+string(value)+"\"");
+	  if(_propKeyResolver.contains(std::string(key))) {
+	    assignQueryParameter(std::string(key), std::string(value));
+	  } else {
+	    Utils::debug("unused parameter \""+string(key)+ "\" with value \""+string(value)+"\"");
+	  }
 	}
       }
     }
     
     void ParameterParser::parseCreateOptions(){
-      map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL);
-      map<string,Properties> propResolver = map_list_of ("trs",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP);
+      
       int count = CSLCount(_options);
       for (int i = 0; i < count; i++) {
 	const char* s = CSLGetField(_options,i);
 	char* key;
 	const char* value = CPLParseNameValue(s,&key);
 	
-	if(paramResolver.find(std::string(key)) != paramResolver.end()) {
-	  switch(paramResolver[std::string(key)]) {
-	    case HOST:
-	      _con->host = value;
-	      _con->ssl = (std::string(value).substr ( 0, 5 ).compare ( "https" ) == 0 );
-	      break;
-	    case USER:
-	      _con->user = value;
-	      break;
-	    case PORT:
-	      _con->port = boost::lexical_cast<int>(value);
-	      break;
-	    case PASSWORD:
-	      _con->passwd = value;
-	      break;
-	    case SSL:
-	      _con->ssl = CSLTestBoolean(value);
-	      break;
-	  }
+	if(_conKeyResolver.contains(std::string(key))) {
+	  assignConectionParameter(std::string(key),value);
 	} else {
-	  if(propResolver.find(std::string(key)) != propResolver.end()) {
-	    switch(propResolver[std::string(key)]) {
-	      case TRS:
-		_create->trs = value;
-		break;
-	      case TIMESTAMP:
-		_create->timestamp = value;
-		break;
-	      default:
-		continue;
-	    }
+	  if(_propKeyResolver.contains(std::string(key))) {
+	    assignCreateParameter(std::string(key), value);
 	  } else {
 	    Utils::debug("unused parameter \""+string(key)+ "\" with value \""+string(value)+"\"");
 	  }
@@ -168,7 +121,7 @@ namespace scidb4gdal
 
     void ParameterParser::parsePropertiesString () {
       //mapping between the constant variables and their string representation for using a switch/case statement later
-      std::map<string,Properties> propResolver = map_list_of ("t",T_INDEX);
+      //std::map<string,Properties> propResolver = map_list_of ("t",T_INDEX);
       
       vector<string> parts;
       boost::split ( parts, _properties_string, boost::is_any_of ( ";" ) ); // Split at semicolon and comma for refering to a whole KVP
@@ -179,16 +132,8 @@ namespace scidb4gdal
 	if ( kv.size() < 2 ) {
 	  continue;
 	} else {
-	  if(propResolver.find(std::string(kv[0])) != propResolver.end()) {
-	    switch(propResolver[kv[0]]) {
-	      case T_INDEX:
-		_query->temp_index = boost::lexical_cast<int>(kv[1]);
-		//TODO maybe we allow also selecting multiple slices (that will later be saved separately as individual files)
-		break;
-	      default:
-		continue;
-		
-	    }
+	  if(_propKeyResolver.contains(std::string(kv[0]))) {
+	    assignQueryParameter(kv[0], kv[1]);
 	  } else {
 	    Utils::debug("unused parameter \""+string(kv[0])+ "\" with value \""+string(kv[1])+"\"");
 	  }
@@ -289,6 +234,7 @@ namespace scidb4gdal
       _isValid = false;
       validate();
       
+      //create the parameter objects
       if (!isValid()) return false;
       _con = new ConnectionParameters();  
       if (_operation == SCIDB_OPEN) {
@@ -320,6 +266,72 @@ namespace scidb4gdal
     bool ParameterParser::isValid(){
 	return _isValid;
     }
+    
+    void ParameterParser::assignConectionParameter(string key, string value)
+    {
+	ConStringParameter enumKey = _conKeyResolver.getKey(key);
+      	  switch(enumKey) {
+	    case HOST:
+	      _con->host = value;
+	      _con->ssl = value.substr ( 0, 5 ).compare ( "https" ) == 0 ;
+	      break;
+	    case USER:
+	      _con->user = value;
+	      break;
+	    case PORT:
+	      _con->port = boost::lexical_cast<int>(value);
+	      break;
+	    case PASSWORD:
+	      _con->passwd = value;
+	      break;
+	    case SSL:
+	      _con->ssl = CSLTestBoolean(value.c_str());
+	      break;
+	    case ARRAY:
+	      _con->arrayname = value;
+	      break;
+	    default:
+	      break;
+	  }
+    }
+
+    void ParameterParser::assignCreateParameter(string key, string value)
+    {
+	Properties enumKey = _propKeyResolver.getKey(key);
+	switch(enumKey) {
+	  case TRS:
+	    _create->trs = value;
+	    break;
+	  case TIMESTAMP:
+	    _create->timestamp = value;
+	    break;
+	  case TYPE:
+	    if (_creationTypeResolver.contains(value)) {
+	      _create->type = _creationTypeResolver.getKey(value);
+	    } else {
+	      Utils::error("Array type incorrect. Please use 'S', 'ST' or 'STS'.");
+	    }
+	  default:
+	    break;
+	    
+	}
+    }
+    void ParameterParser::assignQueryParameter(string key, string value)
+    {
+	Properties enumKey = _propKeyResolver.getKey(key);
+	switch(enumKey) {
+	  case T_INDEX:
+	    //this T_INDEX is for query only!
+	    _query->temp_index = boost::lexical_cast<int>(value);
+	    _query->hasTemporalIndex = true;
+	    //TODO maybe we allow also selecting multiple slices (that will later be saved separately as individual files)
+	    break; 
+	  default:
+	    break;
+	    
+	}
+    }
+
 
 
 }

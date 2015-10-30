@@ -32,6 +32,9 @@ SOFTWARE.
 #include "TemporalReference.h"
 
 #define SCIDB_AUTOCLEANUP_FAILED 2001
+#define SCIDB_AUTOCLEANUP_SUCCESS 2002
+#define SCIDB_TERMINATED_BY_USER 2003
+#define SCIDB_CREATE_TEMP_ARRAY_FAILED 2004
 
 namespace scidb4gdal
 {
@@ -156,7 +159,8 @@ namespace scidb4gdal
       static  char** mapToGdalMD(map<string,string> &kv);
       
       /**
-       * This function will be used to extract the meta data of the source dataset to the SciDB array representation
+       * This function will be used to extract the meta data from the source dataset and copy this information
+       * to the target SciDBArray.
        */
       static void copyMetadataToSciDBArray(GDALDataset* poSrcDS, SciDBSpatialArray &array);
 	

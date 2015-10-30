@@ -42,8 +42,8 @@ Since GDAL was developed primarily in a spatial context, the temporal query prov
 As a solution we allow three different methods:
 
 1. suffix of the array name: `"SCIDB:array=array_name[t,1]"` or `"SCIDB:array=array_name[t,2015-03-03T10:00:00]"`
-2. as part of a property string within the connection string: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>] [properties=t=<temporal_index>]"`
-3. as part of the opening options: `-oo "t=<temporal_index>"`
+2. as part of a property string within the connection string: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>] [properties=i=<temporal_index>]"`
+3. as part of the opening options: `-oo "i=<temporal_index>"`
 
 To address the temporal component the identifier "t" is used in most cases. "t" requires either an integer value (temporal index) or a valid timestamp string according to ISO 8601. The latter is currently only supported in the "suffix" strategy.
 
