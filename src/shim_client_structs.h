@@ -1,7 +1,6 @@
 
 #ifndef SHIM_CLIENT_STRUCTS_H
 # define SHIM_CLIENT_STRUCTS_H
-#define ERROR_NO_ARRAYNAME 1002
 
 # include "utils.h"
 # include <boost/algorithm/string.hpp>
@@ -36,7 +35,7 @@ namespace scidb4gdal {
   };
   
   struct CreationParameters :  Parameters {
-    string trs;
+    string dt;
     string timestamp;
     CreationType type;
   };
@@ -77,7 +76,7 @@ namespace scidb4gdal {
     
     bool isComplete() {
       if (arrayname == "") {
-	error_code = ERROR_NO_ARRAYNAME;
+	error_code = ERR_READ_ARRAYUNKNOWN;
 	return false;
       }
       

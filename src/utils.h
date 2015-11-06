@@ -36,6 +36,7 @@ SOFTWARE.
 //#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_X 512
 //#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y 512
 
+#define SCIDB4GDAL_DEFAULT_BLOCKSIZE 512
 #define SCIDB4GEO_DEFAULT_CHUNKSIZE_MB 32 // This is an upper limit, SciDB recommends smaller chunks ~ 10 MB, but for ingestion and download, larger chunks turned out to be faster.
 
 
@@ -99,18 +100,29 @@ namespace scidb4gdal
         ERR_CREATE_ARRAYEXISTS              = 200 + 1,
         ERR_CREATE_WRONGDIMENSIONALITY      = 200 + 2,
         ERR_CREATE_INVALIDARRAYNAME         = 200 + 3,
+	ERR_CREATE_AUTOCLEANUPFAILED 		= 200 + 4,
+	ERR_CREATE_AUTOCLEANUPSUCCESS		= 200 + 5,
+	ERR_CREATE_TERMINATEDBYUSER		= 200 + 6,
+	ERR_CREATE_TEMPARRAY			= 200 + 7,
+	ERR_CREATE_NOARRAY			= 200+8,
         ERR_CREATE_UNKNOWN                  = 200 + 99,
 
         ERR_GLOBAL_CANNOTCONNECT            = 300 + 1,
         ERR_GLOBAL_INVALIDARRAYNAME         = 300 + 2,
         ERR_GLOBAL_DATATYPEMISMATCH         = 300 + 3,
         ERR_GLOBAL_INVALIDCONNECTIONSTRING  = 300 + 4,
+	ERR_GLOBAL_PARSE			= 300 +5,
 
         ERR_GLOBAL_UNKNOWN                  = 300 + 99,
 
 
         ERR_SRS_NOSPATIALREFFOUND           = 400 + 1,
-        ERR_SRS_NOSCIDB4GEO                 = 400 + 2
+        ERR_SRS_NOSCIDB4GEO                 = 400 + 2,
+	ERR_SRS_INVALID			    = 400 + 3,
+	  
+	ERR_TRS_INVALID		            = 500 + 1
+	
+        
     };
 
 

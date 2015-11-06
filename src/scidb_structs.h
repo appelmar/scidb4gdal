@@ -120,13 +120,6 @@ namespace scidb4gdal
 
         AffineTransform affineTransform;
 
-        string toString() {
-            stringstream s;
-            s << "SPATIAL REFERENCE (" << xdim << "," << ydim << ") :" << affineTransform.toString() << "-->" << proj4text;
-            s << "\n";
-            return s.str();
-        }
-
         bool isSpatial() {
             return ( xdim != "" && ydim != "" && ( srtext != "" || proj4text != "" ) );
         }
@@ -141,18 +134,18 @@ namespace scidb4gdal
 	 */
 	string tdim;
 	 
-	SciDBTemporalReference(): TReference() {}
+	SciDBTemporalReference(): TReference::TReference() {
+	  tdim = SCIDB4GDAL_DEFAULT_TDIMNAME;
+	}
+	
+	SciDBTemporalReference( string t0text, string dttext ): TReference::TReference( t0text, dttext ) { 
+	  tdim = SCIDB4GDAL_DEFAULT_TDIMNAME;
+	}
 	
 	~SciDBTemporalReference() {
 	  
 	}
 	
-	string toString() {
-	    stringstream s;
-	    s << "TEMPORAL REFERENCE ("<< tdim << ", "<< _t0->toStringISO() << ", " << _dt->toStringISO() <<" )";
-	    s << "\n";
-	    return s.str();
-	}
 	bool isTemporal() {
 	    return ( tdim != "" && _t0 != NULL && _dt != NULL);
 	}
@@ -177,6 +170,7 @@ namespace scidb4gdal
 	}
 	
 	TInterval* getTInterval() {
+	void isValid();
 	    return _dt;
 	}
     };
@@ -187,8 +181,13 @@ namespace scidb4gdal
      */
     struct SciDBTemporalArray: public virtual SciDBArray, public SciDBTemporalReference {
 	
-	SciDBTemporalArray(): _t_idx (-1), SciDBTemporalReference() {}
+	SciDBTemporalArray(): SciDBTemporalReference() {
+	  initTemporalDim();
+	}
 	
+	SciDBTemporalArray(string t0text, string dttext) : SciDBTemporalReference(t0text,dttext) {
+	  initTemporalDim();
+	};
 	/**
 	 * The index pointing to the temporal dimension
 	 */
@@ -197,11 +196,11 @@ namespace scidb4gdal
 	/**
 	 * Returns the designated temporal dimension of the SciDB dataset.
 	 */
-	SciDBDimension getTDim() {
+	SciDBDimension* getTDim() {
             if ( _t_idx < 0 ) deriveTemporalDimensionIndex();
-            return dims[_t_idx];
+            return &dims[_t_idx];
         }
-	
+
 	/**
 	 * Returns the index in SciDBArray's dimension list that represents the temporal dimension.
 	 */
@@ -211,7 +210,18 @@ namespace scidb4gdal
         }
 	
 	protected:
-	
+	  void initTemporalDim() {
+	      SciDBDimension dimt;
+	      dimt.low = 0;
+	      dimt.high = 0;
+	      dimt.name = SCIDB4GDAL_DEFAULT_TDIMNAME;
+	      dimt.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE;
+	      dimt.typeId = "int64";
+	      
+	      // This order is more efficient as it fits row major image format (does not require transposing during downloads)
+	      dims.push_back ( dimt );
+	      _t_idx = dims.size() - 1;
+	  }
 	
 	void deriveTemporalDimensionIndex() {
             if ( tdim != "") {
@@ -239,7 +249,9 @@ namespace scidb4gdal
      * If no SpatialReference is sepcified, then the SpatialArray will be a simple cartesian reference system.
      */
     struct SciDBSpatialArray : public virtual SciDBArray, public SciDBSpatialReference {
-        SciDBSpatialArray() : _x_idx ( -1 ), _y_idx ( -1 ) {}
+        SciDBSpatialArray()  {
+	  initSpatialDims();
+	}
         
         SciDBSpatialArray(SciDBArray &parent, SciDBSpatialReference *sr = NULL){
 	  attrs = parent.attrs;
@@ -248,27 +260,32 @@ namespace scidb4gdal
 	  name = parent.name;
 	  
 	  if (sr != NULL) {
-	    //TODO copy the Reference
+	    affineTransform = sr->affineTransform; 
+	    auth_name = sr->auth_name;
+	    auth_srid= sr->auth_srid;
+	    proj4text = sr->proj4text;
+	    srtext = sr->srtext;
+	    xdim = sr->xdim;
+	    ydim = sr->ydim;
 	  }
 	}
 	
-	int _x_idx, _y_idx;
+	virtual ~SciDBSpatialArray() {
+	  
+	}
 	
-        string toString() {
-            stringstream s;
-            s << SciDBArray::toString();
-            s << SciDBSpatialReference::toString();
-            s << "\n";
-            return s.str();
-        }
+	int _x_idx, _y_idx;
 
-        SciDBDimension getYDim() {
+
+        SciDBDimension* getYDim() {
             if ( _y_idx < 0 ) deriveDimensionIndexes();
-            return dims[_y_idx];
+
+            return &dims[_y_idx];;
         }
-        SciDBDimension getXDim() {
+        SciDBDimension* getXDim() {
             if ( _x_idx < 0 ) deriveDimensionIndexes();
-            return dims[_x_idx];
+
+            return &dims[_x_idx];
         }
 
         int getXDimIdx() {
@@ -283,7 +300,29 @@ namespace scidb4gdal
         }
 
     protected:
-        
+        void initSpatialDims() {
+	    SciDBDimension dimx;
+	    dimx.low = 0;
+	    dimx.high = 0; //adapted later
+	    dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
+	    dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE; //should be adapted
+	    dimx.typeId = "int64"; //per default
+
+	    SciDBDimension dimy;
+	    dimy.low = 0;
+	    dimy.high = 0;
+	    dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
+	    dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE;
+	    dimy.typeId = "int64";
+	    
+	    // This order is more efficient as it fits row major image format (does not require transposing during downloads)
+	    dims.push_back ( dimy );
+	    _y_idx = dims.size() - 1;
+	    dims.push_back ( dimx );
+	    _x_idx = dims.size() - 1; 
+
+
+	}
 
 	/**
 	 * assigns the spatial indices. As default it uses x as the first
@@ -310,14 +349,13 @@ namespace scidb4gdal
         }
     };
     
-    struct SciDBSpatioTemporalArray: public SciDBTemporalArray, public SciDBSpatialArray {
-	SciDBSpatioTemporalArray() :  SciDBTemporalArray(), SciDBSpatialArray() {}
+    struct SciDBSpatioTemporalArray: public SciDBSpatialArray, public SciDBTemporalArray  {
+	SciDBSpatioTemporalArray() :  SciDBSpatialArray(), SciDBTemporalArray() {
+	  
+	}
 	
-	string toString() {
-	    stringstream s;
-	    s << "TEMPORAL REFERENCE ("<< tdim << ", "<< _t0->toStringISO() << ", " << _dt->toStringISO() <<" )";
-	    s << "\n";
-	    return s.str();
+	SciDBSpatioTemporalArray(string t0text, string dttext ) : SciDBSpatialArray(),SciDBTemporalArray(t0text,dttext) {
+	
 	}
     };
 }

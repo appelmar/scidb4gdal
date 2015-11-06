@@ -3,7 +3,6 @@
 
 #include "shim_client_structs.h"
 
-#define SCIDB_PARSING_ERROR 1001
 
 namespace scidb4gdal
 {

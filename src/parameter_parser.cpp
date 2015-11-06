@@ -27,15 +27,15 @@ namespace scidb4gdal
     ParameterParser::ParameterParser(string scidbFile, char** optionKVP,  SciDBOperation op) :
       _operation (op)
     {
-      //set the resolver
+      //set the resolver a.k.a the key value pairs in the connection / property string or the create / opening options
       _creationTypeResolver.mapping = map_list_of("S",S_ARRAY) ("ST",ST_ARRAY) ("STS",ST_SERIES);
-      _propKeyResolver.mapping = map_list_of ("trs",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX);
+      _propKeyResolver.mapping = map_list_of ("dt",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX);
       _conKeyResolver.mapping = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL)("array",ARRAY);
       
       _scidb_filename = scidbFile;
       _options = optionKVP;
       if (!init()) {
-	throw SCIDB_PARSING_ERROR;
+	throw ERR_GLOBAL_PARSE;
       }  
     }
     
@@ -300,7 +300,7 @@ namespace scidb4gdal
 	Properties enumKey = _propKeyResolver.getKey(key);
 	switch(enumKey) {
 	  case TRS:
-	    _create->trs = value;
+	    _create->dt = value;
 	    break;
 	  case TIMESTAMP:
 	    _create->timestamp = value;
