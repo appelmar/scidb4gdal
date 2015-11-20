@@ -43,6 +43,7 @@ SOFTWARE.
 #define SCIDB4GDAL_DEFAULT_UPLOAD_FILENAME "scidb4gdal_temp.bin"
 #define SCIDB4GDAL_ARRAYSUFFIX_TEMP "_temp"
 #define SCIDB4GDAL_ARRAYSUFFIX_TEMPLOAD "_tempload"
+#define SCIDB4GDAL_ARRAYSUFFIX_COLLECTION_INTEGRATION "_integrate"
 
 //#define SCIDB4GDAL_ARRAY_PREFIX "GDAL_" // Names of created arrays get a prefix, not yet implemented
 
@@ -92,6 +93,7 @@ namespace scidb4gdal
 
     enum StatusCode {
         SUCCESS                             = 0,
+	PENDING 			= 1,
 
         ERR_READ_ARRAYUNKNOWN               = 100 + 1,
         ERR_READ_WRONGDIMENSIONALITY        = 100 + 2,
@@ -105,6 +107,7 @@ namespace scidb4gdal
 	ERR_CREATE_TERMINATEDBYUSER		= 200 + 6,
 	ERR_CREATE_TEMPARRAY			= 200 + 7,
 	ERR_CREATE_NOARRAY			= 200+8,
+	TEMP_ARRAY_READY_FOR_INTEGRATION	= 200 + 9,
         ERR_CREATE_UNKNOWN                  = 200 + 99,
 
         ERR_GLOBAL_CANNOTCONNECT            = 300 + 1,
@@ -112,6 +115,7 @@ namespace scidb4gdal
         ERR_GLOBAL_DATATYPEMISMATCH         = 300 + 3,
         ERR_GLOBAL_INVALIDCONNECTIONSTRING  = 300 + 4,
 	ERR_GLOBAL_PARSE			= 300 +5,
+	ERR_GLOBAL_NO_SCIDB4GEO			= 300 +6,
 
         ERR_GLOBAL_UNKNOWN                  = 300 + 99,
 

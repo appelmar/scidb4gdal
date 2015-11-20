@@ -94,10 +94,10 @@ namespace scidb4gdal
          * Requests metadata for a given array from shim.
          * Metadata include dimensions, attributes, and spatial reference information.
          * @param inArrayName name of a SciDB array
-         * @param out metadata of an array as SciDBSpatialArray instance, spatial reference information can be missing if not found
+         * @param out pointer to the metadata of an array, depending on the type of the array the correct SciDBArray instance has to be created in this function, spatial reference information can be missing if not found
          * @return status code
          */
-        StatusCode getArrayDesc ( const string &inArrayName, SciDBSpatioTemporalArray &out );
+        StatusCode getArrayDesc ( const string &inArrayName, SciDBSpatialArray *&out );
 
         /**
          * Gets a list of all spatially referenced arrays, currently not needed!
@@ -180,6 +180,7 @@ namespace scidb4gdal
          */
         StatusCode insertData ( SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
 
+	StatusCode insertInto (string tmpArr, string collArr);
 
         /**
         * Updates the spatial reference system of an array
@@ -218,6 +219,7 @@ namespace scidb4gdal
 	void setConnectionParameters(ConnectionParameters &par);
 	void setQueryParameters(QueryParameters &par);
         StatusCode updateTRS(SciDBTemporalArray& array);
+	StatusCode getType(const string &name, SciDBSpatialArray *&array);
 
     protected:
 
@@ -273,6 +275,10 @@ namespace scidb4gdal
         void login();
 
         void logout();
+	
+	StatusCode persistArray(string srcArr, string tarArr);
+	bool arrayIntegrateable(string srcArr, string tarArr);
+	
 	void createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query);
 
     private:

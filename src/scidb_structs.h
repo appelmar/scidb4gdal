@@ -218,7 +218,6 @@ namespace scidb4gdal
 	      dimt.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE;
 	      dimt.typeId = "int64";
 	      
-	      // This order is more efficient as it fits row major image format (does not require transposing during downloads)
 	      dims.push_back ( dimt );
 	      _t_idx = dims.size() - 1;
 	  }

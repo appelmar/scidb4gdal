@@ -49,7 +49,7 @@ namespace scidb4gdal
         friend class SciDBRasterBand;
 
     private:
-        SciDBSpatialArray _array; //!< associated array metadata object
+        SciDBSpatialArray& _array; //!< associated array metadata object
         ShimClient *_client; //!< associated shim client metadata object
         TileCache _cache;
 	
@@ -60,7 +60,7 @@ namespace scidb4gdal
         * Default constructor for creating SciDBDataset instance for a given connectionstring
          * @param connstr string representation of a connection string, e.g. "SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"
          */
-        SciDBDataset ( SciDBSpatialArray array, ShimClient *client);
+        SciDBDataset ( SciDBSpatialArray &array, ShimClient *client);
 
         /**
          * Destructor for SciDBDatasets

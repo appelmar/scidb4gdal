@@ -29,7 +29,7 @@ SOFTWARE.
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
-#include <limits>
+#include <limits.h>
 #include "shim_client_structs.h"
 #include "scidb_structs.h"
 #include "parameter_parser.h"
@@ -265,7 +265,7 @@ namespace scidb4gdal
     
 
 
-    SciDBDataset::SciDBDataset ( SciDBSpatialArray array, ShimClient *client) : _array ( array ), _client ( client )
+    SciDBDataset::SciDBDataset ( SciDBSpatialArray &array, ShimClient *client) : _array ( array ), _client ( client )
     {
 
         this->nRasterXSize = 1 + _array.getXDim()->high - _array.getXDim()->low ;
@@ -322,22 +322,27 @@ namespace scidb4gdal
 	  //3. create client and set parameters
 	  client = new ShimClient (con_pars); //connection parameters are set
 	  
-	  //TODO maybe remove this later
 	  client->setCreateParameters(*create_pars); //create parameters regarding time
 	  
 	  //4. Collect metadata from source data and store in SciDBSpatialArray (happens only in GDAL)
-	  //TODO decide if we need to create a SArray or a STArray but start with a Spatial Array
-	  
-	  if (create_pars->type == S_ARRAY) {
+	  switch (create_pars->type) {
+	    case S_ARRAY:
 	      array = new SciDBSpatialArray();
-	  } else {
+	      break;
+	    case ST_ARRAY:
 	      array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
-	      Utils::debug("Testing trs creation: "+array->toString());
+	      break;
+	    case ST_SERIES:
+	      
+	      array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+	      //TODO recalculate the chunksizes
+	      ((SciDBSpatioTemporalArray*)array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal array
+	      break;
 	  }
-	   
+	  
 	  array->name = con_pars->arrayname;
 	  
-	  copyMetadataToArray(poSrcDS, *array);
+	  copyMetadataToArray(poSrcDS, *array); //copies the information from the source data file into the ST_Array representation
 	  Utils::debug("Testing metadata copy: "+array->toString());
 
 	  
@@ -351,38 +356,65 @@ namespace scidb4gdal
 	  
 	  // Copy data and write to SciDB
 	  uploadImageIntoTempArray(client, *array, poSrcDS,pfnProgress, pProgressData);
-
-	  Utils::debug ( "Persisting temporary array '" + array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP + "'" );
-	  client->copyArray ( array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP, array->name ); //persists temporary array in SciDB
-
-	  Utils::debug ( "Removing temporary array '" + array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP + "'" );
-	  client->removeArray ( array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP ); //deletes the temporary array in SciDB
-
-
-
-	  // Set Spatial reference to persisted array in SciDB
-	  client->updateSRS ( *array );
 	  
-	  // Set temporal reference
-	  if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
-	    client->updateTRS (*((SciDBSpatioTemporalArray*)array));
-	  }
-
-	  Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
-	  // Set Metadata in database
-	  {
-	      // set general image information
-	      for ( DomainMD::iterator it = array->md.begin(); it != array->md.end(); ++it ) {
-		  client->setArrayMD ( array->name, it->second, it->first );
+	  string arrayName = array->name;
+	  string tempArrayName = array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
+	  
+	  StatusCode persistingStatus = PENDING;
+	  
+	  Utils::debug ( "Persisting temporary array '" + tempArrayName + "'" );
+	  
+	  persistingStatus = client->copyArray ( tempArrayName, array->name ); //persists temporary array in SciDB
+	  
+	  switch(persistingStatus) {
+	    case SUCCESS:
+	      Utils::debug ( "Removing temporary array '" + tempArrayName + "'" );
+	      client->removeArray ( tempArrayName ); //deletes the temporary array in SciDB
+	      
+	      client->updateSRS ( *array );
+	      
+	      if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
+		client->updateTRS (*((SciDBSpatioTemporalArray*)array));
 	      }
+	      
+	      Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
+	      // Set Metadata in database
+	      {
+		  // set general image information
+		  for ( DomainMD::iterator it = array->md.begin(); it != array->md.end(); ++it ) {
+		      client->setArrayMD ( array->name, it->second, it->first );
+		  }
 
-	      // set attribute data for each band
-	      for ( int i = 0; i < nBands; ++i ) {
-		  for ( DomainMD::iterator it = array->attrs[i].md.begin(); it != array->attrs[i].md.end(); ++it ) {
-		      client->setAttributeMD ( array->name, array->attrs[i].name, it->second, it->first );
+		  // set attribute data for each band
+		  for ( int i = 0; i < nBands; ++i ) {
+		      for ( DomainMD::iterator it = array->attrs[i].md.begin(); it != array->attrs[i].md.end(); ++it ) {
+			  client->setAttributeMD ( array->name, array->attrs[i].name, it->second, it->first );
+		      }
 		  }
 	      }
+	      
+	      break;
+	    case TEMP_ARRAY_READY_FOR_INTEGRATION:
+	      Utils::debug("Target Array exists, trying to insert source image into it.");
+	      array->name = tempArrayName;
+	      //update the temporary array to prepare the insertion process for over
+	      client->updateSRS ( *array );
+	      if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
+		client->updateTRS (*((SciDBSpatioTemporalArray*)array));
+	      }
+	      //temporary array has SRS (and TRS)
+	      //insert array into existing array
+	      client->insertInto(tempArrayName,arrayName);
+	      client->removeArray( tempArrayName );
+	      array->name = arrayName;
+	      
+	      break;
+	    default:
+	      throw persistingStatus;
 	  }
+	  
+
+
 
 	  pfnProgress ( 1.0, NULL, pProgressData );
 
@@ -586,51 +618,51 @@ namespace scidb4gdal
 
 	  // 3. Create shim client
 	  ShimClient *client = new ShimClient (con_pars);
+	  client->setQueryParameters(*query_pars);
 	  
-	  SciDBSpatioTemporalArray array;
+	  //create simple array here and cast it later if needed
+	  SciDBSpatialArray* array;
 	  // 4. Request array metadata
 	  if ( client->getArrayDesc ( con_pars->arrayname, array ) != SUCCESS ) {
 	      Utils::error ( "Cannot fetch array metadata" );
 	      return NULL;
 	  }
-	  
-		  //check if the temporal index was set or if a timestamp was used
-	  if (query_pars->hasTemporalIndex) {
-	    char* t_index_key = new char[1];
-	    t_index_key[0] = 't';
-	    if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
-	      string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions,t_index_key);
-	      query_pars->temp_index = boost::lexical_cast<int>(value);
-	    } 
-	  } else {
-
-	    //convert date to temporal index
-	    TPoint time = TPoint(query_pars->timestamp);
-	    query_pars->temp_index = array.indexAtDatetime(time);
-	    query_pars->hasTemporalIndex = true;
+	  if(!array) {
+	      Utils::debug("array changes not afflicting the 'scidbdriver'");
 	  }
 	  
-	  
-	  
-	  
-	  //TODO check also if temporal index is within time dimension range
-	  if (array.dims.size() > 2) {
-	    if ( !array.isTemporal() ) {
-		Utils::debug ( "No time statement defined in the connection string. Can't decide which image to fetch in the temporal data set." );
-  // 	      return NULL;
-	    } else {
-		//get dimension for time
-		SciDBDimension *dim;
-		dim = &array.dims[array.getTDimIdx()];
+	  //try to cast the array. if not possible then it is null and the temporal parameter setting is skipped
+	  SciDBSpatioTemporalArray* starray_ptr = dynamic_cast<SciDBSpatioTemporalArray*> (array);
+	  if (starray_ptr) {
+	    Utils::debug("Type Cast OK. Start setting up temporal information");
+	      //check if the temporal index was set or if a timestamp was used
+	      if (query_pars->hasTemporalIndex) {
+		char* t_index_key = new char[1];
+		t_index_key[0] = 't';
+		if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
+		  string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions,t_index_key);
+		  Utils::debug("Casting temp index");
+		  query_pars->temp_index = boost::lexical_cast<int>(value);
+		  Utils::debug("done");
+		} 
+	      } else {
+		//convert date to temporal index
+		TPoint time = TPoint(query_pars->timestamp);
+		query_pars->temp_index = starray_ptr->indexAtDatetime(time);
+		query_pars->hasTemporalIndex = true;
+	      }
+	      
+	      //get dimension for time
+	      SciDBDimension *dim;
+	      dim = &starray_ptr->dims[starray_ptr->getTDimIdx()];
 
-		if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
-		    Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
-		    ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + array.datetimeAtIndex(dim->low).toStringISO() + "), " +
-		      "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + array.datetimeAtIndex(dim->high).toStringISO() + ")"
-		    );
-		    return NULL;
-		}
-	    }
+	      if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
+		  Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
+		  ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + starray_ptr->datetimeAtIndex(dim->low).toStringISO() + "), " +
+		    "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + starray_ptr->datetimeAtIndex(dim->high).toStringISO() + ")"
+		  );
+		  return NULL;
+	      }
 	  }
 
 
@@ -640,7 +672,7 @@ namespace scidb4gdal
 	  // Create the dataset
 
 	  SciDBDataset *poDS;
-	  poDS = new SciDBDataset ( array, client);
+	  poDS = new SciDBDataset ( *array, client);
 	  return ( poDS );
 	} catch (int e) {
 	  switch (e) {
@@ -682,6 +714,7 @@ namespace scidb4gdal
 	  //vector<SciDBDimension> dims;
 
 	  // Derive chunksize from attribute sizes
+	  //TODO adapt for t dim as well
 	  uint32_t blocksize = Utils::nextPow2 ( ( uint32_t ) sqrt ( ( ( ( double ) ( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 ) ) / ( ( double ) ( pixelsize ) ) ) ) ) / 2;
 	  stringstream ss;
 	  ss << "Using chunksize " << blocksize << "x" << blocksize << " --> " << ( int ) ( ( ( double ) ( blocksize * blocksize * pixelsize ) ) / ( ( double ) 1024.0 ) ) << " kilobytes";
