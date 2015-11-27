@@ -1044,9 +1044,10 @@ namespace scidb4gdal
         bool exists;
         arrayExists ( array.name, exists );
         if ( exists ) {
-	  //TODO ceheck if we can add the image into the collection array
+	  if (!(_cp->type == ST_SERIES || _cp->type == ST_ARRAY)) {
             Utils::error ( "Array '" + array.name + "' already exists in SciDB database" );
             return ERR_CREATE_ARRAYEXISTS;
+	  }
         }
 
         if ( array.attrs.size() == 0 ) {
@@ -1121,7 +1122,7 @@ namespace scidb4gdal
 
 
 
-    StatusCode ShimClient::copyArray ( string src, string dest )
+    StatusCode ShimClient::persistTempArray ( string src, string dest )
     {
         if ( dest == "" ) {
             Utils::error ( "Cannot create unnamed arrays" );
@@ -1156,6 +1157,7 @@ namespace scidb4gdal
 	    }
             
         } else {
+	    //array does not exist, no problem in storing the data
 	    return persistArray(src, dest);
 	}
 
@@ -1191,17 +1193,62 @@ namespace scidb4gdal
 	  return SUCCESS;
     }
     
-    StatusCode ShimClient::insertInto(string tmpArr, string collArr)
+    StatusCode ShimClient::insertInto(SciDBArray &srcArray, SciDBArray &destArray)
     {
       	  //create new array
 	  int sessionID = newSession();
-
-
+	  string collArr = destArray.name; //array name in which we want to store the data
+	  string tmpArr = srcArray.name; //array name with the source data
+	  
+	  stringstream castSchema;
+	  castSchema << "<";
+	  
+	  //attributes
+	  for ( uint32_t i = 0; i < srcArray.attrs.size(); i++ ) {
+	      string nullable = (srcArray.attrs[i].nullable) ? " NULL" : "";
+	      castSchema << srcArray.attrs[i].name << ":" << srcArray.attrs[i].typeId << "" << nullable << ",";
+	  }
+	  
+	  // special handling for the over attributes (over_x, over_y, over_t) -> rename them based on the stored names for dimensions in 
+	  // the destination array
+	  if ( SciDBSpatioTemporalArray* starray = dynamic_cast<SciDBSpatioTemporalArray*>(&destArray)) {
+	    castSchema << starray->getXDim()->name <<":int64 NULL, "<< starray->getYDim()->name <<":int64 NULL, "<< starray->getTDim()->name <<":int64 NULL>["; //target attibute names from (over_x, over_y, over_t)
+	  } else if (SciDBSpatialArray* sarray = dynamic_cast<SciDBSpatialArray*>(&destArray)) {
+	    castSchema << sarray->getXDim()->name <<":int64 NULL, "<< sarray->getYDim()->name <<":int64 NULL>["; //target attibute names from (over_x, over_y, over_t)
+	  } else {
+	     Utils::debug("Cannot cast array to spatial or spatiotemporal. Using standard axis definitions.");
+	     castSchema << "x:int64 NULL, y:int64 NULL, t:int64 NULL>[";
+	  }
+	  
+	  // add dimension statement and rename it with src_{x|y|t}
+	  // [src_x=0:1000,512,0, ...] name=min:max,chunksize,overlap
+	  for ( uint32_t i = 0; i < srcArray.dims.size(); i++ ) {
+	      string dim_name = srcArray.dims[i].name;
+	      string dimHigh;
+	      if (srcArray.dims[i].high == INT64_MAX) {
+		  dimHigh = "*";
+	      } else {
+		  dimHigh = boost::lexical_cast<string>(srcArray.dims[i].high);
+	      }
+	      castSchema << "src_" << dim_name << "=" << srcArray.dims[i].low << ":" << dimHigh  << "," << srcArray.dims[i].chunksize << ",0" ; //TODO change statement for overlap
+	      
+	      if (i < srcArray.dims.size() - 1) {
+		castSchema << ", ";
+	      }
+	  }
+	  
+	  castSchema << "]";
+	  //the dimensions of the src array will be discarded later
+	  
 	  stringstream afl;
 	  //afl << "store(" << srcArr << ", " << tarArr << ")";
 	  //insert(redimension(cast(join(tmpArr, eo_over(tmpArr,collArr)),<>[]),collArr),collArr) *<>[] being the template
-	  //TODO extend this code to rename attributes for a working redimension
-	  afl << "insert(" << "redimension("<< "cast("<< "join("<< tmpArr << ", eo_over(" << tmpArr << "," << collArr << ")" << ")" <<", <>[] ) ,'"<< collArr <<"')" << ", " << collArr << ")";
+	  string eo_over = "eo_over(" + tmpArr + "," + collArr + ")";
+	  string join = "join("+ tmpArr + ", "+ eo_over + ")";
+	  string cast = "cast("+ join + ", "+ castSchema.str() + ")";
+	  string redimension = "redimension("+ cast +","+ collArr +")";
+	  
+	  afl << "insert(" << redimension << ", " << collArr <<")";
 	  Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
 
@@ -1224,7 +1271,7 @@ namespace scidb4gdal
     }
 
 
-
+  //TODO implement
     bool ShimClient::arrayIntegrateable(string srcArr, string tarArr)
     {
 	return true;

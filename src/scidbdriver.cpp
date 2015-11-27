@@ -269,7 +269,7 @@ namespace scidb4gdal
     {
 
         this->nRasterXSize = 1 + _array.getXDim()->high - _array.getXDim()->low ;
-        this->nRasterYSize = 1 + _array.getXDim()->high - _array.getXDim()->low ;
+        this->nRasterYSize = 1 + _array.getYDim()->high - _array.getYDim()->low ;
 
 
 
@@ -356,18 +356,13 @@ namespace scidb4gdal
 	  
 	  // Copy data and write to SciDB
 	  uploadImageIntoTempArray(client, *array, poSrcDS,pfnProgress, pProgressData);
-	  
+	  Utils::debug("Data uploaded into temporary array");
 	  string arrayName = array->name;
 	  string tempArrayName = array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
 	  
-	  StatusCode persistingStatus = PENDING;
-	  
-	  Utils::debug ( "Persisting temporary array '" + tempArrayName + "'" );
-	  
-	  persistingStatus = client->copyArray ( tempArrayName, array->name ); //persists temporary array in SciDB
-	  
-	  switch(persistingStatus) {
-	    case SUCCESS:
+	  Utils::debug ( "Persisting temporary array '" + tempArrayName + "'" );  
+	  StatusCode persist_res = client->persistTempArray(tempArrayName, array->name);
+	    if (persist_res == SUCCESS) {
 	      Utils::debug ( "Removing temporary array '" + tempArrayName + "'" );
 	      client->removeArray ( tempArrayName ); //deletes the temporary array in SciDB
 	      
@@ -392,10 +387,13 @@ namespace scidb4gdal
 		      }
 		  }
 	      }
-	      
-	      break;
-	    case TEMP_ARRAY_READY_FOR_INTEGRATION:
+	    } else if ( persist_res == TEMP_ARRAY_READY_FOR_INTEGRATION) {
 	      Utils::debug("Target Array exists, trying to insert source image into it.");
+	      //at this point the destination array exists, get metadata for this array
+	      string destName = array->name;
+	      SciDBSpatialArray* destArray;
+	      client->getArrayDesc(destName, destArray);
+	      
 	      array->name = tempArrayName;
 	      //update the temporary array to prepare the insertion process for over
 	      client->updateSRS ( *array );
@@ -404,13 +402,11 @@ namespace scidb4gdal
 	      }
 	      //temporary array has SRS (and TRS)
 	      //insert array into existing array
-	      client->insertInto(tempArrayName,arrayName);
-	      client->removeArray( tempArrayName );
+	      client->insertInto(*array, *destArray);
+	      //client->removeArray( tempArrayName );
 	      array->name = arrayName;
-	      
-	      break;
-	    default:
-	      throw persistingStatus;
+	  } else {
+	      throw persist_res;
 	  }
 	  
 
@@ -501,7 +497,7 @@ namespace scidb4gdal
     CPLErr SciDBDataset::GetGeoTransform ( double *padfTransform )
     {
         // If array dimensions do not start at 0, change transformation parameters accordingly
-        AffineTransform::double2 p0 ( _array.getXDim()->low, _array.getXDim()->low );
+        AffineTransform::double2 p0 ( _array.getXDim()->low, _array.getYDim()->low );
         _array.affineTransform.f ( p0 );
         // padfTransform[0] = _array.affineTransform._x0;
         padfTransform[0] = p0.x;
@@ -647,9 +643,15 @@ namespace scidb4gdal
 		} 
 	      } else {
 		//convert date to temporal index
-		TPoint time = TPoint(query_pars->timestamp);
-		query_pars->temp_index = starray_ptr->indexAtDatetime(time);
-		query_pars->hasTemporalIndex = true;
+		if (query_pars->timestamp == "") {
+		  Utils::debug("No temporal index and no timestamp provided. Using first temporal index instead");
+		  query_pars->temp_index = 0;
+		  query_pars->hasTemporalIndex = true;
+		} else {
+		  TPoint time = TPoint(query_pars->timestamp);
+		  query_pars->temp_index = starray_ptr->indexAtDatetime(time);
+		  query_pars->hasTemporalIndex = true;
+		}
 	      }
 	      
 	      //get dimension for time
@@ -819,7 +821,7 @@ namespace scidb4gdal
 	size_t pixelSize = 0;
 	for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
 	
-	size_t totalSize = pixelSize *  array.getXDim()->chunksize * array.getXDim()->chunksize;
+	size_t totalSize = pixelSize *  array.getXDim()->chunksize * array.getYDim()->chunksize;
 	
 	uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
 
@@ -827,8 +829,8 @@ namespace scidb4gdal
 	uint32_t nBlockX = ( uint32_t ) ( nXSize / array.getXDim()->chunksize );
 	if ( nXSize % array.getXDim()->chunksize != 0 ) ++nBlockX;
 
-	uint32_t nBlockY = ( uint32_t ) ( nYSize / array.getXDim()->chunksize );
-	if ( nYSize % array.getXDim()->chunksize != 0 ) ++nBlockY;
+	uint32_t nBlockY = ( uint32_t ) ( nYSize / array.getYDim()->chunksize );
+	if ( nYSize % array.getYDim()->chunksize != 0 ) ++nBlockY;
 
 
 
@@ -853,10 +855,10 @@ namespace scidb4gdal
 		if ( xmax > array.getXDim()->high ) xmax = array.getXDim()->high;
 		if ( xmin > array.getXDim()->high ) xmin = array.getXDim()->high;
 
-		int ymin = by *  array.getXDim()->chunksize + array.getXDim()->low;
-		int ymax = ymin + array.getXDim()->chunksize - 1;
-		if ( ymax > array.getXDim()->high ) ymax = array.getXDim()->high;
-		if ( ymin > array.getXDim()->high ) ymin = array.getXDim()->high;
+		int ymin = by *  array.getYDim()->chunksize + array.getYDim()->low;
+		int ymax = ymin + array.getYDim()->chunksize - 1;
+		if ( ymax > array.getYDim()->high ) ymax = array.getYDim()->high;
+		if ( ymin > array.getYDim()->high ) ymin = array.getYDim()->high;
 
 		// We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
 		for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {

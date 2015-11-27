@@ -166,7 +166,7 @@ namespace scidb4gdal
         * @param dest array name of the target array
         * @return status code
         */
-        StatusCode copyArray ( string src, string dest );
+        StatusCode persistTempArray ( string src, string dest );
 
         /**
          * Inserts a chunk of data to an existing array
@@ -180,7 +180,7 @@ namespace scidb4gdal
          */
         StatusCode insertData ( SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
 
-	StatusCode insertInto (string tmpArr, string collArr);
+	StatusCode insertInto (SciDBArray &tmpArr, SciDBArray &collArr);
 
         /**
         * Updates the spatial reference system of an array
