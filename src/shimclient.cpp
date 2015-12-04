@@ -161,6 +161,7 @@ namespace scidb4gdal
     StatusCode ShimClient::testConnection()
     {
 
+      
         curlBegin();
 
         stringstream ss;
@@ -709,7 +710,6 @@ namespace scidb4gdal
 	  Utils::debug("No array was created");
 	}
         out->name = inArrayName;
-	Utils::debug("name set");
         // Get dimensions: project(dimensions(inArrayName),name,low,high,type)
         StatusCode res;
         res = getDimensionDesc ( inArrayName, out->dims );
@@ -799,7 +799,6 @@ namespace scidb4gdal
                 curlEnd();
                 return ERR_GLOBAL_UNKNOWN;
             };
-	    Utils::debug("Fetching data");
             curlEnd();
         }
 

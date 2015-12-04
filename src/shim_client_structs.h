@@ -7,7 +7,6 @@
 # include <boost/lexical_cast.hpp>
 # include <boost/assign.hpp>
 
-
 using namespace boost::assign;
 
 namespace scidb4gdal {
@@ -66,7 +65,7 @@ namespace scidb4gdal {
     int error_code;
     
     
-    ConnectionParameters() : arrayname ( "" ), host ( "https://localhost" ), port ( 8083 ), user ( "scidb" ), passwd ( "scidb" ) {}
+    ConnectionParameters() : arrayname ( "" ), host ( "" ), port ( 0 ), user ( "" ), passwd ( "" ) {}
     
     string toString() {
       stringstream s;
@@ -75,7 +74,7 @@ namespace scidb4gdal {
     };
     
     bool isComplete() {
-      if (arrayname == "") {
+      if (arrayname == "" || host == "" || port == 0) {
 	error_code = ERR_READ_ARRAYUNKNOWN;
 	return false;
       }

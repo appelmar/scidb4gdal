@@ -403,7 +403,7 @@ namespace scidb4gdal
 	      //temporary array has SRS (and TRS)
 	      //insert array into existing array
 	      client->insertInto(*array, *destArray);
-	      //client->removeArray( tempArrayName );
+	      client->removeArray( tempArrayName );
 	      array->name = arrayName;
 	  } else {
 	      throw persist_res;
@@ -572,8 +572,17 @@ namespace scidb4gdal
 
     CPLErr SciDBDataset::Delete ( const char *pszName )
     {
-        // TODO
-        Utils::debug ( "Deleting SciDB arrays from GDAL is currently not allowed..." );
+	ParameterParser p = ParameterParser(pszName, NULL);
+	ConnectionParameters c = p.getConnectionParameters();
+	Utils::debug(c.toString());
+	
+	
+	if (c.isComplete()) {
+	  ShimClient client = ShimClient(&c);
+	  client.removeArray(c.arrayname);
+	}
+	//TODO distinguish types of arrays, e.g. if array is a cube and contains multiple slices then don't remove unless 3rd dim contains just one slice
+//         Utils::debug ( "Deleting SciDB arrays from GDAL is currently not allowed..." );
         return CE_None;
     }
   

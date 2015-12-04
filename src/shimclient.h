@@ -188,6 +188,7 @@ namespace scidb4gdal
         * @return status code
         */
         StatusCode updateSRS ( SciDBSpatialArray &array );
+	
 
 
         /**
