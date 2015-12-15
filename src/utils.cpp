@@ -69,8 +69,8 @@ namespace scidb4gdal
 
         void debug ( const string &msg )
         {
-            std::cout << "(" << getCurDatetime() << ") DEBUG: " << msg << std::endl;
-//             CPLDebug ( "scidb4gdal", msg.c_str(), "" );
+            //std::cout << "(" << getCurDatetime() << ") DEBUG: " << msg << std::endl;
+             CPLDebug ( "scidb4gdal", msg.c_str(), "" );
         }
 
         GDALDataType scidbTypeIdToGDALType ( const string &typeId )
@@ -248,8 +248,14 @@ namespace scidb4gdal
 
 
 
-
-
-
+      std::string mdMapToString(std::map< string, string > &kv) {
+	map<string, string>::iterator it;
+        stringstream result; 
+       
+        for (it = kv.begin(); it != kv.end(); ++it) {
+           result << it->first << "=" << it->second << "  ";
+        }
+        return result.str();
+      }
     }
 }

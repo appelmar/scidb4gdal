@@ -169,6 +169,7 @@ namespace scidb4gdal
 	static void parseArrayName (string& array, TemporalQueryParameters* query);
 	static void parseOpeningOptions (GDALOpenInfo *poOpenInfo, ConnectionPars* con);
 	static void parseConnectionString ( const string &connstr, ConnectionPars* con);
+	static void loadParsFromEnv (ConnectionPars* con);
 	static bool splitPropertyString (string &input, string &constr, string &propstr);
 
     };

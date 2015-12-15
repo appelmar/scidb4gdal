@@ -375,7 +375,7 @@ namespace scidb4gdal
 	string astr = connstr.substr ( 6, connstr.length() - 6 ); // Remove SCIDB: from connection string
 	
 // 	parseOpeningOptions(info, pars);
-        
+        loadParsFromEnv(pars);
         parseConnectionString ( astr, pars);
 
 
@@ -598,20 +598,21 @@ namespace scidb4gdal
 
             array.srtext = wkt;
             OGRSpatialReference srs ( wkt.c_str() );
-            srs.AutoIdentifyEPSG();
-            array.auth_name = srs.GetAuthorityName ( NULL );
-            array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
-            char *proj4;
-            srs.exportToProj4 ( &proj4 );
-            array.proj4text.assign ( proj4 );
-            CPLFree ( proj4 );
+            if (srs.AutoIdentifyEPSG() ==  OGRERR_UNSUPPORTED_SRS) {
+	      Utils::warn("Unsupported spatial reference system, ignoring spatial reference.");
+	    }
+	    else {
+	      array.auth_name = srs.GetAuthorityName ( NULL );
+	      array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
+	      char *proj4;
+	      srs.exportToProj4 ( &proj4 );
+	      array.proj4text.assign ( proj4 );
+	      CPLFree ( proj4 );
 
-            array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
-            array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
-
-
-
-            client->updateSRS ( array );
+	      array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+	      array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
+	      client->updateSRS ( array );
+	    }
         }
 
 
@@ -620,7 +621,13 @@ namespace scidb4gdal
 
         // Set Metadata in databse
         for ( DomainMD::iterator it = array.md.begin(); it != array.md.end(); ++it ) {
-            client->setArrayMD ( array.name, it->second, it->first );
+           client->setArrayMD ( array.name, it->second, it->first );
+	   // The following writes each metadata key value pair individually (slow but more robust against invalid char sequences)
+// 	   for (MD::iterator it2 = it->second.begin(); it2 != it->second.end(); ++it2) {
+// 	     MD m; 
+// 	     m.insert(pair<string,string>(it2->first,it2->second)); 
+// 	      client->setArrayMD ( array.name, m, it->first );
+// 	   }
         }
 
 
@@ -669,11 +676,13 @@ namespace scidb4gdal
 
     char **SciDBDataset::mapToGdalMD ( map< string, string > &kv )
     {
-        CPLStringList out;
-        for ( map<string, string>::iterator it = kv.begin(); it != kv.end(); ++it ) {
-            out.AddNameValue ( it->first.c_str(), it->second.c_str() );
+        CPLStringList* out = new CPLStringList();
+	for ( map<string, string>::iterator it = kv.begin(); it != kv.end(); ++it ) {
+	  const char* k = it->first.c_str();
+	  const char* v = it->second.c_str();
+	  out->AddNameValue ( k, v );
         }
-        return out.List();
+        return out->List();
     }
 
 
@@ -716,9 +725,10 @@ namespace scidb4gdal
         if ( pszDomain == NULL ) {
             _client->getArrayMD ( kv, _array.name, "" );
         }
-        else {
-            _client->getArrayMD ( kv, _array.name, pszDomain );
-        }
+        // DOMAINS NOT YET IMPLEMENTED
+//         else {
+//             _client->getArrayMD ( kv, _array.name, pszDomain );
+//         }
         return mapToGdalMD ( kv );
     }
 
@@ -729,9 +739,10 @@ namespace scidb4gdal
         if ( pszDomain == NULL ) {
             _client->getArrayMD ( kv, _array.name, "" );
         }
-        else {
-            _client->getArrayMD ( kv, _array.name, pszDomain );
-        }
+         // DOMAINS NOT YET IMPLEMENTED
+//         else {
+//             _client->getArrayMD ( kv, _array.name, pszDomain );
+//         }
         if ( kv.find ( pszName ) == kv.end() ) return NULL;
         return kv.find ( pszName )->second.c_str();
 
@@ -806,9 +817,9 @@ namespace scidb4gdal
 	}
 	
 	//first extract information from connection string and afterwards check for the opening options and overwrite values if double
+	loadParsFromEnv(pars);
 	parseConnectionString(connectionString, pars);
 	parseOpeningOptions(poOpenInfo, pars);
-	
 	parseArrayName(pars->arrayname, sp); //array name will be modified if a temporal query is detected (for the ConnectionPars)
 	
 	// 2. Check validity of parameters
@@ -1031,6 +1042,32 @@ namespace scidb4gdal
 	}
       }
     }
+    
+    
+    void SciDBDataset::loadParsFromEnv (ConnectionPars* con) {
+      
+      char *x;
+      
+      x = std::getenv("SCIDB4GDAL_HOST");
+      if (x != NULL) {
+	con->host = x;
+	con->ssl = (con->host.substr ( 0, 5 ).compare ( "https" ) == 0 );
+      }
+    
+      x = std::getenv("SCIDB4GDAL_PASSWD");
+      if (x != NULL) con->passwd = x;
+    
+    
+      x = std::getenv("SCIDB4GDAL_USER");
+      if (x != NULL) con->user = x;
+    
+      x = std::getenv("SCIDB4GDAL_PORT");
+      if (x != NULL) con->port = boost::lexical_cast<int>(x);
+      
+     
+    }
+    
+    
     
     void SciDBDataset::parseConnectionString ( const string &connstr, ConnectionPars *con) {
       std::map<string,ConStringParameter> paramResolver = map_list_of ("host", HOST)("port", PORT) ("array", ARRAY) ("user",USER) ("password", PASSWORD);

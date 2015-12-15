@@ -185,6 +185,13 @@ namespace scidb4gdal
 	* 	Function to validate the time string that is passed
 	*/
 	bool validateTimestampString(string &in);
+	
+	
+	/**
+	 *  Converts key value metadata to a string
+	 */
+	std::string mdMapToString(std::map< string, string > &kv); 
+	
 
     }
 
