@@ -97,6 +97,7 @@ namespace scidb4gdal
 
         ERR_READ_ARRAYUNKNOWN               = 100 + 1,
         ERR_READ_WRONGDIMENSIONALITY        = 100 + 2,
+	ERR_READ_BBOX			= 100 + 3,
         ERR_READ_UNKNOWN                    = 100 + 99,
 
         ERR_CREATE_ARRAYEXISTS              = 200 + 1,

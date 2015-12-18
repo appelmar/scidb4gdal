@@ -19,6 +19,8 @@ chicago="./UTM2GTIF.TIF"
 targetArray=test_chicago_s
 targetArrayST=test_chicago_st
 targetArraySTS=test_chicago_sts
+targetArrayMetaNA=test_chicago_s_meta_na
+targetArraySCov=test_chicago_s_cov
 
 #output file names
 rm -f ./test_*.tif
@@ -29,6 +31,8 @@ outputS3="./test_s_part_out.tif"
 outputST1="./test_st.tif"
 outputSTS1="./test_sts_index.tif"
 outputSTS2="./test_sts_timestamp.tif"
+outputSMetaNA="./test_s_meta_na.tif"
+outputSCov="./test_s_cov.tif"
 
 #create a log file
 log="./test.log"
@@ -39,22 +43,67 @@ exec 2>&1
 exec 3>&1
 exec 4>&1
 
+echo ""
+echo "#################################"
+echo "# Preparing test data"
+echo "#################################"
+echo ""
+#input image files prepare data for spatial insertion
+chicago_part1="./chicago_1.tif"
+chicago_part2="./chicago_2.tif"
+chicago_part3="./chicago_3.tif"
+chicago_part4="./chicago_4.tif"
+chicago_na="./chicago_na.tif"
+
+echo rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
+rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
+echo ""
+echo gdal_translate -of GTiff -srcwin 0 0 349 464 $chicago $chicago_part1
+gdal_translate -of GTiff -srcwin 0 0 349 464 $chicago $chicago_part1
+echo ""
+echo gdal_translate -of GTiff -srcwin 350 0 349 464 $chicago $chicago_part2
+gdal_translate -of GTiff -srcwin 350 0 349 464 $chicago $chicago_part2
+echo ""
+echo gdal_translate -of GTiff -srcwin 0 465 349 464 $chicago $chicago_part3
+gdal_translate -of GTiff -srcwin 0 465 349 464 $chicago $chicago_part3
+echo ""
+echo gdal_translate -of GTiff -srcwin 350 465 349 464 $chicago $chicago_part4
+gdal_translate -of GTiff -srcwin 350 465 349 464 $chicago $chicago_part4
+echo ""
+echo gdal_translate -of GTiff -mo "TIFFTAG_IMAGEDESCRIPTION=Panchromatic image of chicago." -srcwin -50 -50 749 979 -a_nodata 0 $chicago $chicago_na
+gdal_translate -of GTiff -mo "TIFFTAG_IMAGEDESCRIPTION=Panchromatic image of chicago." -srcwin -50 -50 749 979 -a_nodata 0 $chicago $chicago_na
+echo ""
+echo gdalmanage delete "SCIDB:array=${targetArraySCov} host=${host} port=${port} user=${user} password=${passwd}"
+gdalmanage delete "SCIDB:array=${targetArraySCov} host=${host} port=${port} user=${user} password=${passwd}"
+echo ""
+
+echo ""
 echo "#################################"
 echo "# Performing gdalinfo on test img"
 echo "#################################"
-gdalinfo $chicago
+echo ""
+echo gdalinfo $chicago_na
+gdalinfo $chicago_na
 echo ""
 
+echo ""
 echo "###########################################" 
 echo "# Delete test Arrays if exists "
 echo "###########################################"
+echo ""
 
 echo gdalmanage delete "SCIDB:array=${targetArray} host=${host} port=${port} user=${user} password=${passwd}"
 gdalmanage delete "SCIDB:array=${targetArray} host=${host} port=${port} user=${user} password=${passwd}"
+echo ""
 echo gdalmanage delete "SCIDB:array=${targetArrayST} host=${host} port=${port} user=${user} password=${passwd}"
 gdalmanage delete "SCIDB:array=${targetArrayST} host=${host} port=${port} user=${user} password=${passwd}"
+echo ""
 echo gdalmanage delete "SCIDB:array=${targetArraySTS} host=${host} port=${port} user=${user} password=${passwd}"
 gdalmanage delete "SCIDB:array=${targetArraySTS} host=${host} port=${port} user=${user} password=${passwd}"
+echo ""
+echo gdalmanage delete "SCIDB:array=${targetArrayMetaNA} host=${host} port=${port} user=${user} password=${passwd}"
+gdalmanage delete "SCIDB:array=${targetArrayMetaNA} host=${host} port=${port} user=${user} password=${passwd}"
+echo ""
 
 echo "" 
 echo "###########################################"
@@ -68,13 +117,38 @@ echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"u
 gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago}" "SCIDB:array=${targetArray}"
 echo ""
 
+#upload 2
+echo "****** translate an image into a purely spatial array in scidb using create options, test for storing meta data and na_value"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"type=S\" -of SciDB ${chicago_na} \"SCIDB:array=${targetArrayMetaNA}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago_na}" "SCIDB:array=${targetArrayMetaNA}"
+echo ""
+
+echo "" 
+echo "###########################################"
+echo "# Upload Spatial Coverage "
+echo "###########################################"
+echo ""
+
+echo "****** start a spatial coverage by stating a bounding box in the create options (bbox=left upper right lower)"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"bbox=443000 4650000 455000 4629000\" -co \"type=S\" -of SciDB ${chicago_part4} \"SCIDB:array=${targetArraySCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "bbox=443000 4650000 455000 4629000" -co "type=S" -of SciDB "${chicago_part4}" "SCIDB:array=${targetArraySCov}"
+echo ""
+
+echo "****** adding two more images simply by trying to translate to an existing array"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"type=S\" -of SciDB ${chicago_part1} \"SCIDB:array=${targetArraySCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago_part1}" "SCIDB:array=${targetArraySCov}"
+echo ""
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"type=S\" -of SciDB ${chicago_part3} \"SCIDB:array=${targetArraySCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago_part3}" "SCIDB:array=${targetArraySCov}"
+echo ""
+
 echo "" 
 echo "##########################################################"
 echo "# Upload Spatio Temporal single Image with create options "
 echo "##########################################################"
 echo "" 
 
-#upload 2
+#upload 3
 echo "****** translate an image into spatially and temporally annotated SciDB array"
 echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-15T10:00:00\" -co \"type=ST\" -of SciDB ${chicago} \"SCIDB:array=${targetArrayST}\"
 gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-15T10:00:00" -co "type=ST" -of SciDB "${chicago}" "SCIDB:array=${targetArrayST}"
@@ -86,19 +160,19 @@ echo "# Creating spatial and spatio-temporal image series"
 echo "##########################################################"
 echo "" 
 
-#upload 3
+#upload 4
 echo "***** Start a spatial-temporal series"
 echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-15\" -co \"type=STS\" -of SciDB ${chicago} \"SCIDB:array=${targetArraySTS}\"
 gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-15" -co "type=STS" -of SciDB "${chicago}" "SCIDB:array=${targetArraySTS}"
 echo ""
 
-#upload 4
+#upload 5
 echo "***** Insert second time slices"
 echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-20\" -co \"type=ST\" -of SciDB ${chicago} \"SCIDB:array=${targetArraySTS}\"
 gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-20" -co "type=ST" -of SciDB "${chicago}" "SCIDB:array=${targetArraySTS}"
 echo ""
 
-#upload 5
+#upload 6
 echo "***** Insert third time slices inbetween"
 echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-17\" -co \"type=ST\" -of SciDB ${chicago} \"SCIDB:array=${targetArraySTS}\"
 gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-17" -co "type=ST" -of SciDB "${chicago}" "SCIDB:array=${targetArraySTS}"
@@ -115,6 +189,11 @@ echo ""
 echo "***** Info on simple spatial image using the connection file string method"
 echo gdalinfo "SCIDB:host=${host} port=${port} user=${user} password=${passwd} array=${targetArray}"
 gdalinfo "SCIDB:host=${host} port=${port} user=${user} password=${passwd} array=${targetArray}"
+echo ""
+
+echo "***** Info with connection options on the array with additional metadata and NA values"
+echo gdalinfo --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" "SCIDB:array=${targetArrayMetaNA}"
+gdalinfo --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" "SCIDB:array=${targetArrayMetaNA}"
 echo ""
 
 echo "***** Info on time slice in a spatio-temporal image series"
@@ -160,6 +239,16 @@ echo ""
 echo "***** Downloading subset of spatio-temporal image using opening options with temporal index (just one image in)"
 echo gdal_translate --debug ON -srcwin 0 0 200 200 -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySTS}[t,2015-10-17]\" ${outputSTS2}
 gdal_translate --debug ON -srcwin 0 0 200 200 -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySTS}[t,2015-10-17]" ${outputSTS2}
+echo ""
+
+echo "***** Downloading image with additional meta data and NA value"
+echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArrayMetaNA}\" ${outputSMetaNA}
+gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArrayMetaNA}" ${outputSMetaNA}
+echo ""
+
+echo "***** Downloading the coverage"
+echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySCov}\" ${outputSCov}
+gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySCov}" ${outputSCov}
 echo ""
 
 echo "" 

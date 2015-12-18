@@ -29,7 +29,7 @@ namespace scidb4gdal
     {
       //set the resolver a.k.a the key value pairs in the connection / property string or the create / opening options
       _creationTypeResolver.mapping = map_list_of("S",S_ARRAY) ("ST",ST_ARRAY) ("STS",ST_SERIES);
-      _propKeyResolver.mapping = map_list_of ("dt",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX);
+      _propKeyResolver.mapping = map_list_of ("dt",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX) ("bbox",BBOX) ("srs",SRS);
       _conKeyResolver.mapping = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL)("array",ARRAY);
       
       _scidb_filename = scidbFile;
@@ -312,9 +312,25 @@ namespace scidb4gdal
 	    } else {
 	      Utils::error("Array type incorrect. Please use 'S', 'ST' or 'STS'.");
 	    }
-	  default:
 	    break;
+	  case SRS:
+	    _create->srs = value;
+	    break;
+	  case BBOX:
 	    
+	    vector<string> coords;
+	    
+	    boost::split(coords,value,boost::is_any_of(" "));
+	    if (coords.size() != 4) {
+// 	      throw ERR_READ_BBOX;
+	      break;
+	    }
+	    _create->bbox[0] = boost::lexical_cast<double>(coords.at(0));
+	    _create->bbox[1] = boost::lexical_cast<double>(coords.at(1));
+	    _create->bbox[2] = boost::lexical_cast<double>(coords.at(2));
+	    _create->bbox[3] = boost::lexical_cast<double>(coords.at(3));
+	    _create->hasBBOX = true;
+	    break;    
 	}
     }
     void ParameterParser::assignQueryParameter(string key, string value)

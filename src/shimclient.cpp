@@ -907,7 +907,7 @@ namespace scidb4gdal
 	   
 	  tslice << "slice(" << array.name << ","+starray->tdim+"," << t_index << ")";
 	} else {
-	  Utils::debug("Cast failed. Skipping the slicing.");
+	  //Utils::debug("Cast failed. Skipping the slicing.");
 	  tslice << array.name;
 	}
 	
@@ -1043,7 +1043,7 @@ namespace scidb4gdal
         bool exists;
         arrayExists ( array.name, exists );
         if ( exists ) {
-	  if (!(_cp->type == ST_SERIES || _cp->type == ST_ARRAY)) {
+	  if (!(_cp->type == ST_SERIES || _cp->type == ST_ARRAY || _cp->type == S_ARRAY)) {
             Utils::error ( "Array '" + array.name + "' already exists in SciDB database" );
             return ERR_CREATE_ARRAYEXISTS;
 	  }
@@ -1213,7 +1213,8 @@ namespace scidb4gdal
 	  if ( SciDBSpatioTemporalArray* starray = dynamic_cast<SciDBSpatioTemporalArray*>(&destArray)) {
 	    castSchema << starray->getXDim()->name <<":int64 NULL, "<< starray->getYDim()->name <<":int64 NULL, "<< starray->getTDim()->name <<":int64 NULL>["; //target attibute names from (over_x, over_y, over_t)
 	  } else if (SciDBSpatialArray* sarray = dynamic_cast<SciDBSpatialArray*>(&destArray)) {
-	    castSchema << sarray->getXDim()->name <<":int64 NULL, "<< sarray->getYDim()->name <<":int64 NULL>["; //target attibute names from (over_x, over_y, over_t)
+	    //eo_over creates attributes over_x,over_y AND over_t every time
+	    castSchema << sarray->getXDim()->name <<":int64 NULL, "<< sarray->getYDim()->name <<":int64 NULL, t:int64 NULL>["; //target attibute names from (over_x, over_y, over_t)
 	  } else {
 	     Utils::debug("Cannot cast array to spatial or spatiotemporal. Using standard axis definitions.");
 	     castSchema << "x:int64 NULL, y:int64 NULL, t:int64 NULL>[";
@@ -1454,31 +1455,10 @@ namespace scidb4gdal
 
 
 	/*
+	 * clean up
 	* remove (tempArray);
 	*/
-        {
-   
-            stringstream afl;
-            afl << "remove(" << tempArray << ")";
-            Utils::debug ( "Performing AFL Query: " +  afl.str() );
-
-            curlBegin();
-            ss.str ( "" );
-            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
-            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
-            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
-            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
-            if ( curlPerform() != CURLE_OK ) {
-                curlEnd();
-                Utils::warn ( "Insertion or redimensioning of temporary array '" + tempArray + "' failed. Trying to recover initial state." );
-                if ( removeArray ( tempArray ) != SUCCESS ) { // This is somewhat redundant...
-                    Utils::warn ( "Could not delete temporary load array '" + tempArray + "'. This may result in an inconsistent state, please check in SciDB." );
-                }
-                return ERR_CREATE_UNKNOWN;
-            }
-            curlEnd();
-        }
-
+	removeArray(tempArray);
 
 
         // Release session
