@@ -167,6 +167,7 @@ namespace scidb4gdal
         * @return status code
         */
         StatusCode persistTempArray ( string src, string dest );
+	StatusCode persistArray(string srcArr, string tarArr);
 
         /**
          * Inserts a chunk of data to an existing array
@@ -277,7 +278,6 @@ namespace scidb4gdal
 
         void logout();
 	
-	StatusCode persistArray(string srcArr, string tarArr);
 	bool arrayIntegrateable(string srcArr, string tarArr);
 	
 	void createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query);

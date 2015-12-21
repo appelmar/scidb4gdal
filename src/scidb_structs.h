@@ -17,7 +17,7 @@ namespace scidb4gdal
     typedef map<string, MD>      DomainMD;
     
     /**
-     * A structure for storing metadata of a SciDB array attribute
+     * A structure for storing metadata of a SciDB src_array attribute
      */
     struct SciDBAttribute {
         string name;
@@ -34,7 +34,7 @@ namespace scidb4gdal
     };
 
     /**
-    * A structure for storing metadata of a SciDB array dimension
+    * A structure for storing metadata of a SciDB src_array dimension
     */
     struct SciDBDimension {
 	/**
@@ -69,7 +69,7 @@ namespace scidb4gdal
 
 
     /**
-    * A structure for storing general metadata of a SciDB array
+    * A structure for storing general metadata of a SciDB src_array
     */
     struct SciDBArray {
         string name;
@@ -79,7 +79,7 @@ namespace scidb4gdal
 	
 	/**
 	 * The resulting output will be like the following:
-	 * 'arrayname':<'dimname',min:max,type>['attributename',type,nullable]
+	 * 'src_arrayname':<'dimname',min:max,type>['attributename',type,nullable]
 	 * The parts in the brackets can show multiple times.
 	 */
         virtual string toString() {
@@ -108,7 +108,7 @@ namespace scidb4gdal
 
 
     /**
-    * A structure for storing spatial reference of a SciDB array
+    * A structure for storing spatial reference of a SciDB src_array
     */
     struct SciDBSpatialReference {
         string srtext;
@@ -126,7 +126,7 @@ namespace scidb4gdal
     };
     
     /**
-      *  A structure for storing temporal reference of a SciDB array
+      *  A structure for storing temporal reference of a SciDB src_array
       */
     struct SciDBTemporalReference: public TReference {
 	/**
@@ -176,7 +176,7 @@ namespace scidb4gdal
     };
 
     /**
-     * This array is the representation of a SciDB array with a temporal reference that manages the
+     * This src_array is the representation of a SciDB src_array with a temporal reference that manages the
      * correct addressing of the temporal dimension in SciDB, e.g. naming and alike.
      */
     struct SciDBTemporalArray: public virtual SciDBArray, public SciDBTemporalReference {
@@ -243,7 +243,7 @@ namespace scidb4gdal
     };
     
     /**
-     * A structure for storing metadata of a spatially referenced SciDB array.
+     * A structure for storing metadata of a spatially referenced SciDB src_array.
      * 
      * If no SpatialReference is sepcified, then the SpatialArray will be a simple cartesian reference system.
      */
@@ -325,7 +325,7 @@ namespace scidb4gdal
 
 	/**
 	 * assigns the spatial indices. As default it uses x as the first
-	 * parameter in the dimension array (index 0) and y as the second
+	 * parameter in the dimension src_array (index 0) and y as the second
 	 * index (1)
 	 */
         void deriveDimensionIndexes() {

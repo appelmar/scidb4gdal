@@ -300,7 +300,8 @@ namespace scidb4gdal
 	CreationParameters *create_pars;
 	ParameterParser *pp;
 	ShimClient *client;
-	SciDBSpatialArray* array;
+	SciDBSpatialArray* src_array;
+	SciDBSpatialArray* tar_arr;
 	
 	try {
 	  //1. Parse Options and connection string
@@ -323,41 +324,60 @@ namespace scidb4gdal
 	  
 	  client->setCreateParameters(*create_pars); //create parameters regarding time
 	  
-	  //4. Collect metadata from source data and store in SciDBSpatialArray (happens only in GDAL)
-	  switch (create_pars->type) {
-	    case S_ARRAY:
-	      array = new SciDBSpatialArray();
-	      break;
-	    case ST_ARRAY:
-	      array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
-	      break;
-	    case ST_SERIES:
-	      
-	      array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
-	      //TODO recalculate the chunksizes
-	      ((SciDBSpatioTemporalArray*)array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal array
-	      break;
-	  }
-	  
-	  array->name = con_pars->arrayname;
-	  
-	  copyMetadataToArray(poSrcDS, *array); //copies the information from the source data file into the ST_Array representation
-	  Utils::debug("Testing metadata copy: "+array->toString());
-	  
 	  bool exists = false;
-	  StatusCode code = client->arrayExists(array->name, exists);
+	  StatusCode code = client->arrayExists(con_pars->arrayname, exists);
 	  if (code != SUCCESS) {
 	      throw code;
 	  }
 	  
-	  SciDBSpatialArray* tar_arr;
-	  if (create_pars->hasBBOX && !exists) {
+	  if (exists && create_pars->hasBBOX) {
+	    //currently we only support the fresh creation of a coverage by stating a bounding box
+	    throw ERR_CREATE_ARRAYEXISTS;
+	  }
+	  
+	  //4. Collect metadata from source data and store in SciDBSpatialArray (happens only in GDAL)
+	  switch (create_pars->type) {
+	    case S_ARRAY:
+	      src_array = new SciDBSpatialArray();
+	      break;
+	    case ST_ARRAY:
+	      src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+	      break;
+	    case ST_SERIES:
+	      
+	      src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+	      //TODO recalculate the chunksizes
+	      ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
+	      break;
+	  }
+	  
+	  src_array->name = con_pars->arrayname;
+	  
+	  copyMetadataToArray(poSrcDS, *src_array); //copies the information from the source data file into the ST_Array representation
+	  Utils::debug("Testing metadata copy: "+src_array->toString());
+	  
+	  
+	  
+	  if (exists) {
+	    //get the information on the target array
+	    client->getArrayDesc(src_array->name, tar_arr);
+	  } else if (create_pars->hasBBOX) {
+	    //otherwise if an additional bounding box is stated copy the source array and reassign the boundaries
+	    switch (create_pars->type) {
+	      case S_ARRAY:
+		tar_arr = new SciDBSpatialArray(*src_array);
+		break;
+	      case ST_ARRAY:
+	      case ST_SERIES:
+		tar_arr = new SciDBSpatioTemporalArray(*(SciDBSpatioTemporalArray*)src_array);
+		((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = 0;
+		break;
+	    } 
 	    //create "bigger" array
-	    tar_arr = new SciDBSpatialArray(*array);
 	    SciDBDimension* x = tar_arr->getXDim();
 	    SciDBDimension* y = tar_arr->getYDim();
 	    
-	    AffineTransform af = array->affineTransform;
+	    AffineTransform af = src_array->affineTransform;
 	    AffineTransform::double2 ul = AffineTransform::double2(create_pars->bbox[0],create_pars->bbox[1]);
 	    AffineTransform::double2 lr = AffineTransform::double2(create_pars->bbox[2],create_pars->bbox[3]);
 	    
@@ -372,155 +392,131 @@ namespace scidb4gdal
 	    
 	    Utils::debug("BBOX "+boost::lexical_cast<string>(create_pars->bbox[0])+" "+boost::lexical_cast<string>(create_pars->bbox[1])+" "+boost::lexical_cast<string>(create_pars->bbox[2])+" "+boost::lexical_cast<string>(create_pars->bbox[3]));
 	    Utils::debug("BBOX IMAGE "+boost::lexical_cast<string>(tar_arr->getXDim()->low)+" "+boost::lexical_cast<string>(tar_arr->getYDim()->high)+" "+boost::lexical_cast<string>(tar_arr->getXDim()->high)+" "+boost::lexical_cast<string>(tar_arr->getYDim()->low));
-	    //try to insert
-	    
+	  } else {
+	      tar_arr = src_array;
+	  }
+	  
+	  string arrayName = src_array->name;
+	  string tempArrayName = src_array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
+	  string insertableName = src_array->name+"_insertable";
+	  string insertableTempName = insertableName + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
+	  
+	  //at this point the target array for the upload has been created in GDAL
+	  
+	  //now upload the source array into SciDB with the original coordinates as temporary
+	  if (src_array != tar_arr) {
+	    src_array->name = insertableName;
+	  }
+	  if ( client->createTempArray ( *src_array ) != SUCCESS ) {
+	    throw ERR_CREATE_TEMPARRAY;
+	  }
+	  
+	  // Copy data and write to SciDB as a temporary array
+	  uploadImageIntoTempArray(client, *src_array, poSrcDS,pfnProgress, pProgressData);
+	  Utils::debug("Data uploaded into temporary array");
+	  
 
-	    string arrayName = tar_arr->name;
-	    string tempArrayName = tar_arr->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
-	    string insertableName = array->name+"_insertable";
-	    string insertableTempName = insertableName + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
+	  
+	  if (src_array == tar_arr) {
+	    //normal case: image does not exist and has no special boundary
 	    
-	    //create array in which we do the upload before we insert it into the target array
-	    
-	    array->name = insertableName;
-
-	    if ( client->createTempArray ( *array ) != SUCCESS ) {
-	      throw ERR_CREATE_TEMPARRAY;
-	    } 
-
-	    
-	    
-	    uploadImageIntoTempArray(client, *array, poSrcDS,pfnProgress, pProgressData);
-	    array->name = insertableTempName;
-	    //StatusCode persist_res = client->persistTempArray(insertableTempName, insertableName);
-	    
-	    //if (persist_res == SUCCESS) {
-		client->updateSRS ( *array );
-		if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
-		  client->updateTRS (*((SciDBSpatioTemporalArray*)array));
-		}
-	    //}
-	    
-	    //create the temporary target array which will be bigger than the source file and make it spatial/temporal
-	    if ( client->createTempArray ( *tar_arr ) != SUCCESS ) {
-	      throw ERR_CREATE_TEMPARRAY;
-	    } 
-	    tar_arr->name = tempArrayName;
-	    
-	    client->updateSRS ( *tar_arr );
-	    if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
-	      client->updateTRS (*((SciDBSpatioTemporalArray*)tar_arr));
-	    }
-	    
-	    //insert _insertable into _temp
-	    //array->name = insertableTempName;
-	    client->insertInto(*array, *tar_arr);
-	    
-	    //remove _insertable_temp
-	    client->removeArray( array->name);
-	    
-	    tar_arr->name = arrayName;
-	    
-	    //persist _temp
-	    StatusCode persist_res = client->persistTempArray(tempArrayName, arrayName);
-	    
+	    //simply persist the uploaded image, set references and metadata
+	    Utils::debug ( "Persisting temporary array '" + tempArrayName + "'" );  
+	    StatusCode persist_res = client->persistArray(tempArrayName, src_array->name);
 	    if (persist_res == SUCCESS) {
-	      Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
-	      //update final image
-	      client->updateSRS ( *tar_arr );
+	      Utils::debug ( "Removing temporary array '" + tempArrayName + "'" );
+	      client->removeArray ( tempArrayName ); //deletes the temporary array in SciDB
+	      
+	      client->updateSRS ( *src_array );
+	      
 	      if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
-		client->updateTRS (*((SciDBSpatioTemporalArray*)tar_arr));
+		client->updateTRS (*((SciDBSpatioTemporalArray*)src_array));
 	      }
 	      
+	      Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
 	      // Set Metadata in database
 	      {
 		  // set general image information
-		  for ( DomainMD::iterator it = tar_arr->md.begin(); it != tar_arr->md.end(); ++it ) {
-		      client->setArrayMD ( tar_arr->name, it->second, it->first );
+		  for ( DomainMD::iterator it = src_array->md.begin(); it != src_array->md.end(); ++it ) {
+		      client->setArrayMD ( src_array->name, it->second, it->first );
 		  }
 
 		  // set attribute data for each band
 		  for ( int i = 0; i < nBands; ++i ) {
-		      for ( DomainMD::iterator it = tar_arr->attrs[i].md.begin(); it != tar_arr->attrs[i].md.end(); ++it ) {
-			  client->setAttributeMD ( tar_arr->name, tar_arr->attrs[i].name, it->second, it->first );
+		      for ( DomainMD::iterator it = src_array->attrs[i].md.begin(); it != src_array->attrs[i].md.end(); ++it ) {
+			  client->setAttributeMD ( src_array->name, src_array->attrs[i].name, it->second, it->first );
 		      }
 		  }
 	      }
+	    } else {
+		throw persist_res;
+	    }
+	  } else { //new target array case
+	    //update spatial (and temporal) reference for temp source
+	    src_array->name = insertableTempName;
+	    client->updateSRS ( *src_array );
+	    if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
+	      client->updateTRS (*((SciDBSpatioTemporalArray*)src_array));
 	    }
 	    
-	    
-	    client->removeArray(tempArrayName);
-	    
-	    array = tar_arr;
-
-	  } else {
-	    //normal create
-
-  // 	  return NULL;
-	    //stop here for development test in GDAL
-	    
-	    // Create array in SciDB using just the image pixel. This image will be integrated into a ST series or into a S array
-	    if ( client->createTempArray ( *array ) != SUCCESS ) {
+	    //create temporary target array if not exists
+	    if (!exists) {
+	      if ( client->createTempArray ( *tar_arr ) != SUCCESS ) {
 		throw ERR_CREATE_TEMPARRAY;
+	      } 
+	      tar_arr->name = tempArrayName;
+	      
+	      client->updateSRS ( *tar_arr );
+	      if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
+		client->updateTRS (*((SciDBSpatioTemporalArray*)tar_arr));
+	      }
 	    }
 	    
-	    // Copy data and write to SciDB
-	    uploadImageIntoTempArray(client, *array, poSrcDS,pfnProgress, pProgressData);
-	    Utils::debug("Data uploaded into temporary array");
-	    string arrayName = array->name;
-	    string tempArrayName = array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
+	    //insert data into target array
+	    client->insertInto(*src_array, *tar_arr);
+	    client->removeArray( src_array->name); //insertable
 	    
-	    Utils::debug ( "Persisting temporary array '" + tempArrayName + "'" );  
-	    StatusCode persist_res = client->persistTempArray(tempArrayName, array->name);
+	    //persist target array
+	    if (!exists) {
+	      StatusCode persist_res = client->persistArray(tempArrayName, arrayName);
+// 	      client->persistArray(tempArrayName, "sts_test");
 	      if (persist_res == SUCCESS) {
-		Utils::debug ( "Removing temporary array '" + tempArrayName + "'" );
-		client->removeArray ( tempArrayName ); //deletes the temporary array in SciDB
-		
-		client->updateSRS ( *array );
-		
+		tar_arr->name = arrayName;
+		Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
+		//update final image if it was not created yet
+	      
+		client->updateSRS ( *tar_arr );
 		if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
-		  client->updateTRS (*((SciDBSpatioTemporalArray*)array));
+		  client->updateTRS (*((SciDBSpatioTemporalArray*)tar_arr));
 		}
 		
-		Utils::debug ( "Trying to persist array metadata in SciDB system catalog" );
+// 		tar_arr->name = "sts_test";
+// 		client->updateSRS ( *tar_arr );
+// 		if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
+// 		  client->updateTRS (*((SciDBSpatioTemporalArray*)tar_arr));
+// 		}
+// 		tar_arr->name = arrayName;
 		// Set Metadata in database
 		{
 		    // set general image information
-		    for ( DomainMD::iterator it = array->md.begin(); it != array->md.end(); ++it ) {
-			client->setArrayMD ( array->name, it->second, it->first );
+		    for ( DomainMD::iterator it = tar_arr->md.begin(); it != tar_arr->md.end(); ++it ) {
+			client->setArrayMD ( tar_arr->name, it->second, it->first );
 		    }
 
 		    // set attribute data for each band
 		    for ( int i = 0; i < nBands; ++i ) {
-			for ( DomainMD::iterator it = array->attrs[i].md.begin(); it != array->attrs[i].md.end(); ++it ) {
-			    client->setAttributeMD ( array->name, array->attrs[i].name, it->second, it->first );
+			for ( DomainMD::iterator it = tar_arr->attrs[i].md.begin(); it != tar_arr->attrs[i].md.end(); ++it ) {
+			    client->setAttributeMD ( tar_arr->name, tar_arr->attrs[i].name, it->second, it->first );
 			}
 		    }
 		}
-	      } else if ( persist_res == TEMP_ARRAY_READY_FOR_INTEGRATION) {
-		Utils::debug("Target Array exists, trying to insert source image into it.");
-		//at this point the destination array exists, get metadata for this array
-		string destName = array->name;
-		SciDBSpatialArray* destArray;
-		client->getArrayDesc(destName, destArray);
-		
-		array->name = tempArrayName;
-		//update the temporary array to prepare the insertion process for over
-		client->updateSRS ( *array );
-		if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
-		  client->updateTRS (*((SciDBSpatioTemporalArray*)array));
-		}
-		//temporary array has SRS (and TRS)
-		//insert array into existing array
-		client->insertInto(*array, *destArray);
-		client->removeArray( tempArrayName );
-		array->name = arrayName;
-	    } else {
+		client->removeArray(tempArrayName); //temp array
+	      } else {
 		throw persist_res;
-	    }
+	      }
+	    } 	    
+	    src_array = tar_arr;
 	  }
-
-
 
 	  pfnProgress ( 1.0, NULL, pProgressData );
 
@@ -531,7 +527,7 @@ namespace scidb4gdal
 // 	  delete array;
 // 	  return ( GDALDataset * ) GDALOpen ( pszFilename, GA_ReadOnly );
 	  
-	  return new SciDBDataset(*array, client);
+	  return new SciDBDataset(*src_array, client);
 	} catch (int e) {
 	    //catch exceptions and give information back to the user
 	    switch (e) {
@@ -562,11 +558,13 @@ namespace scidb4gdal
 	    if (client) delete client; 
 	    if (con_pars) delete con_pars;
 	    if (create_pars) delete create_pars ;
-	    if (array)delete array;
+	    if (src_array)delete src_array;
 	}
     }
 
-
+    void persistMetadata() {
+      
+    }
 
     void SciDBDataset::gdalMDtoMap ( char **strlist, map<string, string> &kv )
     {

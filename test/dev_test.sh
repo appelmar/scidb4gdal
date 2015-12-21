@@ -21,6 +21,7 @@ targetArrayST=test_chicago_st
 targetArraySTS=test_chicago_sts
 targetArrayMetaNA=test_chicago_s_meta_na
 targetArraySCov=test_chicago_s_cov
+targetArraySTSCov=test_chicago_sts_cov
 
 #output file names
 rm -f ./test_*.tif
@@ -75,6 +76,9 @@ gdal_translate -of GTiff -mo "TIFFTAG_IMAGEDESCRIPTION=Panchromatic image of chi
 echo ""
 echo gdalmanage delete "SCIDB:array=${targetArraySCov} host=${host} port=${port} user=${user} password=${passwd}"
 gdalmanage delete "SCIDB:array=${targetArraySCov} host=${host} port=${port} user=${user} password=${passwd}"
+echo ""
+echo gdalmanage delete "SCIDB:array=${targetArraySTSCov} host=${host} port=${port} user=${user} password=${passwd}"
+gdalmanage delete "SCIDB:array=${targetArraySTSCov} host=${host} port=${port} user=${user} password=${passwd}"
 echo ""
 
 echo ""
@@ -182,6 +186,36 @@ echo ""
 
 echo "" 
 echo "##########################################################"
+echo "# Creating STS Coverages"
+echo "##########################################################"
+echo "" 
+
+echo "***** Start a spatial-temporal series coverage"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-15\" -co \"type=STS\" -co \"bbox=443000 4650000 455000 4629000\" -of SciDB ${chicago_part2} \"SCIDB:array=${targetArraySTSCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-15" -co "type=STS" -co "bbox=443000 4650000 455000 4629000" -of SciDB "${chicago_part2}" "SCIDB:array=${targetArraySTSCov}"
+echo ""
+
+#echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySTSCov}[i,0]\" zwischen.tif
+#gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySTSCov}[i,0]" zwischen.tif
+#echo ""
+
+echo "***** Add ST image to the first time slice"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-15\" -co \"type=ST\" -of SciDB ${chicago_part1} \"SCIDB:array=${targetArraySTSCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-15" -co "type=ST" -of SciDB "${chicago_part1}" "SCIDB:array=${targetArraySTSCov}"
+echo ""
+
+echo "***** Add ST image to the second time slice"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-16\" -co \"type=ST\" -of SciDB ${chicago_part3} \"SCIDB:array=${targetArraySTSCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-16" -co "type=ST" -of SciDB "${chicago_part3}" "SCIDB:array=${targetArraySTSCov}"
+echo ""
+
+echo "***** Add another ST image to the second time slice"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-16\" -co \"type=ST\" -of SciDB ${chicago_part4} \"SCIDB:array=${targetArraySTSCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-16" -co "type=ST" -of SciDB "${chicago_part4}" "SCIDB:array=${targetArraySTSCov}"
+echo ""
+
+echo "" 
+echo "##########################################################"
 echo "# Info on different SciDB arrays"
 echo "##########################################################"
 echo "" 
@@ -246,9 +280,12 @@ echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"u
 gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArrayMetaNA}" ${outputSMetaNA}
 echo ""
 
-echo "***** Downloading the coverage"
-echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySCov}\" ${outputSCov}
-gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySCov}" ${outputSCov}
+echo "***** Downloading the coverages of the ST coverage (index 0 and 1)"
+echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySTSCov}[i,0]\" ${outputSTSCov1}
+gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySTSCov}[i,0]" ${outputSTSCov1}
+echo ""
+echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySTSCov}[i,1]\" ${outputSTSCov2}
+gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySTSCov}[i,1]" ${outputSTSCov2}
 echo ""
 
 echo "" 
