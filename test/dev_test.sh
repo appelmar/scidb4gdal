@@ -134,8 +134,8 @@ echo "###########################################"
 echo ""
 
 echo "****** start a spatial coverage by stating a bounding box in the create options (bbox=left upper right lower)"
-echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"bbox=443000 4650000 455000 4629000\" -co \"type=S\" -of SciDB ${chicago_part4} \"SCIDB:array=${targetArraySCov}\"
-gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "bbox=443000 4650000 455000 4629000" -co "type=S" -of SciDB "${chicago_part4}" "SCIDB:array=${targetArraySCov}"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"bbox=443000 4650000 455000 4629000\" -co \"srs=${srs}\"  -co \"type=S\" -of SciDB ${chicago_part4} \"SCIDB:array=${targetArraySCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "bbox=443000 4650000 455000 4629000" -co "srs=${srs}" -co "type=S" -of SciDB "${chicago_part4}" "SCIDB:array=${targetArraySCov}"
 echo ""
 
 echo "****** adding two more images simply by trying to translate to an existing array"
@@ -191,13 +191,9 @@ echo "##########################################################"
 echo "" 
 
 echo "***** Start a spatial-temporal series coverage"
-echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-15\" -co \"type=STS\" -co \"bbox=443000 4650000 455000 4629000\" -of SciDB ${chicago_part2} \"SCIDB:array=${targetArraySTSCov}\"
-gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-15" -co "type=STS" -co "bbox=443000 4650000 455000 4629000" -of SciDB "${chicago_part2}" "SCIDB:array=${targetArraySTSCov}"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-15\" -co \"type=STS\" -co \"bbox=443000 4650000 455000 4629000\" -co \"srs=${srs}\" -of SciDB ${chicago_part2} \"SCIDB:array=${targetArraySTSCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "dt=P1D" -co "t=2015-10-15" -co "type=STS" -co "bbox=443000 4650000 455000 4629000" -co "srs=${srs}" -of SciDB "${chicago_part2}" "SCIDB:array=${targetArraySTSCov}"
 echo ""
-
-#echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySTSCov}[i,0]\" zwischen.tif
-#gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySTSCov}[i,0]" zwischen.tif
-#echo ""
 
 echo "***** Add ST image to the first time slice"
 echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"dt=P1D\" -co \"t=2015-10-15\" -co \"type=ST\" -of SciDB ${chicago_part1} \"SCIDB:array=${targetArraySTSCov}\"
@@ -323,3 +319,7 @@ echo gdalinfo -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo
 gdalinfo -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" "SCIDB:array=${targetArraySTS}"
 echo ""
 
+echo "***** create coverage with bbox and w/o SRS statement"
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"bbox=443000 4650000 455000 4629000\" -co \"srs=${srs}\"  -co \"type=S\" -of SciDB ${chicago_part4} \"SCIDB:array=fail_bbox_srs\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "bbox=443000 4650000 455000 4629000" -co "srs=${srs}" -co "type=S" -of SciDB "${chicago_part4}" "SCIDB:array=fail_bbox_srs"
+echo ""

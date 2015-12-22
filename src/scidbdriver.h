@@ -153,6 +153,7 @@ namespace scidb4gdal
     protected:
       
       static void gdalMDtoMap(char **strlist, map<string,string> &kv);
+      
       static  char** mapToGdalMD(map<string,string> &kv);
       
       /**
@@ -171,10 +172,8 @@ namespace scidb4gdal
 	 */ 
 // 	static void parsePropertiesString ( const string &propstr, QueryParameters* query );
 // 	
-// 	static void parseArrayName (string& array, QueryParameters* query);
-// 	static void parseOpeningOptions (GDALOpenInfo *poOpenInfo, ConnectionPars* con);
-	//static void parseConnectionString ( const string &connstr, ConnectionPars* con);
-// 	static bool splitPropertyString (string &input, string &constr, string &propstr);
+
+	static bool arrayIntegrateable(SciDBSpatialArray &src_array, SciDBSpatialArray &tar_array);
 
     };
 

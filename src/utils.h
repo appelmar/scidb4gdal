@@ -98,6 +98,7 @@ namespace scidb4gdal
         ERR_READ_ARRAYUNKNOWN               = 100 + 1,
         ERR_READ_WRONGDIMENSIONALITY        = 100 + 2,
 	ERR_READ_BBOX			= 100 + 3,
+	ERR_READ_BBOX_SRS_MISSING	= 100 + 4,
         ERR_READ_UNKNOWN                    = 100 + 99,
 
         ERR_CREATE_ARRAYEXISTS              = 200 + 1,
@@ -108,7 +109,7 @@ namespace scidb4gdal
 	ERR_CREATE_TERMINATEDBYUSER		= 200 + 6,
 	ERR_CREATE_TEMPARRAY			= 200 + 7,
 	ERR_CREATE_NOARRAY			= 200+8,
-	TEMP_ARRAY_READY_FOR_INTEGRATION	= 200 + 9,
+	ERR_CREATE_ARRAY_NOT_INSERTABLE		= 200 + 9,
         ERR_CREATE_UNKNOWN                  = 200 + 99,
 
         ERR_GLOBAL_CANNOTCONNECT            = 300 + 1,
@@ -202,6 +203,7 @@ namespace scidb4gdal
 	* 	Function to validate the time string that is passed
 	*/
 	bool validateTimestampString(string &in);
+	
 
     }
 

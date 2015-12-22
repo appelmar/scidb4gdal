@@ -237,6 +237,7 @@ namespace scidb4gdal
       
       //create the parameter objects
       if (!isValid()) return false;
+      
       _con = new ConnectionParameters();  
       if (_operation == SCIDB_OPEN) {
 	_query = new QueryParameters();
@@ -301,28 +302,40 @@ namespace scidb4gdal
 	Properties enumKey = _propKeyResolver.getKey(key);
 	switch(enumKey) {
 	  case TRS:
+	  {
 	    _create->dt = value;
 	    break;
+	  }
 	  case TIMESTAMP:
+	  {
 	    _create->timestamp = value;
 	    break;
+	  }
 	  case TYPE:
+	  {
 	    if (_creationTypeResolver.contains(value)) {
 	      _create->type = _creationTypeResolver.getKey(value);
 	    } else {
-	      Utils::error("Array type incorrect. Please use 'S', 'ST' or 'STS'.");
+	      Utils::error("Array \"type\" incorrect. Please use 'S', 'ST' or 'STS'.");
 	    }
 	    break;
+	  }
 	  case SRS:
-	    _create->srs = value;
-	    break;
-	  case BBOX:
+	  {
+	    vector<string> code;
+	    boost::split(code,value,boost::is_any_of(":"));
 	    
+	    _create->auth_name = code.at(0);
+	    _create->srid = boost::lexical_cast<int32_t>(code.at(1));
+	    break;
+	  }
+	  case BBOX:
+	  { 
 	    vector<string> coords;
 	    
 	    boost::split(coords,value,boost::is_any_of(" "));
 	    if (coords.size() != 4) {
-// 	      throw ERR_READ_BBOX;
+ 	      throw ERR_READ_BBOX;
 	      break;
 	    }
 	    _create->bbox[0] = boost::lexical_cast<double>(coords.at(0));
@@ -331,6 +344,7 @@ namespace scidb4gdal
 	    _create->bbox[3] = boost::lexical_cast<double>(coords.at(3));
 	    _create->hasBBOX = true;
 	    break;    
+	  }
 	}
     }
     void ParameterParser::assignQueryParameter(string key, string value)

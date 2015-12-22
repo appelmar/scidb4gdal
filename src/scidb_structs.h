@@ -224,7 +224,7 @@ namespace scidb4gdal
 	
 	void deriveTemporalDimensionIndex() {
             if ( tdim != "") {
-                for ( int i = 0; i < dims.size(); ++i ) {
+                for ( size_t i = 0; i < dims.size(); ++i ) {
                     if ( dims[i].name == tdim ) {
 			_t_idx = i;
 			break;
@@ -232,7 +232,7 @@ namespace scidb4gdal
                 }
             }
             else { // Try default dimension names
-                for ( int i = 0; i < dims.size(); ++i ) {
+                for ( size_t i = 0; i < dims.size(); ++i ) {
                     if ( dims[i].name == SCIDB4GDAL_DEFAULT_TDIMNAME ) {
 			_t_idx = i;
 			break;
@@ -332,14 +332,14 @@ namespace scidb4gdal
             _x_idx = 0;
             _y_idx = 1;
             if ( xdim != "" && ydim != "" ) {
-                for ( int i = 0; i < dims.size(); ++i ) { // Assuming 2 dimensions!!!
+                for ( size_t i = 0; i < dims.size(); ++i ) { // Assuming 2 dimensions!!!
                     if ( dims[i].name == xdim ) _x_idx = i;
                     if ( dims[i].name == ydim ) _y_idx = i;
                 }
                 // TODO: Assert x_idx != y_idx
             }
             else { // Try default dimension names
-                for ( int i = 0; i < dims.size(); ++i ) { // Assuming 2 dimensions!!!
+                for ( size_t i = 0; i < dims.size(); ++i ) { // Assuming 2 dimensions!!!
                     if ( dims[i].name == SCIDB4GDAL_DEFAULT_XDIMNAME ) _x_idx = i;
                     if ( dims[i].name == SCIDB4GDAL_DEFAULT_YDIMNAME ) _y_idx = i;
                 }

@@ -278,8 +278,6 @@ namespace scidb4gdal
 
         void logout();
 	
-	bool arrayIntegrateable(string srcArr, string tarArr);
-	
 	void createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query);
 
     private:

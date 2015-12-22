@@ -525,7 +525,7 @@ namespace scidb4gdal
             curlBegin();
             stringstream ss;
             stringstream afl;
-            afl << "project(st_getsrs(" << inArrayName << "),name,xdim,ydim,srtext,proj4text,A)";  // project(dimensions(chicago2),name,low,high,type)
+            afl << "project(st_getsrs(" << inArrayName << "),name,xdim,ydim,srtext,proj4text,A,auth_name,auth_srid)";  // project(dimensions(chicago2),name,low,high,type)
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "csv";
             if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
@@ -604,6 +604,8 @@ namespace scidb4gdal
             out.srtext = cols[3];
             out.proj4text = cols[4];
             out.affineTransform = * ( new AffineTransform ( cols[5] ) ); // Should be released
+	    out.auth_name = cols[6];
+	    out.auth_srid = boost::lexical_cast<uint32_t>(cols[7]);
         }
 
         releaseSession ( sessionID );
@@ -1118,50 +1120,6 @@ namespace scidb4gdal
         return SUCCESS;
 
     }
-
-
-
-    StatusCode ShimClient::persistTempArray ( string src, string dest )
-    {
-        if ( dest == "" ) {
-            Utils::error ( "Cannot create unnamed arrays" );
-            return ERR_CREATE_INVALIDARRAYNAME;
-
-        }
-        bool exists;
-	
-	arrayExists ( src, exists );
-        if ( !exists ) {
-            Utils::error ( "Source array '" + src + "' does not exist in SciDB database" );
-            return ERR_CREATE_ARRAYEXISTS;
-        }
-	
-        arrayExists ( dest, exists );
-        if ( exists ) {
-	    bool integrateable = arrayIntegrateable(src,dest);
-	    
-	    
-	    //TODO check if array can be integrated into an array collection
-	    // therefore check dimensionality
-	    // check boundaries
-	    // calculate position of array in the other (first in temporal axis)
-	    // problem: at this point there is no temporal reference
-	  
-	    
-	    if (integrateable) {
-	      return TEMP_ARRAY_READY_FOR_INTEGRATION;
-	    } else {
-	      Utils::error ( "Target array '" + dest + "' already exists in SciDB database and cannot be extended." );
-	      return ERR_CREATE_ARRAYEXISTS;
-	    }
-            
-        } else {
-	    //array does not exist, no problem in storing the data
-	    return persistArray(src, dest);
-	}
-
-        
-    }
     
     StatusCode ShimClient::persistArray(string srcArr, string tarArr)
     {
@@ -1269,16 +1227,6 @@ namespace scidb4gdal
 
 	  return SUCCESS;
     }
-
-
-  //TODO implement
-    bool ShimClient::arrayIntegrateable(string srcArr, string tarArr)
-    {
-	return true;
-    }
-
-
-
 
     // This is probably incomplete but should be enough for shim generated filenames on the server
     bool isIllegalFilenameCharacter ( char c )

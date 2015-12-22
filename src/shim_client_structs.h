@@ -37,9 +37,23 @@ namespace scidb4gdal {
     string dt;
     string timestamp;
     double bbox[4];
-    string srs;
+    string auth_name;
+    int32_t srid;
     CreationType type;
     bool hasBBOX;
+    
+    StatusCode error;
+    
+    bool isValid() {
+	bool valid = true;
+	
+	if (hasBBOX && (auth_name == "" || srid == 0)) {
+	  valid = false;
+	  error = ERR_READ_BBOX_SRS_MISSING;
+	}
+	
+	return valid;
+    }
   };
   
   struct QueryParameters :  Parameters {
