@@ -304,6 +304,7 @@ namespace scidb4gdal
 	SciDBSpatialArray* tar_arr;
 	
 	try {
+	  Utils::debug("** Parse options and parameters **");
 	  //1. Parse Options and connection string
 	  pp = new ParameterParser(connstr, papszOptions, SCIDB_CREATE); //connstr is the file name, papszOptions are the -co options
 
@@ -313,8 +314,9 @@ namespace scidb4gdal
 	  if (!create_pars->isValid()) throw create_pars->error;
 	  
 	  delete pp;
+	  Utils::debug("-- DONE");
 	  
-	  // 2. Check validity of connection parameters
+	  Utils::debug("** Check validity of connection parameters and set options for SHIM client **");
 	  if ( !con_pars->isComplete()) {
 	    throw con_pars->error_code;
 	  } else {
@@ -325,140 +327,166 @@ namespace scidb4gdal
 	  client = new ShimClient (con_pars); //connection parameters are set
 	  
 	  client->setCreateParameters(*create_pars); //create parameters regarding time
+	  Utils::debug("-- DONE");
 	  
+	  Utils::debug("** Check if array already exists in the database **");
 	  bool exists = false;
 	  StatusCode code = client->arrayExists(con_pars->arrayname, exists);
 	  if (code != SUCCESS) {
 	      throw code;
 	  }
+	  Utils::debug(exists ? "Array exists." : "Array can be created.");
+	  Utils::debug("-- DONE");
 	  
 	  if (exists && create_pars->hasBBOX) {
 	    //currently we only support the fresh creation of a coverage by stating a bounding box
 	    throw ERR_CREATE_ARRAYEXISTS;
 	  }
 	  
+	  Utils::debug("** Create source array representation in GDAL for input image **");
 	  //4. Collect metadata from source data and store in SciDBSpatialArray (happens only in GDAL)
 	  switch (create_pars->type) {
 	    case S_ARRAY:
 	      src_array = new SciDBSpatialArray();
+	      Utils::debug("SciDBSpatialArray created.");
 	      break;
 	    case ST_ARRAY:
 	      src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+	      Utils::debug("SciDBSpatioTemporalArray created.");
 	      break;
 	    case ST_SERIES:
-	      
 	      src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
 	      //TODO recalculate the chunksizes
 	      ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
+	      Utils::debug("SciDBSpatioTemporalArray created with open temporal dimension (spatiotemporal series)");
 	      break;
 	  }
+	  Utils::debug("-- DONE");
 	  
 	  src_array->name = con_pars->arrayname;
 	  
+	  Utils::debug("** Fetch metadata from the source image and copy it to the source array representation **");
 	  copyMetadataToArray(poSrcDS, *src_array); //copies the information from the source data file into the ST_Array representation
-	  Utils::debug("Testing metadata copy: "+src_array->toString());  
+	  Utils::debug("Testing metadata copy: "+src_array->toString());
+	  Utils::debug("-- DONE");
 	  
 	  //prepare the target array
+	  Utils::debug("** Prepare the target array representation **");
 	  if (exists) {
 	    //get the information on the target array
 	    client->getArrayDesc(src_array->name, tar_arr);
-	  } else if (create_pars->hasBBOX) {
-	    
-	    //sort the coordinates if not sorted (e.g. bbox parameter with ll/ur or simlar instead of ul/lr)
-	    double tar_x_min, tar_x_max, tar_y_min, tar_y_max;
-	    if (create_pars->bbox[0] < create_pars->bbox[2]) {
-	      tar_x_min = create_pars->bbox[0];
-	      tar_x_max = create_pars->bbox[2];
-	    } else {
-	      tar_x_min = create_pars->bbox[2];
-	      tar_x_max = create_pars->bbox[0];
-	    }
-	    if (create_pars->bbox[1] < create_pars->bbox[3]) {
-	      tar_y_min = create_pars->bbox[1];
-	      tar_y_max = create_pars->bbox[3];
-	    } else {
-	      tar_y_min = create_pars->bbox[3];
-	      tar_y_max = create_pars->bbox[1];
-	    }
-
-	    //otherwise if an additional bounding box is stated, then copy the source array and reassign the boundaries
-	    switch (create_pars->type) {
-	      case S_ARRAY:
-		tar_arr = new SciDBSpatialArray(*src_array);
-		break;
-	      case ST_ARRAY:
-	      case ST_SERIES:
-		tar_arr = new SciDBSpatioTemporalArray(*(SciDBSpatioTemporalArray*)src_array);
-		((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = 0;
-		break;
-	    } 
-	    //create "bigger" array
-	    SciDBDimension* x = tar_arr->getXDim();
-	    SciDBDimension* y = tar_arr->getYDim();
-	    
-	    AffineTransform af = src_array->affineTransform;
-	    AffineTransform::double2 ul = AffineTransform::double2(tar_x_min,tar_y_max);
-	    AffineTransform::double2 lr = AffineTransform::double2(tar_x_max,tar_y_min);
-	    
-	    //calculate image coordinates
-	    af.fInv(ul);
-	    af.fInv(lr);
-	    
-	    double img_x_min,img_x_max, img_y_min,img_y_max;
-	    if (ul.x < lr.x) {
-	      img_x_min = ul.x;
-	      img_x_max = lr.x;
-	    }else {
-	      img_x_max = ul.x;
-	      img_x_min = lr.x;
-	    }
-	    
-	    if(lr.y < ul.y) {
-	      img_y_min = lr.y;
-	      img_y_max = ul.y;
-	    } else {
-	      img_y_max = lr.y;
-	      img_y_min = ul.y;
-	    }
-	    
-	    //new image coordinates for target array
-	    x->low = img_x_min;
-	    x->high = img_x_max;
-	    y->low = img_y_min;
-	    y->high = img_y_max;
-	    
-	    //transfer the stated SRS information from create options to the target array
-	    tar_arr->auth_name = create_pars->auth_name;
-	    tar_arr->auth_srid = create_pars->srid;
-
+	    Utils::debug("target array was fetched from SciDB, because the array already exists");
 	  } else {
+	    if (create_pars->hasBBOX) {
+	    
+	      //sort the coordinates if not sorted (e.g. bbox parameter with ll/ur or simlar instead of ul/lr)
+	      double tar_x_min, tar_x_max, tar_y_min, tar_y_max;
+	      if (create_pars->bbox[0] < create_pars->bbox[2]) {
+		tar_x_min = create_pars->bbox[0];
+		tar_x_max = create_pars->bbox[2];
+	      } else {
+		tar_x_min = create_pars->bbox[2];
+		tar_x_max = create_pars->bbox[0];
+	      }
+	      if (create_pars->bbox[1] < create_pars->bbox[3]) {
+		tar_y_min = create_pars->bbox[1];
+		tar_y_max = create_pars->bbox[3];
+	      } else {
+		tar_y_min = create_pars->bbox[3];
+		tar_y_max = create_pars->bbox[1];
+	      }
+
+	      //otherwise if an additional bounding box is stated, then copy the source array and reassign the boundaries
+	      switch (create_pars->type) {
+		case S_ARRAY:
+		  tar_arr = new SciDBSpatialArray(*src_array);
+		  break;
+		case ST_ARRAY:
+		case ST_SERIES:
+		  tar_arr = new SciDBSpatioTemporalArray(*(SciDBSpatioTemporalArray*)src_array);
+		  ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = 0;
+		  break;
+	      } 
+	      //create "bigger" array
+	      SciDBDimension* x = tar_arr->getXDim();
+	      SciDBDimension* y = tar_arr->getYDim();
+	      
+	      AffineTransform af = src_array->affineTransform;
+	      AffineTransform::double2 ul = AffineTransform::double2(tar_x_min,tar_y_max);
+	      AffineTransform::double2 lr = AffineTransform::double2(tar_x_max,tar_y_min);
+	      
+	      //calculate image coordinates
+	      af.fInv(ul);
+	      af.fInv(lr);
+	      
+	      double img_x_min,img_x_max, img_y_min,img_y_max;
+	      if (ul.x < lr.x) {
+		img_x_min = ul.x;
+		img_x_max = lr.x;
+	      }else {
+		img_x_max = ul.x;
+		img_x_min = lr.x;
+	      }
+	      
+	      if(lr.y < ul.y) {
+		img_y_min = lr.y;
+		img_y_max = ul.y;
+	      } else {
+		img_y_max = lr.y;
+		img_y_min = ul.y;
+	      }
+	      
+	      //new image coordinates for target array
+	      x->low = img_x_min;
+	      x->high = img_x_max;
+	      x->start = img_x_min;
+	      x->length = img_x_max - img_x_min;
+	      y->low = img_y_min;
+	      y->high = img_y_max;
+	      y->start = img_y_min;
+	      y->length = img_y_max - img_y_min;
+	      
+	      //transfer the stated SRS information from create options to the target array
+	      tar_arr->auth_name = create_pars->auth_name;
+	      tar_arr->auth_srid = create_pars->srid;
+	      Utils::debug("target array was created with the extent of the stated bbox");
+	    } 
+	    else 
+	    {
 	      tar_arr = src_array;
+	      Utils::debug("target array is a copy of the source array");
+	    }
 	  }
+	  Utils::debug("-- DONE");
 	  
-	  //check if source bbox is tangential proper part of the source bbox
+	  Utils::debug("** Check if the source array can be inserted into the target array **");
 	  if (!arrayIntegrateable(*src_array,*tar_arr)) {
 	    Utils::debug("Array not integrateable");
 	    throw ERR_CREATE_ARRAY_NOT_INSERTABLE;
 	  }
+	  Utils::debug("-- DONE");
 	  
 	  string arrayName = src_array->name;
 	  string tempArrayName = src_array->name + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
 	  string insertableName = src_array->name+"_insertable";
 	  string insertableTempName = insertableName + SCIDB4GDAL_ARRAYSUFFIX_TEMP;
 	  
-	  //at this point the target array for the upload has been created in GDAL
-	  
-	  //now upload the source array into SciDB with the original coordinates as temporary
 	  if (src_array != tar_arr) {
 	    src_array->name = insertableName;
 	  }
+	  
+	  Utils::debug("** Creating the array structure for the uploaded image in SciDB **");
 	  if ( client->createTempArray ( *src_array ) != SUCCESS ) {
 	    throw ERR_CREATE_TEMPARRAY;
 	  }
+	  Utils::debug("-- DONE");
+	  //at this point the target array for the upload has been created in GDAL
 	  
+	  //now upload the source array into SciDB with the original coordinates as temporary
 	  // Copy data and write to SciDB as a temporary array
+	  Utils::debug("** Upload the source image into the temporary array **");
 	  uploadImageIntoTempArray(client, *src_array, poSrcDS,pfnProgress, pProgressData);
-	  Utils::debug("Data uploaded into temporary array");
+	  Utils::debug("-- DONE");
 	  
 
 	  
@@ -496,7 +524,8 @@ namespace scidb4gdal
 	    } else {
 		throw persist_res;
 	    }
-	  } else { //new target array case
+	  } 
+	  else { //new target array case
 	    //update spatial (and temporal) reference for temp source
 	    src_array->name = insertableTempName;
 	    client->updateSRS ( *src_array );
@@ -604,9 +633,6 @@ namespace scidb4gdal
 	}
     }
 
-    void persistMetadata() {
-      
-    }
 
     void SciDBDataset::gdalMDtoMap ( char **strlist, map<string, string> &kv )
     {
@@ -888,10 +914,12 @@ namespace scidb4gdal
 	  
 	  dimx =  array.getXDim();
 	  dimx->high = poSrcDS->GetRasterXSize() - 1;
+	  dimx->length = poSrcDS->GetRasterXSize();
 	  dimx->chunksize = blocksize;
 
 	  dimy = array.getYDim();
 	  dimy->high = poSrcDS->GetRasterYSize() - 1;
+	  dimy->length = poSrcDS->GetRasterYSize();
 	  dimy->chunksize = blocksize;
 
 	  
@@ -1062,9 +1090,9 @@ namespace scidb4gdal
     bool SciDBDataset::arrayIntegrateable(SciDBSpatialArray &src_array, SciDBSpatialArray &tar_array)
     {
 	    bool sameSRS = (src_array.auth_srid == tar_array.auth_srid) && boost::iequals(src_array.auth_name, tar_array.auth_name);
-	    stringstream o;
-	    o << "Source SRS: " << src_array.auth_name << ":" << src_array.auth_srid << "; Target SRS: " << tar_array.auth_name << ":" << tar_array.auth_srid;
-	    Utils::debug(o.str());
+// 	    stringstream o;
+// 	    o << "Source SRS: " << src_array.auth_name << ":" << src_array.auth_srid << "; Target SRS: " << tar_array.auth_name << ":" << tar_array.auth_srid;
+// 	    Utils::debug(o.str());
 	    if (sameSRS) {
 		Utils::debug("Arrays have same SRS");
 	    }
@@ -1090,11 +1118,11 @@ namespace scidb4gdal
 	      src_y_max = src_lr.y;
 	      src_y_min = src_ul.y; 
 	    }
-	    stringstream s1;
-	    s1 << src_x_min << " " << src_y_min << " " << src_x_max << " " << src_y_max;
+// 	    stringstream s1;
+// 	    s1 << "BBOX local image: " << src_x_min << " " << src_y_min << " " << src_x_max << " " << src_y_max;
 	    
-	    AffineTransform::double2 tar_ul = AffineTransform::double2(tar_array.getXDim()->low, tar_array.getYDim()->high);
-	    AffineTransform::double2 tar_lr = AffineTransform::double2(tar_array.getXDim()->high, tar_array.getYDim()->low);
+	    AffineTransform::double2 tar_ul = AffineTransform::double2(tar_array.getXDim()->start, tar_array.getYDim()->start + tar_array.getYDim()->length );
+	    AffineTransform::double2 tar_lr = AffineTransform::double2(tar_array.getXDim()->start + tar_array.getXDim()->length, tar_array.getYDim()->start);
 	    tar_array.affineTransform.f(tar_ul);
 	    tar_array.affineTransform.f(tar_lr);
 	    
@@ -1113,20 +1141,17 @@ namespace scidb4gdal
 	    } else {
 	      tar_y_max = tar_lr.y;
 	      tar_y_min = tar_ul.y;
-	    }
+	    }	    
 	    
-	    
-	    
-	    
-	    stringstream s2;
-	    s2 << tar_x_min << " " << tar_y_min << " " << tar_x_max << " " << tar_y_max;
-	    Utils::debug(s1.str());
-	    Utils::debug(s2.str());
+// 	    stringstream s2;
+// 	    s2 << "BBOX scidb array: " << tar_x_min << " " << tar_y_min << " " << tar_x_max << " " << tar_y_max;
+// 	    Utils::debug(s1.str());
+// 	    Utils::debug(s2.str());
 	    
 	    bool isTPP = (src_x_min >= tar_x_min) && (src_y_min >= tar_y_min) && (src_x_max <= tar_x_max) && (src_y_max <= tar_y_max);
 	    
 	    if (isTPP) {
-		Utils::debug("Source array is TPP of target array");
+		Utils::debug("Source array is TPP of target array or equal");
 	    }
 	    
 	    return (sameSRS && isTPP);

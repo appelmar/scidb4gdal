@@ -62,7 +62,14 @@ namespace scidb4gdal
 	 */
         string typeId;
 	
+	/**
+	 * The dimensions allowed minimal value
+	 */
 	int64_t start; //TODO used?
+	
+	/**
+	 * The range of the dimension. E.g. start + length = maximal allowed value
+	 */
 	int64_t length; //TODO used?
 
     };
@@ -302,6 +309,7 @@ namespace scidb4gdal
         void initSpatialDims() {
 	    SciDBDimension dimx;
 	    dimx.low = 0;
+	    dimx.start = 0;
 	    dimx.high = 0; //adapted later
 	    dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
 	    dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE; //should be adapted
@@ -309,6 +317,7 @@ namespace scidb4gdal
 
 	    SciDBDimension dimy;
 	    dimy.low = 0;
+	    dimy.start = 0;
 	    dimy.high = 0;
 	    dimy.name = SCIDB4GDAL_DEFAULT_YDIMNAME;
 	    dimy.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE;

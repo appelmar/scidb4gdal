@@ -589,9 +589,11 @@ namespace scidb4gdal
                 }
             }
         }
+	//TODO epsg code is an integer and has no quotes (') handle it separately
+	//find last comma and create substring
+	cols.push_back ( row.substr ( row.find_last_of(',')+1, row.length()-1 ) );
 
-
-        if ( cols.size() != 6 ) {
+        if ( cols.size() != 8 ) {
             Utils::warn ( "Cannot extract SRS information from response: "  + response );
             return ERR_SRS_NOSPATIALREFFOUND;
 //             out.affineTransform = * ( new AffineTransform() );
@@ -1821,7 +1823,9 @@ namespace scidb4gdal
     void ShimClient::setCreateParameters(CreationParameters &par)
     {
       _cp = &par;
-      Utils::debug("Setting temporal parameters. TRS: "+_cp->dt+" and t:"+_cp->timestamp);
+      if (_cp->dt != "" || _cp->timestamp != "") {
+	Utils::debug("Setting temporal parameters. TRS: "+_cp->dt+" and t:"+_cp->timestamp);
+      }
     }
 
     void ShimClient::setConnectionParameters(ConnectionParameters& par)
