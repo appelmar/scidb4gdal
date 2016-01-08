@@ -50,7 +50,7 @@ void GDALRegister_SciDB()
     if ( GDALGetDriverByName ( "SciDB" ) == NULL ) {
         poDriver = new GDALDriver();
         poDriver->SetDescription ( "SciDB" );
-        //poDriver->SetMetadataItem ( GDAL_DCAP_RASTER, "YES");
+        poDriver->SetMetadataItem ( GDAL_DCAP_RASTER, "YES");
         poDriver->SetMetadataItem ( GDAL_DMD_LONGNAME, "SciDB array driver" );
         poDriver->SetMetadataItem ( GDAL_DMD_HELPTOPIC, "frmt_scidb.html" );
         poDriver->pfnOpen = scidb4gdal::SciDBDataset::Open;
@@ -305,69 +305,70 @@ namespace scidb4gdal
 	
 	try {
 	  Utils::debug("** Parse options and parameters **");
-	  //1. Parse Options and connection string
-	  pp = new ParameterParser(connstr, papszOptions, SCIDB_CREATE); //connstr is the file name, papszOptions are the -co options
+	    //1. Parse Options and connection string
+	    pp = new ParameterParser(connstr, papszOptions, SCIDB_CREATE); //connstr is the file name, papszOptions are the -co options
 
-	  con_pars = &pp->getConnectionParameters();
-	  create_pars = &pp->getCreationParameters();
-	  
-	  if (!create_pars->isValid()) throw create_pars->error;
-	  
-	  delete pp;
+	    con_pars = &pp->getConnectionParameters();
+	    create_pars = &pp->getCreationParameters();
+	    
+	    if (!create_pars->isValid()) throw create_pars->error;
+	    
+	    delete pp;
 	  Utils::debug("-- DONE");
 	  
 	  Utils::debug("** Check validity of connection parameters and set options for SHIM client **");
-	  if ( !con_pars->isComplete()) {
-	    throw con_pars->error_code;
-	  } else {
-	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
-	  }
+	    if ( !con_pars->isComplete()) {
+	      throw con_pars->error_code;
+	    } else {
+	      Utils::debug ( "Using connection parameters: " + con_pars->toString() );
+	    }
 
-	  //3. create client and set parameters
-	  client = new ShimClient (con_pars); //connection parameters are set
-	  
-	  client->setCreateParameters(*create_pars); //create parameters regarding time
+	    //3. create client and set parameters
+	    client = new ShimClient (con_pars); //connection parameters are set
+	    
+	    client->setCreateParameters(*create_pars); //create parameters regarding time
 	  Utils::debug("-- DONE");
 	  
 	  Utils::debug("** Check if array already exists in the database **");
-	  bool exists = false;
-	  StatusCode code = client->arrayExists(con_pars->arrayname, exists);
-	  if (code != SUCCESS) {
-	      throw code;
-	  }
-	  Utils::debug(exists ? "Array exists." : "Array can be created.");
+	    bool exists = false;
+	    StatusCode code = client->arrayExists(con_pars->arrayname, exists);
+	    if (code != SUCCESS) {
+		throw code;
+	    }
+	    Utils::debug(exists ? "Array exists." : "Array can be created.");
 	  Utils::debug("-- DONE");
 	  
 	  if (exists && create_pars->hasBBOX) {
 	    //currently we only support the fresh creation of a coverage by stating a bounding box
+	    Utils::debug("Currently the operation to overwrite an existing image with a bounding box statement is not allowed.");
 	    throw ERR_CREATE_ARRAYEXISTS;
 	  }
 	  
 	  Utils::debug("** Create source array representation in GDAL for input image **");
-	  //4. Collect metadata from source data and store in SciDBSpatialArray (happens only in GDAL)
-	  switch (create_pars->type) {
-	    case S_ARRAY:
-	      src_array = new SciDBSpatialArray();
-	      Utils::debug("SciDBSpatialArray created.");
-	      break;
-	    case ST_ARRAY:
-	      src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
-	      Utils::debug("SciDBSpatioTemporalArray created.");
-	      break;
-	    case ST_SERIES:
-	      src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
-	      //TODO recalculate the chunksizes
-	      ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
-	      Utils::debug("SciDBSpatioTemporalArray created with open temporal dimension (spatiotemporal series)");
-	      break;
-	  }
+	    //4. Collect metadata from source data and store in SciDBSpatialArray (happens only in GDAL)
+	    switch (create_pars->type) {
+	      case S_ARRAY:
+		src_array = new SciDBSpatialArray();
+		Utils::debug("SciDBSpatialArray created.");
+		break;
+	      case ST_ARRAY:
+		src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		Utils::debug("SciDBSpatioTemporalArray created.");
+		break;
+	      case ST_SERIES:
+		src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		//TODO recalculate the chunksizes
+		((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
+		Utils::debug("SciDBSpatioTemporalArray created with open temporal dimension (spatiotemporal series)");
+		break;
+	    }
 	  Utils::debug("-- DONE");
 	  
 	  src_array->name = con_pars->arrayname;
 	  
 	  Utils::debug("** Fetch metadata from the source image and copy it to the source array representation **");
-	  copyMetadataToArray(poSrcDS, *src_array); //copies the information from the source data file into the ST_Array representation
-	  Utils::debug("Testing metadata copy: "+src_array->toString());
+	    copyMetadataToArray(poSrcDS, *src_array); //copies the information from the source data file into the ST_Array representation
+	    Utils::debug("Testing metadata copy: "+src_array->toString());
 	  Utils::debug("-- DONE");
 	  
 	  //prepare the target array
@@ -587,10 +588,16 @@ namespace scidb4gdal
 
 	  pfnProgress ( 1.0, NULL, pProgressData );
 
-	  delete create_pars ;
+
+	  if (tar_arr && tar_arr != src_array) delete tar_arr;
 	  
 	  return new SciDBDataset(*src_array, client);
 	} catch (StatusCode e) {
+	    if (client) delete client; 
+	    if (con_pars) delete con_pars;
+	    if (create_pars) delete create_pars ;
+	    if (src_array)delete src_array;
+	    if (tar_arr) delete tar_arr;
 	    //catch exceptions and give information back to the user
 	    switch (e) {
 	      case ERR_GLOBAL_PARSE:  
@@ -620,6 +627,9 @@ namespace scidb4gdal
 	      case ERR_READ_BBOX_SRS_MISSING:
 		Utils::error("Cannot create target array, because the stated coordinates of \"bbox\" are not interpretable. Please state the SRS with parameter \"srs\", e.g. EPSG:4326");
 		break;
+	      case ERR_CREATE_ARRAYEXISTS:
+		Utils::error("The array shall not be overwriten. Please delete the array or rename it first and then run the command again.");
+		break;
 	      default:
 		Utils::error("Uncaught error: "+boost::lexical_cast<string>(e));
 		break;
@@ -628,6 +638,7 @@ namespace scidb4gdal
 	    if (con_pars) delete con_pars;
 	    if (create_pars) delete create_pars ;
 	    if (src_array)delete src_array;
+	    if (tar_arr) delete tar_arr;
 	    
 	    return NULL;
 	}

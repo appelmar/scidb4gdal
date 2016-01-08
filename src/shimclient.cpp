@@ -80,13 +80,6 @@ namespace scidb4gdal
         _curl_handle = 0;
     }
 
-
-
-    static size_t responseSilentCallback ( void *ptr, size_t size, size_t count, void *stream )
-    {
-        return size * count;
-    }
-
     void ShimClient::curlBegin()
     {
         if ( _curl_initialized ) curlEnd();
@@ -110,8 +103,6 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseSilentCallback ); // default silent, otherwise weird number output on stdout
 #endif
     }
-
-
 
 
     void ShimClient::curlEnd()
@@ -141,23 +132,32 @@ namespace scidb4gdal
         return res;
     }
 
-
-
-
-
-
-
-
+    /**
+     * Handles the cURL callback by creating a string from it.
+     */
     static size_t responseToStringCallback ( void *ptr, size_t size, size_t count, void *stream )
     {
         ( ( string * ) stream )->append ( ( char * ) ptr, 0, size * count );
         return size * count;
     }
 
+    static size_t responseSilentCallback ( void *ptr, size_t size, size_t count, void *stream )
+    {
+        return size * count;
+    }
 
-
-
-
+    /**
+     * Callback function for receiving scidb binary data
+     */
+    static size_t responseBinaryCallback ( void *ptr, size_t size, size_t count, void *stream )
+    {
+        size_t realsize = size * count;
+        struct SingleAttributeChunk *mem = ( struct SingleAttributeChunk * ) stream;
+        memcpy ( & ( mem->memory[mem->size] ), ptr, realsize );
+        mem->size += realsize;
+        return realsize;
+    }
+    
     StatusCode ShimClient::testConnection()
     {
 
@@ -181,12 +181,6 @@ namespace scidb4gdal
 
         return SUCCESS;
     }
-
-
-
-
-
-
 
     int ShimClient::newSession()
     {
@@ -244,7 +238,6 @@ namespace scidb4gdal
 
     }
 
-
     void ShimClient::login()
     {
 
@@ -272,7 +265,6 @@ namespace scidb4gdal
         }
     }
 
-
     void ShimClient::logout()
     {
         curlBegin();
@@ -291,23 +283,14 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
-
     StatusCode  ShimClient::getAttributeDesc ( const string &inArrayName, vector< SciDBAttribute > &out )
     {
-
-
         out.clear();
-
 
         int sessionID = newSession();
 
         string response;
         stringstream ss;
-        // EXECUTE QUERY  /////
 
 	/*
 	 * Make a request to fetch the attributes of the data set
@@ -507,13 +490,6 @@ namespace scidb4gdal
         return SUCCESS;
 
     }
-
-
-
-
-
-
-
 
     StatusCode ShimClient::getSRSDesc ( const string &inArrayName, SciDBSpatialReference &out )
     {
@@ -756,7 +732,6 @@ namespace scidb4gdal
 
     }
 
-
     StatusCode ShimClient::getType(const string& name, SciDBSpatialArray *&array)
     {
 	int sessionID = newSession();
@@ -839,30 +814,8 @@ namespace scidb4gdal
         return SUCCESS;
     }
 
-
-
-
-
-
-    /**
-     * Callback function for receiving scidb binary data
-     */
-    static size_t responseBinaryCallback ( void *ptr, size_t size, size_t count, void *stream )
-    {
-        size_t realsize = size * count;
-        struct SingleAttributeChunk *mem = ( struct SingleAttributeChunk * ) stream;
-        memcpy ( & ( mem->memory[mem->size] ), ptr, realsize );
-        mem->size += realsize;
-        return realsize;
-    }
-
-
     StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, bool use_subarray, bool emptycheck)
-
     {	
-// 	std::stringstream sstm;
-// 	sstm << "Fire getData in SHIM client with the following image coordinates " << x_min << " " << y_min << " " << x_max << " " << y_max;
-// 	Utils::debug(sstm.str());
       
 	int t_index;
         if ( x_min < array.getXDim()->low || x_min > array.getXDim()->high ||
@@ -1029,8 +982,6 @@ namespace scidb4gdal
 
         return SUCCESS;
     }
-
-
 
     StatusCode ShimClient::createTempArray ( SciDBSpatialArray &array )
     {
@@ -1230,9 +1181,17 @@ namespace scidb4gdal
 	  return SUCCESS;
     }
 
-    // This is probably incomplete but should be enough for shim generated filenames on the server
+    /**
+     * @brief Checks for illegal chars for file name use. 
+     * 
+     * This function is used to check bad letters for creating an appropriate file name for the temporary SciDB array. Allowed chars are alpha numeric values
+     * and the following chars: '/', '_', '-' and '.'. All other chars are neglected.
+     * 
+     * @param c char value to be tested
+     */
     bool isIllegalFilenameCharacter ( char c )
     {
+	// This is probably incomplete but should be enough for shim generated filenames on the server
         return ! ( std::isalnum ( c ) || c == '/' || c == '_' || c == '-' || c == '.' );
     }
 
@@ -1417,8 +1376,6 @@ namespace scidb4gdal
         return SUCCESS;
     }
 
-
-
     StatusCode ShimClient::getAttributeStats ( SciDBSpatialArray &array, uint8_t nband, SciDBAttributeStats &out )
     {
 
@@ -1483,10 +1440,6 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
     StatusCode ShimClient::arrayExists ( const string &inArrayName, bool &out )
     {
         stringstream ss, afl;
@@ -1544,8 +1497,6 @@ namespace scidb4gdal
 
     }
 
-
-
     StatusCode ShimClient::updateSRS ( SciDBSpatialArray &array )
     {
         // Add spatial reference system information if available
@@ -1584,7 +1535,6 @@ namespace scidb4gdal
         return SUCCESS;
     }
 
-
     StatusCode ShimClient::removeArray ( const string &inArrayName )
     {
         int sessionID = newSession();
@@ -1611,8 +1561,6 @@ namespace scidb4gdal
         return SUCCESS;
 
     }
-
-
 
 
     StatusCode  ShimClient::setArrayMD ( string arrayname, std::map< std::string, std::string > kv, string domain )
@@ -1651,7 +1599,6 @@ namespace scidb4gdal
         releaseSession ( sessionID );
         return SUCCESS;
     }
-
 
 
     StatusCode ShimClient::getArrayMD ( std::map< string, string > &kv, string arrayname, string domain )
@@ -1713,11 +1660,6 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
-
     StatusCode ShimClient::setAttributeMD ( string arrayname, string attribute, map< string, string > kv, string domain )
     {
 
@@ -1754,12 +1696,6 @@ namespace scidb4gdal
         releaseSession ( sessionID );
         return SUCCESS;
     }
-
-
-
-
-
-
 
     StatusCode ShimClient::getAttributeMD ( std::map< std::string, std::string > &kv, std::string arrayname, string attribute, std::string domain )
     {
@@ -1819,7 +1755,6 @@ namespace scidb4gdal
         return SUCCESS;
     }
 
-
     void ShimClient::setCreateParameters(CreationParameters &par)
     {
       _cp = &par;
@@ -1832,16 +1767,14 @@ namespace scidb4gdal
     {
 	_conp = &par;
     }
-
+    
     void ShimClient::setQueryParameters(QueryParameters& par)
     {
 	_qp = &par;
     }
 
-
-
-StatusCode ShimClient::updateTRS(SciDBTemporalArray &array)
-{
+    StatusCode ShimClient::updateTRS(SciDBTemporalArray &array)
+    {
         // Add temporal reference system information if available
         if ( array.getTPoint() != NULL && array.getTInterval() != NULL && array.getTInterval()->toStringISO() != "P") {
 	    
@@ -1872,20 +1805,5 @@ StatusCode ShimClient::updateTRS(SciDBTemporalArray &array)
         }
 
         return SUCCESS;
-}
-
-
-
-
-
-
-  void ShimClient::createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query)
-  {
-      base << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << query.str();
-      if ( _ssl && !_auth.empty() ) base << "&auth=" << _auth; // Add auth parameter if using ssl
-
-  }
-
-
-
+    }
 }

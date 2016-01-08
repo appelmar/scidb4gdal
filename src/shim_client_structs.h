@@ -86,7 +86,7 @@ namespace scidb4gdal {
     
     string toString() {
       stringstream s;
-      s << "array= " << arrayname << " host=" << host << " port=" << port << "  user=" << user << " passwd=" << passwd;
+      s << "array=" << arrayname << " host=" << host << " port=" << port << "  user=" << user << " passwd=" << passwd;
       return s.str();
     };
     

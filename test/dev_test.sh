@@ -3,8 +3,12 @@ outputFolder="/tmp/"
 cd "${outputFolder}"
 
 #download chicago black-white geotiff image
-rm -f "./UTM2GTIF.TIF"
+chicago="./UTM2GTIF.TIF"
+if (! test -f ${chicago})
+then
+#rm -f $chicago
 wget "http://download.osgeo.org/geotiff/samples/spot/chicago/UTM2GTIF.TIF"
+fi
 
 #change connection details for scidb and uncomment it
 #user="scidb"
@@ -12,8 +16,7 @@ wget "http://download.osgeo.org/geotiff/samples/spot/chicago/UTM2GTIF.TIF"
 #host="https://localhost"
 #port=31000
 
-#input image files
-chicago="./UTM2GTIF.TIF"
+
 
 #scidb array names
 targetArray=test_chicago_s
@@ -56,39 +59,68 @@ chicago_part3="./chicago_3.tif"
 chicago_part4="./chicago_4.tif"
 chicago_na="./chicago_na.tif"
 
-echo rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
-rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
-echo ""
-echo gdal_translate -of GTiff -srcwin 0 0 349 464 $chicago $chicago_part1
-gdal_translate -of GTiff -srcwin 0 0 349 464 $chicago $chicago_part1
-echo ""
-echo gdal_translate -of GTiff -srcwin 350 0 349 464 $chicago $chicago_part2
-gdal_translate -of GTiff -srcwin 350 0 349 464 $chicago $chicago_part2
-echo ""
-echo gdal_translate -of GTiff -srcwin 0 465 349 464 $chicago $chicago_part3
-gdal_translate -of GTiff -srcwin 0 465 349 464 $chicago $chicago_part3
-echo ""
-echo gdal_translate -of GTiff -srcwin 350 465 349 464 $chicago $chicago_part4
-gdal_translate -of GTiff -srcwin 350 465 349 464 $chicago $chicago_part4
-echo ""
-echo gdal_translate -of GTiff -mo "TIFFTAG_IMAGEDESCRIPTION=Panchromatic image of chicago." -srcwin -50 -50 749 979 -a_nodata 0 $chicago $chicago_na
-gdal_translate -of GTiff -mo "TIFFTAG_IMAGEDESCRIPTION=Panchromatic image of chicago." -srcwin -50 -50 749 979 -a_nodata 0 $chicago $chicago_na
-echo ""
-echo gdalmanage delete "SCIDB:array=${targetArraySCov} host=${host} port=${port} user=${user} password=${passwd}"
-gdalmanage delete "SCIDB:array=${targetArraySCov} host=${host} port=${port} user=${user} password=${passwd}"
-echo ""
-echo gdalmanage delete "SCIDB:array=${targetArraySTSCov} host=${host} port=${port} user=${user} password=${passwd}"
-gdalmanage delete "SCIDB:array=${targetArraySTSCov} host=${host} port=${port} user=${user} password=${passwd}"
-echo ""
+# echo rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
+# rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
+# echo ""
+
+if (! test -f $chicago_part1)
+then
+  echo gdal_translate -of GTiff -srcwin 0 0 349 464 $chicago $chicago_part1
+  gdal_translate -of GTiff -srcwin 0 0 349 464 $chicago $chicago_part1
+  echo ""
+else
+  echo "$chicago_part1 does already exist. Skipping creation."
+  echo ""
+fi
+
+if (! test -f $chicago_part2)
+then
+  echo gdal_translate -of GTiff -srcwin 350 0 349 464 $chicago $chicago_part2
+  gdal_translate -of GTiff -srcwin 350 0 349 464 $chicago $chicago_part2
+  echo ""
+else
+  echo "$chicago_part2 does already exist. Skipping creation."
+  echo ""
+fi
+
+if (! test -f $chicago_part3)
+then
+  echo gdal_translate -of GTiff -srcwin 0 465 349 464 $chicago $chicago_part3
+  gdal_translate -of GTiff -srcwin 0 465 349 464 $chicago $chicago_part3
+  echo ""
+else
+  echo "$chicago_part3 does already exist. Skipping creation."
+  echo ""
+fi
+
+if (! test -f $chicago_part4)
+then
+  echo gdal_translate -of GTiff -srcwin 350 465 349 464 $chicago $chicago_part4
+  gdal_translate -of GTiff -srcwin 350 465 349 464 $chicago $chicago_part4
+  echo ""
+else
+  echo "$chicago_part4 does already exist. Skipping creation."
+  echo ""
+fi
+
+if (! test -f $chicago_na)
+then
+  echo gdal_translate -of GTiff -mo "TIFFTAG_IMAGEDESCRIPTION=Panchromatic image of chicago." -srcwin -50 -50 749 979 -a_nodata 0 $chicago $chicago_na
+  gdal_translate -of GTiff -mo "TIFFTAG_IMAGEDESCRIPTION=Panchromatic image of chicago." -srcwin -50 -50 749 979 -a_nodata 0 $chicago $chicago_na
+  echo ""
+else
+  echo "$chicago_na does already exist. Skipping creation."
+  echo ""
+fi
 
 echo ""
 echo "#################################"
 echo "# Performing gdalinfo on test img"
 echo "#################################"
 echo ""
-echo gdalinfo $chicago_na
-gdalinfo $chicago_na
-echo ""
+# echo gdalinfo $chicago_na
+# gdalinfo $chicago_na
+# echo ""
 
 echo ""
 echo "###########################################" 
@@ -117,11 +149,11 @@ echo ""
 
 echo "" 
 echo "###########################################"
-echo "# Upload Spatial Image with create options "
+echo "# Upload Spatial Images "
 echo "###########################################"
 echo ""
 
-#upload 1
+# #upload 1
 echo "****** translate an image into a purely spatial array in scidb using create options"
 echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"type=S\" -of SciDB ${chicago} \"SCIDB:array=${targetArray}\"
 gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago}" "SCIDB:array=${targetArray}"
@@ -150,6 +182,9 @@ gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user
 echo ""
 echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"type=S\" -of SciDB ${chicago_part3} \"SCIDB:array=${targetArraySCov}\"
 gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago_part3}" "SCIDB:array=${targetArraySCov}"
+echo ""
+echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"type=S\" -of SciDB ${chicago_part2} \"SCIDB:array=${targetArraySCov}\"
+gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago_part2}" "SCIDB:array=${targetArraySCov}"
 echo ""
 
 echo "" 
@@ -243,13 +278,13 @@ echo "# Retrieving different kinds of images from SciDB"
 echo "##########################################################"
 echo "" 
 #to speed up the download part we restrict the image windows to 200x200 pixel
-#outputS1="./test_s_con.tif"
+
 echo "***** Downloading subset of spatial image using connection string"
 echo gdal_translate --debug ON -srcwin 0 0 200 200 -of GTiff \"SCIDB:host=${host} port=${port} user=${user} password=${passwd} array=${targetArray}\" ${outputS1} 
 gdal_translate --debug ON -srcwin 0 0 200 200 -of GTiff "SCIDB:host=${host} port=${port} user=${user} password=${passwd} array=${targetArray}" ${outputS1} 
 echo ""
 
-#outputS2="./test_s_oo.tif"
+
 echo "***** Downloading subset of spatial image using opening options"
 echo gdal_translate --debug ON -srcwin 0 0 200 200 -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArray}\" ${outputS2}
 gdal_translate --debug ON -srcwin 0 0 200 200 -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArray}" ${outputS2}
@@ -265,13 +300,11 @@ echo gdal_translate --debug ON -srcwin 0 0 200 200 -oo \"host=${host}\" -oo \"po
 gdal_translate --debug ON -srcwin 0 0 200 200 -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -oo "i=0" -of GTiff "SCIDB:array=${targetArrayST}" ${outputST1}
 echo ""
 
-#outputSTS1="./test_sts_index.tif"
 echo "***** Downloading subset of spatio-temporal image using opening options with temporal index from STS"
 echo gdal_translate --debug ON -srcwin 0 0 200 200 -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySTS}[i,5]\" ${outputSTS2}
 gdal_translate --debug ON -srcwin 0 0 200 200 -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySTS}[i,5]" ${outputSTS1}
 echo ""
 
-#outputSTS2="./test_sts_timestamp.tif"
 echo "***** Downloading subset of spatio-temporal image using opening options with temporal index (just one image in)"
 echo gdal_translate --debug ON -srcwin 0 0 200 200 -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySTS}[t,2015-10-17]\" ${outputSTS2}
 gdal_translate --debug ON -srcwin 0 0 200 200 -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySTS}[t,2015-10-17]" ${outputSTS2}
@@ -280,6 +313,11 @@ echo ""
 echo "***** Downloading image with additional meta data and NA value"
 echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArrayMetaNA}\" ${outputSMetaNA}
 gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArrayMetaNA}" ${outputSMetaNA}
+echo ""
+
+echo "***** Downloading the coverage"
+echo gdal_translate --debug ON -oo \"host=${host}\" -oo \"port=${port}\" -oo \"user=${user}\" -oo \"password=${passwd}\" -of GTiff \"SCIDB:array=${targetArraySCov}\" ${outputSCov}
+gdal_translate --debug ON -oo "host=${host}" -oo "port=${port}" -oo "user=${user}" -oo "password=${passwd}" -of GTiff "SCIDB:array=${targetArraySCov}" ${outputSCov}
 echo ""
 
 echo "***** Downloading the coverages of the ST coverage (index 0 and 1)"
