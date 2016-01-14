@@ -91,7 +91,7 @@ namespace scidb4gdal {
     };
     
     bool isComplete() {
-      if (arrayname == "" || host == "" || port == 0) {
+      if (arrayname == "" || host == "") {
 	error_code = ERR_READ_ARRAYUNKNOWN;
 	return false;
       }

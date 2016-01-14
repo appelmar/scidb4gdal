@@ -80,6 +80,32 @@ namespace scidb4gdal
         _curl_handle = 0;
     }
 
+    /**
+     * Handles the cURL callback by creating a string from it.
+     */
+    static size_t responseToStringCallback ( void *ptr, size_t size, size_t count, void *stream )
+    {
+        ( ( string * ) stream )->append ( ( char * ) ptr, 0, size * count );
+        return size * count;
+    }
+
+    static size_t responseSilentCallback ( void *ptr, size_t size, size_t count, void *stream )
+    {
+        return size * count;
+    }
+
+    /**
+     * Callback function for receiving scidb binary data
+     */
+    static size_t responseBinaryCallback ( void *ptr, size_t size, size_t count, void *stream )
+    {
+        size_t realsize = size * count;
+        struct SingleAttributeChunk *mem = ( struct SingleAttributeChunk * ) stream;
+        memcpy ( & ( mem->memory[mem->size] ), ptr, realsize );
+        mem->size += realsize;
+        return realsize;
+    }
+    
     void ShimClient::curlBegin()
     {
         if ( _curl_initialized ) curlEnd();
@@ -130,32 +156,6 @@ namespace scidb4gdal
             Utils::error ( ( string ) ( "curl_easy_perform() failed: " ) + curl_easy_strerror ( res ) );
         }
         return res;
-    }
-
-    /**
-     * Handles the cURL callback by creating a string from it.
-     */
-    static size_t responseToStringCallback ( void *ptr, size_t size, size_t count, void *stream )
-    {
-        ( ( string * ) stream )->append ( ( char * ) ptr, 0, size * count );
-        return size * count;
-    }
-
-    static size_t responseSilentCallback ( void *ptr, size_t size, size_t count, void *stream )
-    {
-        return size * count;
-    }
-
-    /**
-     * Callback function for receiving scidb binary data
-     */
-    static size_t responseBinaryCallback ( void *ptr, size_t size, size_t count, void *stream )
-    {
-        size_t realsize = size * count;
-        struct SingleAttributeChunk *mem = ( struct SingleAttributeChunk * ) stream;
-        memcpy ( & ( mem->memory[mem->size] ), ptr, realsize );
-        mem->size += realsize;
-        return realsize;
     }
     
     StatusCode ShimClient::testConnection()
@@ -721,7 +721,7 @@ namespace scidb4gdal
         getArrayMD ( m, inArrayName, "" );
         out->md.insert ( pair < string, MD> ( "", m ) ); // TODO: Add domain
 
-        for ( int i = 0; i < out->attrs.size(); ++i ) {
+        for ( size_t i = 0; i < out->attrs.size(); ++i ) {
             MD ma;
             getAttributeMD ( ma, inArrayName, out->attrs[i].name, "" ); // TODO: Add domain
             out->attrs[i].md.insert ( pair < string, MD> ( "", ma ) ); // TODO: Add domain
@@ -1545,10 +1545,10 @@ namespace scidb4gdal
         afl << "remove(" << inArrayName << ")";
 	
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
-        createSHIMExecuteString(ss, sessionID, afl);
-// 	ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
-// 	if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
-// 	
+
+	ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
+	if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+	
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
         if ( curlPerform() != CURLE_OK ) {

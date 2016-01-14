@@ -17,12 +17,16 @@ namespace scidb4gdal
     typedef map<string, MD>      DomainMD;
     
     /**
-     * A structure for storing metadata of a SciDB src_array attribute
+     * A structure for storing metadata of an attribute of a SciDB array
      */
     struct SciDBAttribute {
+	/** the name of the attribute as stored in SciDB */
         string name;
+	/** the name of the data type that the values will represent */
         string typeId;
+	/** a flag if the attribute is allowed to have null values */
         bool nullable;
+	/** metadata about the domain of the attribute */
 	DomainMD md;
     };
     
@@ -34,62 +38,64 @@ namespace scidb4gdal
     };
 
     /**
-    * A structure for storing metadata of a SciDB src_array dimension
-    */
+      * A structure for storing metadata of a dimension of a SciDB Array
+      */
     struct SciDBDimension {
-	/**
-	 * name of the dimension
-	 */
-        string name;
+	/** name of the dimension */
+        string name; 
 	
-	/**
-	 * lowest value for this axis
-	 */
+	/**  lowest value for this axis */
         int64_t low;
 	
-	/**
-	 * highest value for this axis
-	 */
+	/**  highest value for this axis */
         int64_t high;
 	
-	/**
-	 * The intended chunksize for this Dimension
-	 */
+	/**  The intended chunksize for this Dimension */
         uint32_t chunksize;
 	
-	/**
-	 * GDAL type specification as string
-	 */
+	/**  GDAL type specification as string */
         string typeId;
 	
-	/**
-	 * The dimensions allowed minimal value
-	 */
-	int64_t start; //TODO used?
+	/** The dimensions allowed minimal value  */
+	int64_t start;
 	
-	/**
-	 * The range of the dimension. E.g. start + length = maximal allowed value
-	 */
-	int64_t length; //TODO used?
+	/** The range of the dimension. E.g. start + length = maximal allowed value */
+	int64_t length;
 
     };
 
 
     /**
-    * A structure for storing general metadata of a SciDB src_array
+    * A structure for storing general metadata of an array in SciDB. The most basic representation is considered
+    * to hold at least information about the array name, its attributes and its dimensions.
+    * 
+    * Dimensions:
+    * The dimensions describe the conditions unber which the information was stored. For example dimensions be
+    * temporal, spatial (e.g. image coordinates) or they describe other attributal information (e.g. gender, a category, a sensor...)
+    * 
+    * Attributes:
+    * The attributes hold the information of the cell value in each band.
     */
     struct SciDBArray {
+	/** the name of the array under which it is (or will be) stored in SciDB */
         string name;
+	/** a list of scidb4gdal::Attribute that contain metadata about the attributes */
         vector<SciDBAttribute> attrs;
+	/** a list of scidb4gdal::Dimension that contain metadata about the dimensions */
         vector<SciDBDimension> dims;
+	/** a map of strings holding domain metadata */
 	DomainMD md;
 	
 	/**
+	 * @brief toString method
+	 * 
 	 * The resulting output will be like the following:
 	 * 'src_arrayname':<'dimname',min:max,type>['attributename',type,nullable]
 	 * The parts in the brackets can show multiple times.
+	 * 
+	 * @return std::string
 	 */
-        virtual string toString() {
+	virtual string toString() {
             stringstream s;
             s << "'" << name << "'" << ":";
             for ( uint32_t i = 0; i < dims.size(); ++i ) s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high << "," << dims[i].typeId << ">";
@@ -98,8 +104,15 @@ namespace scidb4gdal
             return s.str();
         }
 
+        /**
+	  * @brief creates a string about the data type for each attribute 
+	  * 
+	  * For each attribute its data type will be appended to an output string.
+	  * 
+	  * @return std::string
+	  */
         virtual string getFormatString() {
-            stringstream s;
+	  stringstream s;
             s << "(";
             for ( uint32_t i = 0; i < attrs.size() - 1; ++i ) {
                 s << attrs[i].typeId << ","; // TODO: Add nullable

@@ -241,9 +241,7 @@ namespace scidb4gdal
       _con = new ConnectionParameters();  
       if (_operation == SCIDB_OPEN) {
 	_query = new QueryParameters();
-      }
-      if (_operation == SCIDB_CREATE) {
-	
+      } else if (_operation == SCIDB_CREATE) {
 	_create = new CreationParameters();
       }
       

@@ -61,9 +61,10 @@ namespace scidb4gdal
     /**
      * @brief Basic Shim client class
      * 
-     * SciDB currently allows two major query mechanisms. Either the use of iquery a specific interface to execute AFL or AQL queries, or the SHIM web client.
-     * This class offers functions to interact with the latter interface. For querying the SHIM web client the external library cURL is used. The web client
-     * offers different endpoints to either do user authentication actions, to executes queries, to upload files and to read data in plain text or as bytes.
+     * SciDB allows for two major interfaces to interact with the database. One is the commandline interface 'iquery', a specific interface to execute 
+     * AFL or AQL queries, and the other one is a web client implemented in Python, called SHIM. This class offers functions to interact with the latter 
+     * interface. For querying the SHIM web client the external library cURL is used. The web client offers different endpoints to either do user 
+     * authentication actions, to execute queries, to upload files and to read data in plain text or as bytes.
      * For all the endpoints this class offers different functions to call the endpoints and especially at the execute-query-endpoint this class offers lots 
      * of function to either create, manipulate or delete SciDB arrays.
      * To perform all those interaction the SHIM client representation needs authentication credentials and other task dependent information, that are captured

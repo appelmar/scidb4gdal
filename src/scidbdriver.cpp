@@ -66,7 +66,10 @@ void GDALRegister_SciDB()
 
 namespace scidb4gdal
 {
-
+    /* =============================================
+     *  SciDBRasterBand
+     * =============================================  
+     */
     SciDBRasterBand::SciDBRasterBand ( SciDBDataset *poDS, SciDBSpatialArray *array, int nBand )
     {
         this->poDS = poDS;
@@ -81,13 +84,10 @@ namespace scidb4gdal
         nBlockXSize = ( _array->getXDim()->chunksize < nImgXSize ) ? _array->getXDim()->chunksize : nImgXSize;
     }
 
-
     SciDBRasterBand::~SciDBRasterBand()
     {
         FlushCache();
     }
-
-
 
     CPLErr SciDBRasterBand::GetStatistics ( int bApproxOK, int bForce, double *pdfMin, double *pdfMax, double *pdfMean, double *pdfStdDev )
     {
@@ -102,8 +102,6 @@ namespace scidb4gdal
 
         return CE_None;
     }
-
-
 
     CPLErr SciDBRasterBand::IReadBlock ( int nBlockXOff, int nBlockYOff, void *pImage )
     {
@@ -177,9 +175,6 @@ namespace scidb4gdal
         return CE_None;
     }
 
-
-
-
     double SciDBRasterBand::GetNoDataValue ( int *pbSuccess )
     {
         string key = "NODATA";
@@ -191,7 +186,6 @@ namespace scidb4gdal
         if ( pbSuccess != NULL ) *pbSuccess = true;
         return boost::lexical_cast<double> ( md[key] );
     }
-
 
     double SciDBRasterBand::GetMaximum ( int *pbSuccess )
     {
@@ -206,7 +200,6 @@ namespace scidb4gdal
         return boost::lexical_cast<double> ( md[key] );
     }
 
-
     double SciDBRasterBand::GetMinimum ( int *pbSuccess )
     {
         string key = "MIN";
@@ -220,7 +213,6 @@ namespace scidb4gdal
         return boost::lexical_cast<double> ( md[key] );
 
     }
-
 
     double SciDBRasterBand::GetOffset ( int *pbSuccess )
     {
@@ -249,7 +241,6 @@ namespace scidb4gdal
         return boost::lexical_cast<double> ( md[key] );
     }
 
-
     const char *SciDBRasterBand::GetUnitType()
     {
         string key = "UNIT";
@@ -260,10 +251,10 @@ namespace scidb4gdal
         return md[key].c_str();
     }
 
-
-    
-
-
+    /* =============================================
+     *  SciDBDataset
+     * =============================================  
+     */
     SciDBDataset::SciDBDataset ( SciDBSpatialArray &array, ShimClient *client) : _array ( array ), _client ( client )
     {
 
@@ -290,8 +281,374 @@ namespace scidb4gdal
 
     }
 
+    void SciDBDataset::gdalMDtoMap ( char **strlist, map<string, string> &kv )
+    {
+        kv.clear();
 
-    GDALDataset *SciDBDataset::CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData )
+        int i = 0;
+        char *it = strlist[0];
+        while ( it != NULL ) {
+            string s ( strlist[i] );
+            size_t p = string::npos;
+            p = ( s.find ( '=' ) != string::npos ) ? s.find ( '=' ) : p;
+            p = ( s.find ( ':' ) != string::npos ) ? s.find ( ':' ) : p;
+            if ( p != string::npos ) {
+                kv.insert ( pair<string, string> ( s.substr ( 0, p ), s.substr ( p + 1, s.length() - p - 1 ) ) );
+            }
+            it = strlist[++i];
+
+        }
+    }
+
+    char **SciDBDataset::mapToGdalMD ( map< string, string > &kv )
+    {
+        CPLStringList out;
+        for ( map<string, string>::iterator it = kv.begin(); it != kv.end(); ++it ) {
+            out.AddNameValue ( it->first.c_str(), it->second.c_str() );
+        }
+        return out.List();
+    }
+
+    SciDBDataset::~SciDBDataset()
+    {
+        FlushCache();
+        delete _client;
+    }
+    
+    CPLErr SciDBDataset::GetGeoTransform ( double *padfTransform )
+    {
+        // If array dimensions do not start at 0, change transformation parameters accordingly
+        AffineTransform::double2 p0 ( _array.getXDim()->low, _array.getYDim()->low );
+        _array.affineTransform.f ( p0 );
+        // padfTransform[0] = _array.affineTransform._x0;
+        padfTransform[0] = p0.x;
+        padfTransform[1] = _array.affineTransform._a11;
+        padfTransform[2] = _array.affineTransform._a12;
+        //padfTransform[3] = _array.affineTransform._y0;
+        padfTransform[3] = p0.y;
+        padfTransform[4] = _array.affineTransform._a21;
+        padfTransform[5] = _array.affineTransform._a22;
+        return CE_None;
+    }
+
+
+    const char *SciDBDataset::GetProjectionRef()
+    {
+        return _array.srtext.c_str();
+    }
+    
+    char **SciDBDataset::GetMetadata ( const char *pszDomain )
+    {
+        map <string, string> kv;
+        if ( pszDomain == NULL ) {
+            _client->getArrayMD ( kv, _array.name, "" );
+        }
+        else {
+            _client->getArrayMD ( kv, _array.name, pszDomain );
+        }
+        return mapToGdalMD ( kv );
+    }
+
+    const char *SciDBDataset::GetMetadataItem ( const char *pszName, const char *pszDomain )
+    {
+        map <string, string> kv;
+        if ( pszDomain == NULL ) {
+            _client->getArrayMD ( kv, _array.name, "" );
+        }
+        else {
+            _client->getArrayMD ( kv, _array.name, pszDomain );
+        }
+        if ( kv.find ( pszName ) == kv.end() ) return NULL;
+        return kv.find ( pszName )->second.c_str();
+
+    }
+
+    ShimClient* SciDBDataset::getClient() {
+	return _client;
+    }
+
+    void SciDBDataset::copyMetadataToArray(GDALDataset* poSrcDS, SciDBSpatialArray& array)
+    {
+      // Attributes
+	  size_t pixelsize = 0; // size in bytes of one pixel, i.e. sum of attribute sizes
+	  vector<SciDBAttribute> attrs;
+	  for ( int i = 0; i < poSrcDS->GetRasterCount(); ++i ) {
+	      SciDBAttribute a;
+	      a.nullable = false; // TODO
+	      a.typeId = Utils::gdalTypeToSciDBTypeId ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() ); // All attribtues must have the same data type
+	      stringstream aname;
+	      pixelsize += Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
+	      aname << "band" << i + 1;
+	      //aname << poSrcDS->GetRasterBand ( i + 1 )->GetDescription();
+	      a.name = aname.str();
+	      attrs.push_back ( a );
+	  }
+	  array.attrs = attrs;
+
+
+
+	  // Dimensions
+
+	  //vector<SciDBDimension> dims;
+
+	  // Derive chunksize from attribute sizes
+	  //TODO adapt for t dim as well
+	  uint32_t blocksize = Utils::nextPow2 ( ( uint32_t ) sqrt ( ( ( ( double ) ( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 ) ) / ( ( double ) ( pixelsize ) ) ) ) ) / 2;
+	  stringstream ss;
+	  ss << "Using chunksize " << blocksize << "x" << blocksize << " --> " << ( int ) ( ( ( double ) ( blocksize * blocksize * pixelsize ) ) / ( ( double ) 1024.0 ) ) << " kilobytes";
+	  Utils::debug ( ss.str() );
+	  
+	  SciDBDimension* dimx;
+	  SciDBDimension* dimy;
+	  
+	  
+	  dimx =  array.getXDim();
+	  dimx->high = poSrcDS->GetRasterXSize() - 1;
+	  dimx->length = poSrcDS->GetRasterXSize();
+	  dimx->chunksize = blocksize;
+
+	  dimy = array.getYDim();
+	  dimy->high = poSrcDS->GetRasterYSize() - 1;
+	  dimy->length = poSrcDS->GetRasterYSize();
+	  dimy->chunksize = blocksize;
+
+	  
+	  //extracting SRS information from source
+	  double padfTransform[6];
+	  string wkt ( poSrcDS->GetProjectionRef() );
+	  if ( wkt != "" && poSrcDS->GetGeoTransform ( padfTransform ) == CE_None ) {
+	      AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
+
+	      array.affineTransform = a;
+
+	      array.srtext = wkt;
+	      OGRSpatialReference srs ( wkt.c_str() );
+	      srs.AutoIdentifyEPSG();
+	      array.auth_name = srs.GetAuthorityName ( NULL );
+	      array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
+	      char *proj4;
+	      srs.exportToProj4 ( &proj4 );
+	      array.proj4text.assign ( proj4 );
+	      CPLFree ( proj4 );
+
+	      array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+	      array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
+	  }
+
+
+	  Utils::debug ( "Reading metadata from source dataset" );
+
+	  // Get Metadata // TODO: Add domains
+	  map<string, string> kv;
+	  gdalMDtoMap ( poSrcDS->GetMetadata(), kv );
+	  array.md.insert ( pair<string, MD> ( "", kv ) );
+	  
+
+	  for ( int i = 0; i < poSrcDS->GetRasterCount(); ++i ) {
+	      map<string, string> kv2;
+	      //  gdalMDtoMap(  poSrcDS->GetRasterBand ( i + 1 )->GetMetadata(), kv2);
+	      stringstream s;
+	      double v;
+	      int *ret = NULL;
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( ret );
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( ret ) ;
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "OFFSET", s.str() ) );
+		  s.str ( "" );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( ret ) ;
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
+		  s.str ( "" );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( ret );
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "MIN", s.str() ) );
+	      }
+	      s.str ( "" );
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( ret );
+	      if ( ret != NULL && *ret != 0 ) {
+		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
+		  kv2.insert ( pair<string, string> ( "MAX", s.str() ) );
+	      }
+	      s.str ( "" );
+	      s <<  std::setprecision ( numeric_limits< double >::digits10 ) << poSrcDS->GetRasterBand ( i + 1 )->GetUnitType() ;
+	      kv2.insert ( pair<string, string> ( "UNIT", s.str() ) );
+
+
+	      array.attrs[i].md.insert ( pair<string, MD> ( "", kv2 ) );
+	  }
+    }
+
+    void SciDBDataset::uploadImageIntoTempArray(ShimClient *client, SciDBSpatialArray& array, GDALDataset *poSrcDS, GDALProgressFunc pfnProgress, void* pProgressData)
+    {
+	int  nBands = poSrcDS->GetRasterCount();
+	int  nXSize = poSrcDS->GetRasterXSize();
+        int  nYSize = poSrcDS->GetRasterYSize();
+	
+	size_t pixelSize = 0;
+	for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
+	
+	size_t totalSize = pixelSize *  array.getXDim()->chunksize * array.getYDim()->chunksize;
+	
+	uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
+
+	
+	uint32_t nBlockX = ( uint32_t ) ( nXSize / array.getXDim()->chunksize );
+	if ( nXSize % array.getXDim()->chunksize != 0 ) ++nBlockX;
+
+	uint32_t nBlockY = ( uint32_t ) ( nYSize / array.getYDim()->chunksize );
+	if ( nYSize % array.getYDim()->chunksize != 0 ) ++nBlockY;
+
+
+
+	//upload array in chunks
+	for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
+	    for ( uint32_t by = 0; by < nBlockY; ++by ) {
+
+		size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
+
+
+
+		if ( !pfnProgress ( ( ( double ) ( bx * nBlockY + by ) ) / ( ( double ) ( nBlockX * nBlockY ) ), NULL, pProgressData ) ) {
+		    Utils::debug ( "Interruption by user requested, trying to clean up" );
+		    // Clean up intermediate arrays
+		    client->removeArray ( array.name );
+		    throw ERR_CREATE_TERMINATEDBYUSER;
+		}
+
+		// 1. Compute array bounds from block offsets
+		int xmin = bx *  array.getXDim()->chunksize + array.getXDim()->low;
+		int xmax = xmin +  array.getXDim()->chunksize - 1;
+		if ( xmax > array.getXDim()->high ) xmax = array.getXDim()->high;
+		if ( xmin > array.getXDim()->high ) xmin = array.getXDim()->high;
+
+		int ymin = by *  array.getYDim()->chunksize + array.getYDim()->low;
+		int ymax = ymin + array.getYDim()->chunksize - 1;
+		if ( ymax > array.getYDim()->high ) ymax = array.getYDim()->high;
+		if ( ymin > array.getYDim()->high ) ymin = array.getYDim()->high;
+
+		// We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
+		for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
+		    void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+
+		    // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
+		    GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
+		    //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
+		    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
+
+
+		    /* SciDB load file format is band interleaved by pixel / cell, whereas common
+		    GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
+		    manually. */
+
+		    // Variable (unknown) data types and band numbers make this somewhat ugly
+		    for ( int i = 0; i < ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ); ++i ) {
+			memcpy ( & ( ( char * ) bandInterleavedChunk ) [i * pixelSize + bandOffset], & ( ( char * ) blockBandBuf ) [i * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId )], Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
+		    }
+		    free ( blockBandBuf );
+		    bandOffset += Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId );
+
+		}
+
+		if ( client->insertData ( array, bandInterleavedChunk, xmin, ymin, xmax, ymax ) != SUCCESS ) {
+		    Utils::debug ( "Copying data to SciDB array failed, trying to recover initial state..." );
+		    if ( client->removeArray ( array.name ) != SUCCESS ) {
+		      throw ERR_CREATE_AUTOCLEANUPFAILED;
+		    } else {
+		      throw ERR_CREATE_AUTOCLEANUPSUCCESS;
+		    } 
+		}
+	    }
+	}
+
+
+
+	free ( bandInterleavedChunk );
+    }
+
+    bool SciDBDataset::arrayIntegrateable(SciDBSpatialArray &src_array, SciDBSpatialArray &tar_array)
+    {
+	    bool sameSRS = (src_array.auth_srid == tar_array.auth_srid) && boost::iequals(src_array.auth_name, tar_array.auth_name);
+// 	    stringstream o;
+// 	    o << "Source SRS: " << src_array.auth_name << ":" << src_array.auth_srid << "; Target SRS: " << tar_array.auth_name << ":" << tar_array.auth_srid;
+// 	    Utils::debug(o.str());
+	    if (sameSRS) {
+		Utils::debug("Arrays have same SRS");
+	    }
+	    
+	    //source arrays bounding box
+	    AffineTransform::double2 src_ul = AffineTransform::double2(src_array.getXDim()->low, src_array.getYDim()->high);
+	    AffineTransform::double2 src_lr = AffineTransform::double2(src_array.getXDim()->high, src_array.getYDim()->low);
+	    src_array.affineTransform.f(src_ul);
+	    src_array.affineTransform.f(src_lr);
+	    double src_x_min,src_x_max,src_y_min,src_y_max;
+	    if (src_ul.x < src_lr.x) {
+	      src_x_min = src_ul.x;
+	      src_x_max = src_lr.x;
+	    } else {
+	      src_x_max =  src_ul.x;
+	      src_x_min = src_lr.x;
+	    }
+	    
+	    if (src_lr.y < src_ul.y) {
+	      src_y_min = src_lr.y;
+	      src_y_max = src_ul.y;
+	    } else {
+	      src_y_max = src_lr.y;
+	      src_y_min = src_ul.y; 
+	    }
+// 	    stringstream s1;
+// 	    s1 << "BBOX local image: " << src_x_min << " " << src_y_min << " " << src_x_max << " " << src_y_max;
+	    
+	    AffineTransform::double2 tar_ul = AffineTransform::double2(tar_array.getXDim()->start, tar_array.getYDim()->start + tar_array.getYDim()->length );
+	    AffineTransform::double2 tar_lr = AffineTransform::double2(tar_array.getXDim()->start + tar_array.getXDim()->length, tar_array.getYDim()->start);
+	    tar_array.affineTransform.f(tar_ul);
+	    tar_array.affineTransform.f(tar_lr);
+	    
+	    double tar_x_min,tar_x_max, tar_y_min,tar_y_max;
+	    if (tar_ul.x < tar_lr.x) {
+	      tar_x_min = tar_ul.x;
+	      tar_x_max = tar_lr.x;
+	    }else {
+	      tar_x_max = tar_ul.x;
+	      tar_x_min = tar_lr.x;
+	    }
+	    
+	    if(tar_lr.y < tar_ul.y) {
+	      tar_y_min = tar_lr.y;
+	      tar_y_max = tar_ul.y;
+	    } else {
+	      tar_y_max = tar_lr.y;
+	      tar_y_min = tar_ul.y;
+	    }	    
+	    
+// 	    stringstream s2;
+// 	    s2 << "BBOX scidb array: " << tar_x_min << " " << tar_y_min << " " << tar_x_max << " " << tar_y_max;
+// 	    Utils::debug(s1.str());
+// 	    Utils::debug(s2.str());
+	    
+	    bool isTPP = (src_x_min >= tar_x_min) && (src_y_min >= tar_y_min) && (src_x_max <= tar_x_max) && (src_y_max <= tar_y_max);
+	    
+	    if (isTPP) {
+		Utils::debug("Source array is TPP of target array or equal");
+	    }
+	    
+	    return (sameSRS && isTPP);
+    }
+    
+    
+    GDALDataset* SciDBDataset::CreateCopy ( const char *pszFilename, GDALDataset *poSrcDS, int bStrict, char **papszOptions, GDALProgressFunc pfnProgress, void *pProgressData )
     {
         int  nBands = poSrcDS->GetRasterCount();
 	
@@ -644,121 +1001,6 @@ namespace scidb4gdal
 	}
     }
 
-
-    void SciDBDataset::gdalMDtoMap ( char **strlist, map<string, string> &kv )
-    {
-        kv.clear();
-
-        int i = 0;
-        char *it = strlist[0];
-        while ( it != NULL ) {
-            string s ( strlist[i] );
-            size_t p = string::npos;
-            p = ( s.find ( '=' ) != string::npos ) ? s.find ( '=' ) : p;
-            p = ( s.find ( ':' ) != string::npos ) ? s.find ( ':' ) : p;
-            if ( p != string::npos ) {
-                kv.insert ( pair<string, string> ( s.substr ( 0, p ), s.substr ( p + 1, s.length() - p - 1 ) ) );
-            }
-            it = strlist[++i];
-
-        }
-    }
-
-    char **SciDBDataset::mapToGdalMD ( map< string, string > &kv )
-    {
-        CPLStringList out;
-        for ( map<string, string>::iterator it = kv.begin(); it != kv.end(); ++it ) {
-            out.AddNameValue ( it->first.c_str(), it->second.c_str() );
-        }
-        return out.List();
-    }
-
-
-
-
-    SciDBDataset::~SciDBDataset()
-    {
-        FlushCache();
-        delete _client;
-    }
-    
-
-    CPLErr SciDBDataset::GetGeoTransform ( double *padfTransform )
-    {
-        // If array dimensions do not start at 0, change transformation parameters accordingly
-        AffineTransform::double2 p0 ( _array.getXDim()->low, _array.getYDim()->low );
-        _array.affineTransform.f ( p0 );
-        // padfTransform[0] = _array.affineTransform._x0;
-        padfTransform[0] = p0.x;
-        padfTransform[1] = _array.affineTransform._a11;
-        padfTransform[2] = _array.affineTransform._a12;
-        //padfTransform[3] = _array.affineTransform._y0;
-        padfTransform[3] = p0.y;
-        padfTransform[4] = _array.affineTransform._a21;
-        padfTransform[5] = _array.affineTransform._a22;
-        return CE_None;
-    }
-
-
-    const char *SciDBDataset::GetProjectionRef()
-    {
-        return _array.srtext.c_str();
-    }
-    
-
-
-    char **SciDBDataset::GetMetadata ( const char *pszDomain )
-    {
-        map <string, string> kv;
-        if ( pszDomain == NULL ) {
-            _client->getArrayMD ( kv, _array.name, "" );
-        }
-        else {
-            _client->getArrayMD ( kv, _array.name, pszDomain );
-        }
-        return mapToGdalMD ( kv );
-    }
-
-
-    const char *SciDBDataset::GetMetadataItem ( const char *pszName, const char *pszDomain )
-    {
-        map <string, string> kv;
-        if ( pszDomain == NULL ) {
-            _client->getArrayMD ( kv, _array.name, "" );
-        }
-        else {
-            _client->getArrayMD ( kv, _array.name, pszDomain );
-        }
-        if ( kv.find ( pszName ) == kv.end() ) return NULL;
-        return kv.find ( pszName )->second.c_str();
-
-    }
-
-//     CPLErr SciDBDataset::SetMetadata ( char   **papszMetadataIn, const char *pszDomain )
-//     {
-//         map <string, string> kv;
-//         gdalMDtoMap ( papszMetadataIn, kv );
-//         _client->setArrayMD ( _array.name, kv, pszDomain );
-//         return CE_None;
-//     }
-//
-//     CPLErr SciDBDataset::SetMetadataItem ( const char *pszName, const char *pszValue, const char *pszDomain )
-//     {
-//         map <string, string> kv;
-//         kv.insert ( pair<string, string> ( pszName, pszValue ) );
-//         _client->setArrayMD ( _array.name, kv, pszDomain );
-//         return CE_None;
-//     }
-
-    int SciDBDataset::Identify ( GDALOpenInfo *poOpenInfo )
-    {
-        if ( poOpenInfo->pszFilename == NULL || !EQUALN ( poOpenInfo->pszFilename, "SCIDB:", 6 ) ) {
-            return FALSE;
-        }
-        return TRUE;
-    }
-
-
     CPLErr SciDBDataset::Delete ( const char *pszName )
     {
 	ParameterParser p = ParameterParser(pszName, NULL);
@@ -773,9 +1015,16 @@ namespace scidb4gdal
 
         return CE_None;
     }
-  
 
-    GDALDataset *SciDBDataset::Open ( GDALOpenInfo *poOpenInfo )
+    int SciDBDataset::Identify ( GDALOpenInfo *poOpenInfo )
+    {
+	if ( poOpenInfo->pszFilename == NULL || !EQUALN ( poOpenInfo->pszFilename, "SCIDB:", 6 ) ) {
+	    return FALSE;
+	}
+	return TRUE;
+    }
+
+    GDALDataset* SciDBDataset::Open ( GDALOpenInfo *poOpenInfo )
     {
 	// Check whether dataset matches SciDB dataset
         if ( !Identify ( poOpenInfo ) ) {
@@ -886,287 +1135,5 @@ namespace scidb4gdal
 	  return NULL;
 	}
     }
-    
-    
-    void SciDBDataset::copyMetadataToArray(GDALDataset* poSrcDS, SciDBSpatialArray& array)
-    {
-      // Attributes
-	  size_t pixelsize = 0; // size in bytes of one pixel, i.e. sum of attribute sizes
-	  vector<SciDBAttribute> attrs;
-	  for ( int i = 0; i < poSrcDS->GetRasterCount(); ++i ) {
-	      SciDBAttribute a;
-	      a.nullable = false; // TODO
-	      a.typeId = Utils::gdalTypeToSciDBTypeId ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() ); // All attribtues must have the same data type
-	      stringstream aname;
-	      pixelsize += Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
-	      aname << "band" << i + 1;
-	      //aname << poSrcDS->GetRasterBand ( i + 1 )->GetDescription();
-	      a.name = aname.str();
-	      attrs.push_back ( a );
-	  }
-	  array.attrs = attrs;
-
-
-
-	  // Dimensions
-
-	  //vector<SciDBDimension> dims;
-
-	  // Derive chunksize from attribute sizes
-	  //TODO adapt for t dim as well
-	  uint32_t blocksize = Utils::nextPow2 ( ( uint32_t ) sqrt ( ( ( ( double ) ( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 ) ) / ( ( double ) ( pixelsize ) ) ) ) ) / 2;
-	  stringstream ss;
-	  ss << "Using chunksize " << blocksize << "x" << blocksize << " --> " << ( int ) ( ( ( double ) ( blocksize * blocksize * pixelsize ) ) / ( ( double ) 1024.0 ) ) << " kilobytes";
-	  Utils::debug ( ss.str() );
-	  
-	  SciDBDimension* dimx;
-	  SciDBDimension* dimy;
-	  
-	  
-	  dimx =  array.getXDim();
-	  dimx->high = poSrcDS->GetRasterXSize() - 1;
-	  dimx->length = poSrcDS->GetRasterXSize();
-	  dimx->chunksize = blocksize;
-
-	  dimy = array.getYDim();
-	  dimy->high = poSrcDS->GetRasterYSize() - 1;
-	  dimy->length = poSrcDS->GetRasterYSize();
-	  dimy->chunksize = blocksize;
-
-	  
-	  //extracting SRS information from source
-	  double padfTransform[6];
-	  string wkt ( poSrcDS->GetProjectionRef() );
-	  if ( wkt != "" && poSrcDS->GetGeoTransform ( padfTransform ) == CE_None ) {
-	      AffineTransform a ( padfTransform[0], padfTransform[3], padfTransform[1], padfTransform[5], padfTransform[2], padfTransform[4] );
-
-	      array.affineTransform = a;
-
-	      array.srtext = wkt;
-	      OGRSpatialReference srs ( wkt.c_str() );
-	      srs.AutoIdentifyEPSG();
-	      array.auth_name = srs.GetAuthorityName ( NULL );
-	      array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
-	      char *proj4;
-	      srs.exportToProj4 ( &proj4 );
-	      array.proj4text.assign ( proj4 );
-	      CPLFree ( proj4 );
-
-	      array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
-	      array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
-	  }
-
-
-	  Utils::debug ( "Reading metadata from source dataset" );
-
-	  // Get Metadata // TODO: Add domains
-	  map<string, string> kv;
-	  gdalMDtoMap ( poSrcDS->GetMetadata(), kv );
-	  array.md.insert ( pair<string, MD> ( "", kv ) );
-	  
-
-	  for ( int i = 0; i < poSrcDS->GetRasterCount(); ++i ) {
-	      map<string, string> kv2;
-	      //  gdalMDtoMap(  poSrcDS->GetRasterBand ( i + 1 )->GetMetadata(), kv2);
-	      stringstream s;
-	      double v;
-	      int *ret = NULL;
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
-		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-		  kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
-	      }
-	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( ret ) ;
-	      if ( ret != NULL && *ret != 0 ) {
-		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-		  kv2.insert ( pair<string, string> ( "OFFSET", s.str() ) );
-		  s.str ( "" );
-	      }
-	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( ret ) ;
-	      if ( ret != NULL && *ret != 0 ) {
-		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-		  kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
-		  s.str ( "" );
-	      }
-	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
-		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-		  kv2.insert ( pair<string, string> ( "MIN", s.str() ) );
-	      }
-	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
-		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
-		  kv2.insert ( pair<string, string> ( "MAX", s.str() ) );
-	      }
-	      s.str ( "" );
-	      s <<  std::setprecision ( numeric_limits< double >::digits10 ) << poSrcDS->GetRasterBand ( i + 1 )->GetUnitType() ;
-	      kv2.insert ( pair<string, string> ( "UNIT", s.str() ) );
-
-
-	      array.attrs[i].md.insert ( pair<string, MD> ( "", kv2 ) );
-	  }
-    }
-
-    void SciDBDataset::uploadImageIntoTempArray(ShimClient *client, SciDBSpatialArray& array, GDALDataset *poSrcDS, GDALProgressFunc pfnProgress, void* pProgressData)
-    {
-	int  nBands = poSrcDS->GetRasterCount();
-	int  nXSize = poSrcDS->GetRasterXSize();
-        int  nYSize = poSrcDS->GetRasterYSize();
-	
-	size_t pixelSize = 0;
-	for ( uint32_t i = 0; i < array.attrs.size(); ++i ) pixelSize += Utils::scidbTypeIdBytes ( array.attrs[i].typeId );
-	
-	size_t totalSize = pixelSize *  array.getXDim()->chunksize * array.getYDim()->chunksize;
-	
-	uint8_t *bandInterleavedChunk = ( uint8_t * ) malloc ( totalSize ); // This is a byte array
-
-	
-	uint32_t nBlockX = ( uint32_t ) ( nXSize / array.getXDim()->chunksize );
-	if ( nXSize % array.getXDim()->chunksize != 0 ) ++nBlockX;
-
-	uint32_t nBlockY = ( uint32_t ) ( nYSize / array.getYDim()->chunksize );
-	if ( nYSize % array.getYDim()->chunksize != 0 ) ++nBlockY;
-
-
-
-	//upload array in chunks
-	for ( uint32_t bx = 0; bx < nBlockX; ++bx ) {
-	    for ( uint32_t by = 0; by < nBlockY; ++by ) {
-
-		size_t bandOffset = 0; // sum of bytes taken by previous bands, will be updated in loop over bands
-
-
-
-		if ( !pfnProgress ( ( ( double ) ( bx * nBlockY + by ) ) / ( ( double ) ( nBlockX * nBlockY ) ), NULL, pProgressData ) ) {
-		    Utils::debug ( "Interruption by user requested, trying to clean up" );
-		    // Clean up intermediate arrays
-		    client->removeArray ( array.name );
-		    throw ERR_CREATE_TERMINATEDBYUSER;
-		}
-
-		// 1. Compute array bounds from block offsets
-		int xmin = bx *  array.getXDim()->chunksize + array.getXDim()->low;
-		int xmax = xmin +  array.getXDim()->chunksize - 1;
-		if ( xmax > array.getXDim()->high ) xmax = array.getXDim()->high;
-		if ( xmin > array.getXDim()->high ) xmin = array.getXDim()->high;
-
-		int ymin = by *  array.getYDim()->chunksize + array.getYDim()->low;
-		int ymax = ymin + array.getYDim()->chunksize - 1;
-		if ( ymax > array.getYDim()->high ) ymax = array.getYDim()->high;
-		if ( ymin > array.getYDim()->high ) ymin = array.getYDim()->high;
-
-		// We assume reading whole blocks of individual bands first is more efficient than reading single band pixels subsequently
-		for ( uint16_t iBand = 0; iBand < nBands; ++iBand ) {
-		    void *blockBandBuf =  malloc ( ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ) * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
-
-		    // Using nPixelSpace and nLineSpace arguments could maybe automatically write to bandInterleavedChunk properly
-		    GDALRasterBand *poBand = poSrcDS->GetRasterBand ( iBand + 1 );
-		    //poBand->RasterIO ( GF_Read, ymin, xmin, 1 + ymax - ymin, 1 + xmax - xmin, ( void * ) blockBandBuf,  1 + ymax - ymin, 1 + xmax - xmin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0 );
-		    poBand->RasterIO ( GF_Read, xmin, ymin, 1 + xmax - xmin, 1 + ymax - ymin, ( void * ) blockBandBuf,  1 + xmax - xmin, 1 + ymax - ymin, Utils::scidbTypeIdToGDALType ( array.attrs[iBand].typeId ), 0, 0, NULL );
-
-
-		    /* SciDB load file format is band interleaved by pixel / cell, whereas common
-		    GDAL functions are rather band sequential. In the following, we perform block-wise interleaving
-		    manually. */
-
-		    // Variable (unknown) data types and band numbers make this somewhat ugly
-		    for ( int i = 0; i < ( 1 + xmax - xmin ) * ( 1 + ymax - ymin ); ++i ) {
-			memcpy ( & ( ( char * ) bandInterleavedChunk ) [i * pixelSize + bandOffset], & ( ( char * ) blockBandBuf ) [i * Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId )], Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId ) );
-		    }
-		    free ( blockBandBuf );
-		    bandOffset += Utils::scidbTypeIdBytes ( array.attrs[iBand].typeId );
-
-		}
-
-		if ( client->insertData ( array, bandInterleavedChunk, xmin, ymin, xmax, ymax ) != SUCCESS ) {
-		    Utils::debug ( "Copying data to SciDB array failed, trying to recover initial state..." );
-		    if ( client->removeArray ( array.name ) != SUCCESS ) {
-		      throw ERR_CREATE_AUTOCLEANUPFAILED;
-		    } else {
-		      throw ERR_CREATE_AUTOCLEANUPSUCCESS;
-		    } 
-		}
-	    }
-	}
-
-
-
-	free ( bandInterleavedChunk );
-    }
-
-    bool SciDBDataset::arrayIntegrateable(SciDBSpatialArray &src_array, SciDBSpatialArray &tar_array)
-    {
-	    bool sameSRS = (src_array.auth_srid == tar_array.auth_srid) && boost::iequals(src_array.auth_name, tar_array.auth_name);
-// 	    stringstream o;
-// 	    o << "Source SRS: " << src_array.auth_name << ":" << src_array.auth_srid << "; Target SRS: " << tar_array.auth_name << ":" << tar_array.auth_srid;
-// 	    Utils::debug(o.str());
-	    if (sameSRS) {
-		Utils::debug("Arrays have same SRS");
-	    }
-	    
-	    //source arrays bounding box
-	    AffineTransform::double2 src_ul = AffineTransform::double2(src_array.getXDim()->low, src_array.getYDim()->high);
-	    AffineTransform::double2 src_lr = AffineTransform::double2(src_array.getXDim()->high, src_array.getYDim()->low);
-	    src_array.affineTransform.f(src_ul);
-	    src_array.affineTransform.f(src_lr);
-	    double src_x_min,src_x_max,src_y_min,src_y_max;
-	    if (src_ul.x < src_lr.x) {
-	      src_x_min = src_ul.x;
-	      src_x_max = src_lr.x;
-	    } else {
-	      src_x_max =  src_ul.x;
-	      src_x_min = src_lr.x;
-	    }
-	    
-	    if (src_lr.y < src_ul.y) {
-	      src_y_min = src_lr.y;
-	      src_y_max = src_ul.y;
-	    } else {
-	      src_y_max = src_lr.y;
-	      src_y_min = src_ul.y; 
-	    }
-// 	    stringstream s1;
-// 	    s1 << "BBOX local image: " << src_x_min << " " << src_y_min << " " << src_x_max << " " << src_y_max;
-	    
-	    AffineTransform::double2 tar_ul = AffineTransform::double2(tar_array.getXDim()->start, tar_array.getYDim()->start + tar_array.getYDim()->length );
-	    AffineTransform::double2 tar_lr = AffineTransform::double2(tar_array.getXDim()->start + tar_array.getXDim()->length, tar_array.getYDim()->start);
-	    tar_array.affineTransform.f(tar_ul);
-	    tar_array.affineTransform.f(tar_lr);
-	    
-	    double tar_x_min,tar_x_max, tar_y_min,tar_y_max;
-	    if (tar_ul.x < tar_lr.x) {
-	      tar_x_min = tar_ul.x;
-	      tar_x_max = tar_lr.x;
-	    }else {
-	      tar_x_max = tar_ul.x;
-	      tar_x_min = tar_lr.x;
-	    }
-	    
-	    if(tar_lr.y < tar_ul.y) {
-	      tar_y_min = tar_lr.y;
-	      tar_y_max = tar_ul.y;
-	    } else {
-	      tar_y_max = tar_lr.y;
-	      tar_y_min = tar_ul.y;
-	    }	    
-	    
-// 	    stringstream s2;
-// 	    s2 << "BBOX scidb array: " << tar_x_min << " " << tar_y_min << " " << tar_x_max << " " << tar_y_max;
-// 	    Utils::debug(s1.str());
-// 	    Utils::debug(s2.str());
-	    
-	    bool isTPP = (src_x_min >= tar_x_min) && (src_y_min >= tar_y_min) && (src_x_max <= tar_x_max) && (src_y_max <= tar_y_max);
-	    
-	    if (isTPP) {
-		Utils::debug("Source array is TPP of target array or equal");
-	    }
-	    
-	    return (sameSRS && isTPP);
-    }
-    
     
 }
