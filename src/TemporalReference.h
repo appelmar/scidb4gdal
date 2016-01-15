@@ -33,8 +33,33 @@ namespace scidb4geo
 
     using namespace std;
 
-    // Enumeration to model the granularitiy of temporal references
-    enum TResolution {NONE, YEAR, MONTH, WEEK, DAY, HOUR, MINUTE, SECOND, FRACTION};
+    
+    /**
+     * @brief A temporal resolution statement
+     * 
+     * This enumeration refers to the infered temporal resolution that is based on the
+     * temporal interval.
+     */
+    enum class TResolution {
+      /** no temporal resoultion */
+      NONE, 
+      /** temporal resoultion of one year */
+      YEAR, 
+      /** temporal resolution of one month */
+      MONTH, 
+      /** temporal resoultion of one week */
+      WEEK,
+      /** temporal resolution of one day */
+      DAY, 
+      /** temporal resolution of one hour */
+      HOUR, 
+      /** temporal resolution of one minute */
+      MINUTE, 
+      /** temporal resolution of one second */
+      SECOND, 
+      /** temporal resolution of the fraction of a second */
+      FRACTION
+    };
 
     // Forward declarations
     class TPoint;
@@ -42,7 +67,7 @@ namespace scidb4geo
     class TReference;
     
     /**
-     * Class that represents a point in time with variable resolution
+     * @brief Class that represents a point in time with variable resolution
      */
     class TPoint
     {
@@ -54,20 +79,34 @@ namespace scidb4geo
         friend class TReference;
 
     public:
-	TPoint ( );
+      /**
+       * @brief Basic constructor
+       * 
+       */
+      TPoint ( );
 	
         /**
-         * Construction from ISO 8601 string
+         * @brief Construction from ISO 8601 string
+	 * 
+	 * The constructor evaluates a given string against a valid ISO 8601 string and creates
+	 * based on that information this class.
+	 * 
          * @param str ISO 8601 string
          **/
         TPoint ( string str );
 
         /**
-        * ISO 8601 string output
+        * @brief creates a string representation
+	* 
+	* Creates a string representation of this temporal point that is conform to the ISO 8601 standard.
+	*
+	* @return string ISO 8601 conform string 
         **/
         string toStringISO();
 
-
+	/**
+	 * a boost representation of an unreferenced temporal point
+	 */
         boost::posix_time::ptime _pt;
 
         /**
@@ -76,14 +115,51 @@ namespace scidb4geo
         TResolution _resolution;
 
     protected:
-	int _year, _month, _week, _doy, _dow, _dom, _hour, _minute, _second, _fraction;
-	int _tz_hour, _tz_minute;
+	/** year value */
+	int _year;
+	/** month value */
+	int _month;
+	/** week value */
+	int _week;
+	/** day of year value */
+	int _doy;
+	/** day of week value */
+	int _dow;
+	/** day of month value */
+	int _dom;
+	/** hour value */
+	int _hour;
+	/** minute value */
+	int _minute;
+	/** second value */
+	int _second;
+	/** fraction of second value */
+	int _fraction;
+	
+	/** time zone hour value */
+	int _tz_hour;
+	/** time zone minute value */
+	int _tz_minute;
 
     private:
+      /**
+       * @brief initiate the temporal point values
+       * 
+       * @return void
+       */
         void init();
         
     };
-
+    
+    /**
+     * @brief A representation form of a temporal interval
+     * 
+     * The TInterval is a class that is used to represent a temporal interval in one of the following ways:
+     * - number months
+     * - number of years
+     * - number of days
+     * - exact time interval in seconds
+     */
     class TInterval
     {
 
@@ -99,47 +175,53 @@ namespace scidb4geo
 
 
         /**
-         * Default constructor creates a time interval that equals 0.
-         **/
+         * @brief Basic constructor
+	 * Default constructor creates a time interval that equals 0.
+         */
         TInterval();
 
         /**
-        * Construction from ISO 8601 string.
+        * @brief constructor with a ISO 8601 string.
+	* 
+	* Construction from ISO 8601 string.
+	* 
         * @param str ISO 8601 string
-        **/
+        */
         TInterval ( string str );
 
         /**
         * Duration given as number of months. Months vary in its number of days.
-        **/
+        */
         int _md;
 
         /**
         * Duration given as number of years. Years may or may not count the same number of days, but always
         * have 12 months.
-        **/
+        */
         int _yd;
 
 
         /**
         * Duration given as number of days. Days may or may not count the same number of seconds.
-        **/
+        */
         boost::gregorian::date_duration  _dd;
 
         /**
         * Exact posix time difference (seconds).
-        **/
+        */
         boost::posix_time::time_duration _td;
 
         /**
         * Guessed resolution, most significant user-specified entry of a given string
-        **/
+        */
         TResolution _resolution;
 
-        /**
-        * ISO 8601 string output
-        **/
-        std::string toStringISO();
+	/**
+	 * @brief ISO 8601 string output
+	 * 
+	 * @return std::string
+	 */
+	std::string toStringISO();
 
     private:
         void init();
@@ -157,46 +239,67 @@ namespace scidb4geo
     {	
     public:
       /**
-        * Construction of a temporal reference based on a start point and a duration
-         * representing the temporal distance between two neighbouring array cells. Based on
-         * the given duration, the temporal resolution is to some degree "guessed":
-         * Examples:
-         * - 1 day always represents a whole day, whether it has 23,24, or 25 hours;
-         * - 1 month always represents a whole month and does not convert to days.
-         * Combining incompatible date/time values in the cellsize might lead to unpredictable results:
-         * (Bad) Examples: P1MT1H (1 month + 1 hour)
-         * (Good) Examples: P1M, P1Y6M, P16D, PT1H, PT30M, PT100S
-         **/
+        * @brief Representation of a Temporal Reference
+	* 
+	* Construction of a temporal reference based on a start point and a duration
+	* representing the temporal distance between two neighbouring array cells. Based on
+	* the given duration, the temporal resolution is to some degree "guessed":
+	* Examples:
+	* - 1 day always represents a whole day, whether it has 23,24, or 25 hours;
+	* - 1 month always represents a whole month and does not convert to days.
+	* Combining incompatible date/time values in the cellsize might lead to unpredictable results:
+	* (Bad) Examples: P1MT1H (1 month + 1 hour)
+	* (Good) Examples: P1M, P1Y6M, P16D, PT1H, PT30M, PT100S
+	**/
         TReference ( string t0text, string dttext );
 	TReference ();
 	~TReference();
 
-        /**
-         * Returns the start date/time, i.e. the date/time at dimension index 0
-        **/
-        TPoint     getStart();
+	/**
+	 * @brief Getter for the temporal starting point
+	 * 
+	 * Returns the start date/time, i.e. the date/time at dimension index 0
+	 * 
+	 * @return scidb4geo::TPoint The temporal point at t0
+	 */
+	TPoint     getStart();
 
-        /**
-         * Returns the temporal distance between neighbouring cells
-        **/
-        TInterval  getCellsize();
+	/**
+	 * @brief Getter for the temporal resolution
+	 * 
+	 * Returns the temporal distance between neighbouring cells
+	 * 
+	 * @return scidb4geo::TInterval
+	 */
+	TInterval  getCellsize();
 
-        /**
-         * Returns the date/time at a given index
-        **/
-        TPoint     datetimeAtIndex ( int index );
+	/**
+	 * @brief Returns the date/time at a given index
+	 * 
+	 * Calculates the date/time of an given index on the temporal dimension.
+	 * 
+	 * @param index The index on the temporal dimension
+	 * @return scidb4geo::TPoint The calculated temporal point for an given index.
+	 */
+	TPoint     datetimeAtIndex ( int index );
 
-        /**
-         * Returns the index at a specific date/time.
-         * Cells are assumed as temporal periods (i.e. with a start and end time/date)
-         * within which values do not change.
-        **/
-        int    indexAtDatetime ( TPoint &t );
+	/**
+	 * @brief Returns the index at a specific date/time.
+	 * 
+	 * Calculates the temporal index of an array given a temporal point (TPoint). The cells are assumed as 
+	 * temporal periods (i.e. with a start and end time/date) within which values do not change.
+	 * 
+	 * @param t The TPoint representation of a certain date/time
+	 * @return int The nearest index for the given date/time
+	 */
+	int    indexAtDatetime ( TPoint &t );
 
     protected:
+	/** the temporal datum */
         TPoint *_t0;
+	/** the temporal resolution (technically)*/
         TInterval *_dt;
-
+	/** the  temporal resolution (informal) */
         TResolution _r;
     };
 

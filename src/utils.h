@@ -92,13 +92,19 @@ namespace scidb4gdal
     using namespace std;
 
     enum StatusCode {
+	/** Successfully executed a function */
         SUCCESS                             = 0,
+	/** A function is currently pending */
 	PENDING 			= 1,
-
+	/** Error statement that input array is unknown */
         ERR_READ_ARRAYUNKNOWN               = 100 + 1,
+	/** Error code if a index for a dimension is out of bounds */
         ERR_READ_WRONGDIMENSIONALITY        = 100 + 2,
+	/** Error code if the user input of the bounding box is not valid */
 	ERR_READ_BBOX			= 100 + 3,
+	/** Error code if a bounding box was stated, but there was no spatial reference to interprete the coordinates */
 	ERR_READ_BBOX_SRS_MISSING	= 100 + 4,
+	/** Error code for a unspecified */
         ERR_READ_UNKNOWN                    = 100 + 99,
 
         ERR_CREATE_ARRAYEXISTS              = 200 + 1,
@@ -135,7 +141,7 @@ namespace scidb4gdal
     namespace Utils
     {
         /**
-         * Maps SciDB string type identifiers to GDAL data type enumeration items.
+         * @brief Maps SciDB string type identifiers to GDAL data type enumeration items.
          * @param typeId SciDB type identifier string e.g. "int32"
          * @return A GDALDataType item
          */
@@ -143,7 +149,7 @@ namespace scidb4gdal
 
 
         /**
-         * Maps  GDAL data type to SciDB string type identifiers.
+         * @brief Maps GDAL data type to SciDB string type identifiers.
          * @param type value of GDALDataType enumeration
          * @return SciDB type identifier string e.g. "int32"
          */
@@ -151,7 +157,7 @@ namespace scidb4gdal
 
 
         /**
-         * Gets the size in bytes of given a SciDB type.
+         * @brief Gets the size in bytes of given a SciDB type.
          * @param typeId SciDB type identifier string e.g. "int32"
          * @return Size in bytes
          */
@@ -159,49 +165,84 @@ namespace scidb4gdal
 
 
         /**
-         * Gets the size in bytes of given a GDAL type.
+         * @brief Gets the size in bytes of given a GDAL type.
          * @param typeId SciDB type identifier string e.g. "int32"
          * @return Size in bytes
          */
         size_t gdalTypeBytes ( GDALDataType type );
 
 
-        /**
-         *
-         */
-        double defaultNoDataGDAL ( GDALDataType type );
-        double defaultNoDataSciDB ( const string &typeId );
-
-        /**
-        * Error handling function, calls CPLError()
-         */
-        void error ( const string &msg, bool kill = false );
-
-        /**
-         * Error handling function, calls CPLError()
-         */
-        void warn ( const string &msg ) ;
-
-        /**
-         * Error handling function, calls CPLDebug()
-         */
-        void debug ( const string &msg ) ;
-
-        /**
-         * Utility function for sleeping after connection retries
-         */
-        void sleep ( long ms );
-
-
-        /**
-         * Rounds up to the next power of two
-         * @param x integer number
-         */
-        uint32_t nextPow2 ( uint32_t x );
+	/**
+	 * @brief Returns the default no data value for a GDAL data type.
+	 * 
+	 * @param type one of the type definitions of GDAL
+	 * @return double
+	 */
+	double defaultNoDataGDAL ( GDALDataType type );
 	
 	/**
-	* 	Function to validate the time string that is passed
-	*/
+	 * @brief Returns the default no data value for a SciDB data type
+	 * 
+	 * @param typeId a string representation of a SciDB data type
+	 * @return double
+	 */
+	double defaultNoDataSciDB ( const string &typeId );
+
+	/**
+	 * @brief makes an error output
+	 * 
+	 * Error handling function, calls CPLError() and aborts the running process
+	 * 
+	 * @param msg the message to print
+	 * @return void
+	 */
+        void error ( const string &msg, bool kill = false );
+
+	/**
+	 * @brief makes an warn output
+	 * 
+	 * Error handling function, calls CPLWarn()
+	 * 
+	 * @param msg the message to print
+	 * @return void
+	 */
+	void warn ( const string &msg ) ;
+
+	/**
+	 * @brief makes a debugging output to console
+	 * 
+	 * Error handling function, calls CPLDebug()
+	 * 
+	 * @param msg the message to print
+	 * @return void
+	 */
+	void debug ( const string &msg ) ;
+
+	/**
+	 * @brief time out function
+	 * 
+	 * Utility function for sleeping after connection retries
+	 * 
+	 * @param ms the amount of milliseconds to wait
+	 * @return void
+	 */
+	void sleep ( long ms );
+
+
+	/**
+	 * @brief Rounds up to the next power of two.
+	 * 
+	 * @param x integer number
+	 * @return uint32_t the next higher power of two value
+	 */
+	uint32_t nextPow2 ( uint32_t x );
+	
+	/**
+	 * @brief Function to validate the time string that is passed
+	 * 
+	 * @param in the date/time string that needs to be evaluated
+	 * @return bool whether or not the passed string is valid
+	 */
 	bool validateTimestampString(string &in);
 	
 

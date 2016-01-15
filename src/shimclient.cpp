@@ -985,11 +985,6 @@ namespace scidb4gdal
 
     StatusCode ShimClient::createTempArray ( SciDBSpatialArray &array )
     {
-// 	if (array  == NULL) {
-// 	    return ERR_CREATE_NOARRAY;
-// 	}
-
-	
         if ( array.name == "" ) {
             Utils::error ( "Cannot create unnamed arrays" );
             return ERR_CREATE_INVALIDARRAYNAME;

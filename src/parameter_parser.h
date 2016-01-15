@@ -17,13 +17,15 @@ namespace scidb4gdal
     template <typename T>
     
     /**
+     * @brief class to get a specific class type (or enum) by a string
+     * 
      * A Resolver class that resolves the string value of a parameter description to address the correct parameter in the respective kind
      * of parameter. The main reason to use this class is to interprete the parameter names of the create options or the connection string
      * in order to provide enums to allow a switch-case statement to assign the values of an user input (options or connection string).
      * 
-     * @author Florian Lahn, IfGI Muenster
      */
     struct Resolver  {
+	/** a map that maps a name (string) to a generic type T (intended to be an enum) */
 	map<string, T> mapping;
 	
 	public:
@@ -53,6 +55,8 @@ namespace scidb4gdal
     using namespace std;
     
     /**
+     * @brief parser for the user input
+     * 
      * A class to parse the user input that is coming from the invoking command. The user input is either
      * stated in the create/opening options or it is stated in the connection string. In both cases this
      * class reads the key-value pairs and assigns it to the internal *Parameters representation (e.g. scidb4gdal::CreationParameters,

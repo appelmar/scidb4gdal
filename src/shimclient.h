@@ -105,7 +105,9 @@ namespace scidb4gdal
     public:
 
         /**
-         * Default constructor for the Shim client, initializes all members with default values.
+         * @brief Basic constructor
+	 * 
+	 * Default constructor for the Shim client, initializes all members with default values.
          */
         ShimClient();
 
@@ -170,7 +172,10 @@ namespace scidb4gdal
 
 
         /**
-         * Gets simple band statistics using in-database aggregation functions
+         * @brief Fetches the band statistics of the data from the SciDB database
+	 * 
+	 * Gets simple band statistics using in-database aggregation functions
+	 * 
          * @param array metadata of an existing array
          * @param nband band index, 0 based
          * @param out result statistics, i.e. min, max, mean, sd
@@ -179,38 +184,62 @@ namespace scidb4gdal
         StatusCode getAttributeStats ( SciDBSpatialArray &array, uint8_t nband, SciDBAttributeStats &out );
 
         /**
-         * Initializes cURL's easy interface, should be performaed before each web service request
+         * @brief intializes the cURL easy interface
+	 * 
+	 * Initializes cURL's easy interface, should be performaed before each web service request
+	 * 
+	 * @return void
          */
         void curlBegin();
 
         /**
-         * Cleans up cURL's easy interface, should be performaed after each web service request
+         * @brief Cancels the cURL easy interface and cleans up
+	 * 
+	 * Cleans up cURL's easy interface, should be performaed after each web service request
+	 * 
+	 * @return void
          */
         void curlEnd();
 
 
         /**
-         * Wrapper function around curl_easy_perform that retries requests and includes some error handling
+         * @brief Executes a HTTP request
+	 * 
+	 * Wrapper function around curl_easy_perform that retries requests and includes some error handling
+	 * 
+	 * @return CURLcode
          */
         CURLcode curlPerform();
 
 
         /**
-         * Tests a shim connection by requesting version information
+         * @brief Checks the cURL connection
+	 * 
+	 * Tests a shim connection by requesting version information
+	 * 
+	 * @return scidb4gdal::StatusCode
          */
         StatusCode testConnection();
 
 
         /**
-         * Creates a new (temporary) SciDB array
-         * @param array metadata of the new array
+         * @brief Creates a new (temporary) SciDB array
+	 * 
+	 * This function uses the stated SciDBSpatialArray with its original name and makes a HTTP request to
+	 * the SHIM web client to create a new temporal array under the original array name with the attached suffix
+	 * scidb4gdal::SCIDB4GDAL_ARRAYSUFFIX_TEMP ("_temp").
+	 * 
+         * @param array metadata representation of a spatial array
          * @return scidb4gdal::StatusCode
          */
         StatusCode createTempArray ( SciDBSpatialArray &array );
 
         /**
-	* This function applies the 'store' command to a temporary array in SciDB. The result is a persisted array in SciDB, which means
-	* that the temporary array in memory is written into the database.
+	* @brief Makes a temporary array persistent in SciDB
+	* 
+	* This function applies the 'store' command to a temporary array in SciDB, which means that the array in memory is stored
+	* on the disk and will be available even if the server restarts. The temporary array will then be deleted.
+	* 
         * @param srcArr array name of the source array
         * @param tarArr array name of the target array
         * @return scidb4gdal::StatusCode
@@ -218,8 +247,16 @@ namespace scidb4gdal
         StatusCode persistArray ( string srcArr, string tarArr );
 
         /**
-         * Inserts a chunk of data to an existing array
-         * @param array metadata of an existing array
+         * @brief Inserts a chunk of data to an existing array
+	 * 
+	 * The data file will be uploaded to the server using the "upload file" endpoint of the Shim web client. After that
+	 * this function will create another temporary array, accessable under the arrays name with the attached suffix 
+	 * scidb4gdal::SCIDB4GDAL_ARRAYSUFFIX_TEMPLOAD ("_tempload"), opens the submitted file and stores its attibute data at the
+	 * respective dimension values of the "tempload array". After this chunk is stored in the tempload array it will be stored
+	 * in the prior create temporary array by using a insert/redimension command in AFL language. The temporary array has to be
+	 * created prior to this function using scidb4gdal::ShimClient::createTempArray.
+	 * 
+         * @param array metadata representation of an existing SciDBSpatialArray
          * @param inchunk pointer to a chunk of memory that holds data in scidb binary format
          * @param xmin left boundary, we assume x to be "easting" which is different from GDAL!
          * @param ymin lower boundary, we assume y to be "northing" which is different from GDAL!
@@ -230,6 +267,8 @@ namespace scidb4gdal
         StatusCode insertData ( SciDBSpatialArray &array, void *inChunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max );
 	
 	/**
+	 * @brief Inserts an array in SciDB into another one if they are compatible
+	 * 
 	 * Tries to inset an array in SciDB into another array. It is important that the two arrays are compatible, meaning that the
 	 * target array needs to be large enough to capture the array that is to be inserted. Therefore the target arrays dimensions must be large 
 	 * enough that the source array does not run out of bounds.
@@ -240,9 +279,12 @@ namespace scidb4gdal
 	 */
 	StatusCode insertInto (SciDBArray &tmpArr, SciDBArray &collArr);
 
-        /**
-        * Updates the spatial reference system of an array
-        * @param array metadata including its srs to be updated
+       /**
+        * @brief Annotates an array in SciDB with a Spatial Reference
+	* 
+	* Performs a HTTP request to set the spatial reference system of an array in SciDB.
+	* 
+        * @param array metadata representation of an SciDBSpatialArray including its srs to be updated
         * @return scidb4gdal::StatusCode
         */
         StatusCode updateSRS ( SciDBSpatialArray &array );
@@ -250,8 +292,11 @@ namespace scidb4gdal
 
 
         /**
-        * Removes an existing array
-        * @param inArrayName string name of an existing array
+        * @brief Removes an existing array in SciDB
+	* 
+	* Performs HTTP requests to delete an array in SciDB given the array name.
+	* 
+        * @param inArrayName the name of an existing array
         * @return scidb4gdal::StatusCode
         */
         StatusCode removeArray ( const string &inArrayName );
@@ -271,7 +316,11 @@ namespace scidb4gdal
 
 
 	/**
-	 * This function feeds an SciDB array with some meta data.
+	 * @brief Adds metadata on an array in SciDB
+	 * 
+	 * This function feeds an SciDB array with some meta data. During the process it will
+	 * perform several HTTP requests to store all metadata that is stored in the map.
+	 * 
 	 * @param arrayname The name of the array for which the metadata is stored
 	 * @param kv A map structure with key-value pairs as strings.
 	 * @param domain The domain under which the metadata is stored.
@@ -280,7 +329,10 @@ namespace scidb4gdal
         StatusCode setArrayMD ( string arrayname, map<string, string> kv, string domain = "" );
 
 	/**
+	 * @brief Fetches metadata of an array from the SciDB database
+	 * 
 	 * This function retrieves metadata of an SciDB array.
+	 * 
 	 * @param kv A reference to a map structure for key-value pairs as strings.
 	 * @param arrayname The name of the array from which the metadata is loaded.
 	 * @param domain The domain from which the metadata is loaded.
@@ -289,6 +341,8 @@ namespace scidb4gdal
         StatusCode getArrayMD ( map<string, string> &kv, string arrayname, string domain = "" );
 
 	/**
+	 * @brief Adds metadata on an attribute of an array in SciDB
+	 * 
 	 * Transfers and stores metadata of an attribute (e.g. NA values) for a SciDB array.
 	 * 
 	 * @param arrayname The name of the array for which the metadata is stored
@@ -300,7 +354,9 @@ namespace scidb4gdal
         StatusCode setAttributeMD ( string arrayname, string attribute, map<string, string> kv, string domain = "" );
 
 	/**
-	 * Fetches the metadata stored for an attribute of an SciDB array.
+	 * @brief Fetches the metadata stored for an attribute of an SciDB array.
+	 * 
+	 * This function retreives metadata for an attribute of an array in SciDB.
 	 * 
 	 * @param kv A reference to a map structure in which the result is stored as string key-value pairs. 
 	 * @param arrayname The name of the array from which the metadata is loaded
@@ -311,6 +367,8 @@ namespace scidb4gdal
         StatusCode getAttributeMD ( map<string, string> &kv, string arrayname, string attribute,  string domain = "" );
 	
 	/**
+	 * @brief Setter for create options.
+	 * 
 	 * This function sets the create parameter obtained from the create options or the properties string to SHIM client.
 	 * 
 	 * @param par The create parameters
@@ -359,7 +417,7 @@ namespace scidb4gdal
 	 * needs a pointer for a parameter.
 	 * 
 	 * @param name The name of the array.
-	 * @param array A pointer to SciDB structure
+	 * @param array A pointer to SciDB structure that will be modified during the process
 	 * @return scidb4gdal::StatusCode of the operation.
 	 */
 	StatusCode getType(const string &name, SciDBSpatialArray *&array);
@@ -367,37 +425,53 @@ namespace scidb4gdal
     protected:
 
         /**
-        * Gets metadata of an array's attributes
+        * @brief Fetches all attribute metadata of an array in SciDB
+	* 
+	* Performs HTTP queries to query and retrieve all metadata of the attributes of an array
+	* in SciDB.
+	* 
         * @param inArrayName name of existing array
-        * @param out list of SciDBAtribute descriptors
-        * @return status code
+        * @param out list of SciDBAtribute descriptors (out)
+        * @return scidb4gdal::StausCode
         * @see SciDBAttribute
         */
         StatusCode getAttributeDesc ( const string &inArrayName, vector<SciDBAttribute> &out );
 
         /**
-        * Gets metadata of an array's dimensions
+        * @brief Fetches all dimension metadata of an array in SciDB
+	* 
+	* Performs HTTP queries to query and retrieve all the metadata for dimensions of an array
+	* in SciDB.
+	* 
         * @param inArrayName name of existing array
         * @param out list of SciDBDimension descriptors
-        * @return status code
+        * @return scidb4gdal::StausCode
         * @see SciDBDimension
         */
         StatusCode getDimensionDesc ( const string &inArrayName, vector<SciDBDimension> &out );
 
         /**
-        * Gets metadata of an array's spatial reference if available. Otherwise, result contains default values representing no reference.
+        * @brief Fetches the spatial reference metadata of an array in SciDB
+	* 
+	* Performs HTTP queries to query and retrieve metadata of an array's spatial reference if available. 
+	* Otherwise, result contains default values representing no reference.
+	* 
         * @param inArrayName name of existing array
-        * @param out Spatial reference description
+        * @param out Spatial reference description (output)
         * @return scidb4gdal::StatusCode
         * @see scidb4gdal::SciDBSpatialReference
         */
         StatusCode getSRSDesc ( const string &inArrayName, SciDBSpatialReference &out );
 	
 	/**
-        * Gets metadata of an array's temporal reference if available. Otherwise, result contains default values representing no reference.
+        * @brief Fetches the temporal reference metadata of an array in SciDB
+	* 
+	* Performs HTTP queries to query and retrieve metadata of an array's temporal reference if available. 
+	* Otherwise, result contains default values representing no reference.
+	* 
         * @param inArrayName name of existing array
-        * @param out temporal reference description
-        * @return status code
+        * @param out temporal reference description (output)
+        * @return scidb4gdal::StausCode
         * @see scidb4gdal::SciDBSTemporalReference
         */
 	StatusCode getTRSDesc (const string &inArrayName, SciDBTemporalReference &out);

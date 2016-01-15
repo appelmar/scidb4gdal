@@ -37,16 +37,29 @@ SOFTWARE.
 namespace scidb4gdal
 {
     using namespace std;
-
+    
+    /**
+     * @brief An array tile that is used to represent data of one chunk in SciDB
+     * 
+     * The Array Tile will hold the data of a chunk as well as the size of the held data and the id of the tile
+     * if refers to.
+     */
     struct ArrayTile {
+	/** @brief Basic constructor */
         ArrayTile() : data ( 0 ), size ( 0 ), id ( 0 ) {}
+        /** the data */
         void *data;
+	/** the size of the data in memory */
         size_t size;
-        uint32_t id; // unique chunk id
+	/** the id of tile / chunk */ 
+        uint32_t id;
     };
 
     /**
-     * This class caches tiles read from SciDB by gdal locally in order to make writing SciDB arrays to line- or stripe-oriented image formats more efficient.
+     * @brief A cache for various chunks of an SciDB array.
+     * 
+     * This class caches tiles that were read from SciDB by gdal locally. Because some formats that are line- or stripe oriented require to read a whole line
+     * in order to run efficiently.
      */
     class TileCache
     {
@@ -54,18 +67,18 @@ namespace scidb4gdal
     public:
 
         /**
-         * Default constructor
+         * @brief Default constructor
          */
         TileCache();
 
         /**
-         * Default  desctuctor gracefully releases memory
+         * @brief Default destructor gracefully releases memory
          */
         ~TileCache();
 
 
         /**
-         * Checks whether a tile with given id is already cached
+         * @brief Checks whether a tile with given id is already cached
          * @param id unique tile id
          * @return true if tile is in cached
          */
@@ -73,34 +86,41 @@ namespace scidb4gdal
 
 
         /**
-         * Removes a tile with given id from cache
+	 * @brief Removes a tile with given id from cache
          * @param id unique tile id
          */
         void remove ( uint32_t id );
 
         /**
-         * Adds a given tile to the cache
+         * @brief add a tile to the cache
          * @param c the tile to be cached including its data pointer, size in bytes, and unique id
          */
         void add ( ArrayTile c );
 
 
         /**
-         * Fetches a tile with given id from the cache
+         * @brief Fetches a tile with given id from the cache
          * @param id unique tile id
          * @return Pointer to the requested tile including its data pointer, size in bytes, and unique id or null pointer if tile is not in cache
          */
         ArrayTile *get ( uint32_t id );
 
         /**
-         * Clears the cache, i.e. removes all elements and frees memory
+         * @brief Clears the cache
+	 * 
+	 * Clears the cache by removing all tiles and freeing the memory
+	 * 
+	 * @return void
          */
         void clear();
 
 
 
         /**
-         * Function for computing unique tile ids for two-dimensional multiband images
+         * @brief calculates unique tile id
+	 * 
+	 * Function for computing unique tile ids for two-dimensional multiband images
+	 * 
          * @param bx specific tile index in x direction
          * @param by specific tile index in y direction
          * @param by specific band index
@@ -114,7 +134,8 @@ namespace scidb4gdal
         }
 
         /**
-        * Computes the available memory in bytes
+	 * @brief Computes the available memory in bytes
+	 * @return size_t remaining size
          */
         inline size_t freeSpace() {
             return _maxSize - _totalSize;
@@ -123,15 +144,15 @@ namespace scidb4gdal
 
 
     private:
-
+	/** the total size of the cached image */
         size_t _totalSize;
+	/** the maximum size that is reserved */
         size_t _maxSize;
+	/** a look up table to relate unique ids and the array tile that is referred to */
         map<uint32_t, ArrayTile> _cache; // TODO: unordered_map would be more efficient but C++11
-        list<uint32_t> _q; // order of insertions for removing oldes first
-
+        /** order of insertions for removing oldes first */
+        list<uint32_t> _q; 
     };
-
-
 };
 
 
