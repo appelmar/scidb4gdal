@@ -106,32 +106,47 @@ namespace scidb4gdal
 	ERR_READ_BBOX_SRS_MISSING	= 100 + 4,
 	/** Error code for a unspecified */
         ERR_READ_UNKNOWN                    = 100 + 99,
-
+	/** Error while creating a new SciDB Array, because the array already exists in SciDB */
         ERR_CREATE_ARRAYEXISTS              = 200 + 1,
+	/** Error while creating a new SciDB Array, because the dimensions are either assigned wrong or there are some missing */
         ERR_CREATE_WRONGDIMENSIONALITY      = 200 + 2,
+	/** Error while creating due to an incorrect array name. */
         ERR_CREATE_INVALIDARRAYNAME         = 200 + 3,
+	/** Error while creating a new array with a failing auto clean up procedure. Leaving the data base administrator with the task to clean up manually. */
 	ERR_CREATE_AUTOCLEANUPFAILED 		= 200 + 4,
+	/** Error while creating a new array, but the auto cleanup has succeeded */
 	ERR_CREATE_AUTOCLEANUPSUCCESS		= 200 + 5,
+	/** Error while creating based on a request cancelation by the user */
 	ERR_CREATE_TERMINATEDBYUSER		= 200 + 6,
+	/** Error while creating a temporary array. */
 	ERR_CREATE_TEMPARRAY			= 200 + 7,
+	/** Error while creating when there is no array stated */
 	ERR_CREATE_NOARRAY			= 200+8,
+	/** Error while creating when an array is not compatible to being inserted into another array */
 	ERR_CREATE_ARRAY_NOT_INSERTABLE		= 200 + 9,
+	/** Default error while creating an array */
         ERR_CREATE_UNKNOWN                  = 200 + 99,
-
+	/** Error that is thrown when the connection to the SHIM client cannot be established */
         ERR_GLOBAL_CANNOTCONNECT            = 300 + 1,
+	/** Error when an array name cannot be found in the database during the connection step */
         ERR_GLOBAL_INVALIDARRAYNAME         = 300 + 2,
+	/** Error when the data type does not match */
         ERR_GLOBAL_DATATYPEMISMATCH         = 300 + 3,
+	/** Error thrown if the connection string is invalid. */
         ERR_GLOBAL_INVALIDCONNECTIONSTRING  = 300 + 4,
+	/** Error while parsing information from the user input */
 	ERR_GLOBAL_PARSE			= 300 +5,
+	/** Error stating that no spatial or temporal queries can be executed in SciDB */
 	ERR_GLOBAL_NO_SCIDB4GEO			= 300 +6,
-
+	/** Default error if something went wrong */
         ERR_GLOBAL_UNKNOWN                  = 300 + 99,
-
-
+	/** Error when no spatial reference can be found for a bounding box */
         ERR_SRS_NOSPATIALREFFOUND           = 400 + 1,
+	/** Error when a eo_getsrs cannot be executed with assumption the scidb4geo package missing in SciDB */
         ERR_SRS_NOSCIDB4GEO                 = 400 + 2,
+	/** Error if the spatial reference is not valid */
 	ERR_SRS_INVALID			    = 400 + 3,
-	  
+	/** Error if the temporal reference is incorrect */
 	ERR_TRS_INVALID		            = 500 + 1
 	
         

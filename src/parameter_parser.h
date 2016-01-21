@@ -205,7 +205,7 @@ namespace scidb4gdal
 	/**
 	 * the resolver to get the internal enum for connection parameter
 	 */
-	Resolver<ConStringParameter> _conKeyResolver; 
+	Resolver<ConnectionStringKey> _conKeyResolver; 
 	/**
 	 * resolver to get internal enums for query or creation parameter
 	 */

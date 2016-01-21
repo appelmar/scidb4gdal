@@ -40,7 +40,7 @@ namespace scidb4geo
      * This enumeration refers to the infered temporal resolution that is based on the
      * temporal interval.
      */
-    enum class TResolution {
+    enum TResolution {
       /** no temporal resoultion */
       NONE, 
       /** temporal resoultion of one year */

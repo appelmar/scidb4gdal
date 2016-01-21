@@ -269,7 +269,7 @@ namespace scidb4gdal
     
     void ParameterParser::assignConectionParameter(string key, string value)
     {
-	ConStringParameter enumKey = _conKeyResolver.getKey(key);
+	ConnectionStringKey enumKey = _conKeyResolver.getKey(key);
       	  switch(enumKey) {
 	    case HOST:
 	      _con->host = value;

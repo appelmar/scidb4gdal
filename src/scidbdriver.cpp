@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 -----------------------------------------------------------------------------*/
 
+
 #include "scidbdriver.h"
 #include "shimclient.h"
 #include "utils.h"
@@ -674,7 +675,7 @@ namespace scidb4gdal
 	  Utils::debug("-- DONE");
 	  
 	  Utils::debug("** Check validity of connection parameters and set options for SHIM client **");
-	    if ( !con_pars->isComplete()) {
+	    if ( !con_pars->isValid()) {
 	      throw con_pars->error_code;
 	    } else {
 	      Utils::debug ( "Using connection parameters: " + con_pars->toString() );
@@ -874,8 +875,9 @@ namespace scidb4gdal
 
 		  // set attribute data for each band
 		  for ( int i = 0; i < nBands; ++i ) {
-		      for ( DomainMD::iterator it = src_array->attrs[i].md.begin(); it != src_array->attrs[i].md.end(); ++it ) {
-			  client->setAttributeMD ( src_array->name, src_array->attrs[i].name, it->second, it->first );
+		      SciDBAttribute attr = src_array->attrs[i];
+		      for ( DomainMD::iterator it = attr.md.begin(); it != attr.md.end(); ++it ) {
+			  client->setAttributeMD ( src_array->name, attr.name, it->second, it->first );
 		      }
 		  }
 	      }
@@ -885,6 +887,11 @@ namespace scidb4gdal
 	  } 
 	  else { //new target array case
 	    //update spatial (and temporal) reference for temp source
+	    if (src_array == NULL) {
+	      throw ERR_CREATE_NOARRAY;
+	      return NULL;
+	      
+	    }
 	    src_array->name = insertableTempName;
 	    client->updateSRS ( *src_array );
 	    if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {
@@ -987,6 +994,9 @@ namespace scidb4gdal
 	      case ERR_CREATE_ARRAYEXISTS:
 		Utils::error("The array shall not be overwriten. Please delete the array or rename it first and then run the command again.");
 		break;
+	      case ERR_CREATE_NOARRAY:
+		Utils::error("Could not create an internal representation for the temporary array.");
+		break;
 	      default:
 		Utils::error("Uncaught error: "+boost::lexical_cast<string>(e));
 		break;
@@ -1008,7 +1018,7 @@ namespace scidb4gdal
 	Utils::debug(c.toString());
 	
 	
-	if (c.isComplete()) {
+	if (c.isValid()) {
 	  ShimClient client = ShimClient(&c);
 	  client.removeArray(c.arrayname);
 	}
@@ -1052,7 +1062,7 @@ namespace scidb4gdal
 	  con_pars = &pp.getConnectionParameters();
 	    
 	  // 2. Check validity of connection parameters
-	  if ( !con_pars->isComplete()) {
+	  if ( !con_pars->isValid()) {
 	    throw con_pars->error_code;
 	  } else {
 	    Utils::debug ( "Using connection parameters: " + con_pars->toString() );
