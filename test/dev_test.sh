@@ -15,7 +15,7 @@ fi
 #passwd="scidb"
 #host="https://localhost"
 #port=31000
-
+srs="EPSG:26716"
 
 
 #scidb array names
@@ -37,6 +37,8 @@ outputSTS1="./test_sts_index.tif"
 outputSTS2="./test_sts_timestamp.tif"
 outputSMetaNA="./test_s_meta_na.tif"
 outputSCov="./test_s_cov.tif"
+outputSTSCov1="./test_sts_cov1.tif"
+outputSTSCov2="./test_sts_cov2.tif"
 
 #create a log file
 log="./test.log"
