@@ -68,16 +68,6 @@ namespace scidb4gdal {
    */
   struct Parameters {
     
-    /**
-     * @brief function to validate the parameter for correctness
-     * 
-     * Returns a boolean to state whether or not the Pameters are correct and complete.
-     * 
-     * @return bool
-     */
-    virtual bool isValid() {
-      return true;
-    };
   };
   
   /**
@@ -191,9 +181,6 @@ namespace scidb4gdal {
       return s.str();
     };
     
-    /**
-     * @copydoc
-     */
     bool isValid() {
       bool valid = true;
       if (arrayname == "" || host == "") {

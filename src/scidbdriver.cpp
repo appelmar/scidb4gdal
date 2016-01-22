@@ -698,7 +698,7 @@ namespace scidb4gdal
 	  
 	  if (exists && create_pars->hasBBOX) {
 	    //currently we only support the fresh creation of a coverage by stating a bounding box
-	    Utils::debug("Currently the operation to overwrite an existing image with a bounding box statement is not allowed.");
+	    Utils::error("Currently the operation to overwrite an existing image with a bounding box statement is not allowed.");
 	    throw ERR_CREATE_ARRAYEXISTS;
 	  }
 	  
@@ -846,7 +846,6 @@ namespace scidb4gdal
 	  Utils::debug("** Upload the source image into the temporary array **");
 	  uploadImageIntoTempArray(client, *src_array, poSrcDS,pfnProgress, pProgressData);
 	  Utils::debug("-- DONE");
-	  
 
 	  
 	  if (src_array == tar_arr) {
@@ -887,11 +886,6 @@ namespace scidb4gdal
 	  } 
 	  else { //new target array case
 	    //update spatial (and temporal) reference for temp source
-	    if (src_array == NULL) {
-	      throw ERR_CREATE_NOARRAY;
-	      return NULL;
-	      
-	    }
 	    src_array->name = insertableTempName;
 	    client->updateSRS ( *src_array );
 	    if (create_pars->type == ST_ARRAY || create_pars->type == ST_SERIES) {

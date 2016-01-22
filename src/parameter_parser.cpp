@@ -37,7 +37,7 @@ namespace scidb4gdal
       if (!init()) {
 	throw ERR_GLOBAL_PARSE;
       }  
-      
+
     }
     
     void ParameterParser::parseConnectionString () {
