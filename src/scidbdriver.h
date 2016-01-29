@@ -300,9 +300,6 @@ namespace scidb4gdal
 	
 	/** @copydoc GDALPamRasterBand::GetUnitType */
 	virtual const char *GetUnitType ();
-
-	static void loadParsFromEnv (ConnectionPars* con);
-
     };
 }
 

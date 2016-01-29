@@ -31,6 +31,16 @@ fi
 #port=31000
 srs="EPSG:26716"
 
+## uncomment the following to test the setting of global environment variables. make sure the data is correct.
+# SCIDB4GDAL_USER="scidb"
+# SCIDB4GDAL_PASSWD="scidb"
+# SCIDB4GDAL_HOST="https://localhost"
+# SCIDB4GDAL_PORT=31000
+# export SCIDB4GDAL_USER
+# export SCIDB4GDAL_PASSWD
+# export SCIDB4GDAL_HOST
+# export SCIDB4GDAL_PORT
+
 
 #scidb array names
 targetArray=test_chicago_s
@@ -39,6 +49,7 @@ targetArraySTS=test_chicago_sts
 targetArrayMetaNA=test_chicago_s_meta_na
 targetArraySCov=test_chicago_s_cov
 targetArraySTSCov=test_chicago_sts_cov
+targetArrayConEnv=test_chicago_con_env
 
 #output file names
 rm -f ./test_*.tif
@@ -148,6 +159,9 @@ time {
   echo gdalmanage delete \"SCIDB:array=${targetArray} host=${host} port=${port} user=${user} password=${passwd}\"
   gdalmanage delete "SCIDB:array=${targetArray} host=${host} port=${port} user=${user} password=${passwd}"
   echo ""
+  echo gdalmanage delete \"SCIDB:array=${targetArrayConEnv} host=${host} port=${port} user=${user} password=${passwd}\"
+  gdalmanage delete "SCIDB:array=${targetArrayConEnv} host=${host} port=${port} user=${user} password=${passwd}"
+  echo ""
   echo gdalmanage delete \"SCIDB:array=${targetArrayST} host=${host} port=${port} user=${user} password=${passwd}\"
   gdalmanage delete "SCIDB:array=${targetArrayST} host=${host} port=${port} user=${user} password=${passwd}"
   echo ""
@@ -186,6 +200,15 @@ time {
   echo "****** translate an image into a purely spatial array in scidb using create options, test for storing meta data and na_value"
   echo gdal_translate --debug ON -co \"host=${host}\" -co \"port=${port}\" -co \"user=${user}\" -co \"password=${passwd}\" -co \"type=S\" -of SciDB ${chicago_na} \"SCIDB:array=${targetArrayMetaNA}\"
   gdal_translate --debug ON -co "host=${host}" -co "port=${port}" -co "user=${user}" -co "password=${passwd}" -co "type=S" -of SciDB "${chicago_na}" "SCIDB:array=${targetArrayMetaNA}"
+  check $?
+}
+echo ""
+
+TIMEFORMAT='Upload of spatial image using environment parameter took %R seconds to complete'
+time {
+  echo "****** translate an image into a purely spatial array in scidb using connection parameter as environment variables"
+  echo gdal_translate --debug ON -co \"type=S\" -of SciDB ${chicago} \"SCIDB:array=${targetArrayConEnv}\"
+  gdal_translate --debug ON -co "type=S" -of SciDB "${chicago}" "SCIDB:array=${targetArrayConEnv}"
   check $?
 }
 echo ""

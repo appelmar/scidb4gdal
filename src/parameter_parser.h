@@ -164,6 +164,17 @@ namespace scidb4gdal
 	 * @return void
 	 */
 	void parseArrayName ();
+	
+	/**
+	* @brief loads the connection string from environment parameters
+	* 
+	* If there are no connection parameter explicitly stated, then this function will try to read the connection
+	* parameter from the global environment parameter.
+	* 
+	* @param con The connection parameters, where the information shall be stored in (in/out)
+	* @return void
+	*/
+	static void loadParsFromEnv (ConnectionParameters* con);
       private:
 	/**
 	 * pointer to the connection parameters

@@ -142,6 +142,29 @@ namespace scidb4gdal
       }
     }
     
+    void ParameterParser::loadParsFromEnv (ConnectionParameters* con) {
+      
+      char *x;
+      
+      x = std::getenv("SCIDB4GDAL_HOST");
+      if (x != NULL) {
+	con->host = x;
+	con->ssl = (con->host.substr ( 0, 5 ).compare ( "https" ) == 0 );
+      }
+    
+      x = std::getenv("SCIDB4GDAL_PASSWD");
+      if (x != NULL) con->passwd = x;
+    
+    
+      x = std::getenv("SCIDB4GDAL_USER");
+      if (x != NULL) con->user = x;
+    
+      x = std::getenv("SCIDB4GDAL_PORT");
+      if (x != NULL) con->port = boost::lexical_cast<int>(x);
+      
+     
+    }    
+    
     void ParameterParser::parseArrayName() {
       // 	  string array = pars->arrayname;
       size_t length = _con->arrayname.size();
@@ -224,6 +247,7 @@ namespace scidb4gdal
     void ParameterParser::validate(){
 	if ( _scidb_filename == "" || _scidb_filename.substr ( 0, 6 ).compare ( "SCIDB:" ) != 0 ) {
 	  _isValid = false;
+	  _con->error_code = ERR_GLOBAL_INVALIDCONNECTIONSTRING;
 	  return;
 	}
 	
@@ -252,6 +276,14 @@ namespace scidb4gdal
       
       //first extract information from connection string and afterwards check for the opening options and overwrite values if double
       parseConnectionString();
+      
+      //TODO check if connection parameter are set. if not then try to parse parameter from global environment
+      if (!_con->isValid()) {
+	loadParsFromEnv(_con);
+      }
+      if (!_con->isValid()) {
+	throw ERR_GLOBAL_INVALIDCONNECTIONSTRING;
+      }
       
       if (_operation == SCIDB_OPEN) {
 	parseOpeningOptions();

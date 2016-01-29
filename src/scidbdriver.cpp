@@ -428,16 +428,20 @@ namespace scidb4gdal
 
 	      array.srtext = wkt;
 	      OGRSpatialReference srs ( wkt.c_str() );
-	      srs.AutoIdentifyEPSG();
-	      array.auth_name = srs.GetAuthorityName ( NULL );
-	      array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
-	      char *proj4;
-	      srs.exportToProj4 ( &proj4 );
-	      array.proj4text.assign ( proj4 );
-	      CPLFree ( proj4 );
+	      if (srs.AutoIdentifyEPSG() ==  OGRERR_UNSUPPORTED_SRS) {
+		Utils::warn("Unsupported spatial reference system, ignoring spatial reference.");
+	      }
+	      else {
+		array.auth_name = srs.GetAuthorityName ( NULL );
+		array.auth_srid = boost::lexical_cast<uint32_t> ( srs.GetAuthorityCode ( NULL ) );
+		char *proj4;
+		srs.exportToProj4 ( &proj4 );
+		array.proj4text.assign ( proj4 );
+		CPLFree ( proj4 );
 
-	      array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
-	      array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
+		array.xdim = SCIDB4GDAL_DEFAULT_XDIMNAME;
+		array.ydim = SCIDB4GDAL_DEFAULT_YDIMNAME;
+	      }
 	  }
 
 
@@ -659,7 +663,6 @@ namespace scidb4gdal
 	
 	string connstr = pszFilename;
 	ConnectionParameters *con_pars;
-//	loadParsFromEnv(con_pars);
 	CreationParameters *create_pars;
 	ParameterParser *pp;
 	ShimClient *client;
@@ -885,6 +888,7 @@ namespace scidb4gdal
 		      }
 		  }
 	      }
+	      
 	    } else {
 		throw persist_res;
 	    }
@@ -995,6 +999,9 @@ namespace scidb4gdal
 		break;
 	      case ERR_CREATE_NOARRAY:
 		Utils::error("Could not create an internal representation for the temporary array.");
+		break;
+	      case ERR_GLOBAL_INVALIDCONNECTIONSTRING:
+		Utils::error("The connection parameters are invalid. Please make sure to state the parameters either as opening or create options, as connection string in the file name or as environment parameter.");
 		break;
 	      default:
 		Utils::error("Uncaught error: "+boost::lexical_cast<string>(e));
@@ -1144,28 +1151,5 @@ namespace scidb4gdal
 	}
     }    
     
-    
-    void SciDBDataset::loadParsFromEnv (ConnectionPars* con) {
-      
-      char *x;
-      
-      x = std::getenv("SCIDB4GDAL_HOST");
-      if (x != NULL) {
-	con->host = x;
-	con->ssl = (con->host.substr ( 0, 5 ).compare ( "https" ) == 0 );
-      }
-    
-      x = std::getenv("SCIDB4GDAL_PASSWD");
-      if (x != NULL) con->passwd = x;
-    
-    
-      x = std::getenv("SCIDB4GDAL_USER");
-      if (x != NULL) con->user = x;
-    
-      x = std::getenv("SCIDB4GDAL_PORT");
-      if (x != NULL) con->port = boost::lexical_cast<int>(x);
-      
-     
-    }    
-    
+
 }

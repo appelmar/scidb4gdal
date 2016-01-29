@@ -260,10 +260,11 @@ namespace scidb4gdal
 	 */
 	bool validateTimestampString(string &in);
 	
-	
-	
 	/**
-	 *  Converts key value metadata to a string
+	 * @brief Converts key value metadata to a string
+	 * 
+	 * @param kv map of strings that represent key-value pairs
+	 * @return std::string The merged string of all key-value entries
 	 */
 	std::string mdMapToString(std::map< string, string > &kv); 
 	
