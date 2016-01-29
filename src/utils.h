@@ -260,6 +260,13 @@ namespace scidb4gdal
 	 */
 	bool validateTimestampString(string &in);
 	
+	
+	
+	/**
+	 *  Converts key value metadata to a string
+	 */
+	std::string mdMapToString(std::map< string, string > &kv); 
+	
 
     }
 

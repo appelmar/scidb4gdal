@@ -248,8 +248,14 @@ namespace scidb4gdal
 
 
 
-
-
-
+      std::string mdMapToString(std::map< string, string > &kv) {
+	map<string, string>::iterator it;
+        stringstream result; 
+       
+        for (it = kv.begin(); it != kv.end(); ++it) {
+           result << it->first << "=" << it->second << "  ";
+        }
+        return result.str();
+      }
     }
 }

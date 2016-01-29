@@ -303,11 +303,13 @@ namespace scidb4gdal
 
     char **SciDBDataset::mapToGdalMD ( map< string, string > &kv )
     {
-        CPLStringList out;
-        for ( map<string, string>::iterator it = kv.begin(); it != kv.end(); ++it ) {
-            out.AddNameValue ( it->first.c_str(), it->second.c_str() );
+        CPLStringList* out = new CPLStringList();
+	for ( map<string, string>::iterator it = kv.begin(); it != kv.end(); ++it ) {
+	  const char* k = it->first.c_str();
+	  const char* v = it->second.c_str();
+	  out->AddNameValue ( k, v );
         }
-        return out.List();
+        return out->List();
     }
 
     SciDBDataset::~SciDBDataset()
@@ -344,9 +346,10 @@ namespace scidb4gdal
         if ( pszDomain == NULL ) {
             _client->getArrayMD ( kv, _array.name, "" );
         }
-        else {
-            _client->getArrayMD ( kv, _array.name, pszDomain );
-        }
+        // DOMAINS NOT YET IMPLEMENTED
+//         else {
+//             _client->getArrayMD ( kv, _array.name, pszDomain );
+//         }
         return mapToGdalMD ( kv );
     }
 
@@ -356,9 +359,10 @@ namespace scidb4gdal
         if ( pszDomain == NULL ) {
             _client->getArrayMD ( kv, _array.name, "" );
         }
-        else {
-            _client->getArrayMD ( kv, _array.name, pszDomain );
-        }
+         // DOMAINS NOT YET IMPLEMENTED
+//         else {
+//             _client->getArrayMD ( kv, _array.name, pszDomain );
+//         }
         if ( kv.find ( pszName ) == kv.end() ) return NULL;
         return kv.find ( pszName )->second.c_str();
 
@@ -655,6 +659,7 @@ namespace scidb4gdal
 	
 	string connstr = pszFilename;
 	ConnectionParameters *con_pars;
+//	loadParsFromEnv(con_pars);
 	CreationParameters *create_pars;
 	ParameterParser *pp;
 	ShimClient *client;
@@ -1135,9 +1140,32 @@ namespace scidb4gdal
 	      Utils::error ("No array name stated.");
 	      break;
 	  }
-	  
-	  return NULL;
+	  	  return NULL;
 	}
-    }
+    }    
+    
+    
+    void SciDBDataset::loadParsFromEnv (ConnectionPars* con) {
+      
+      char *x;
+      
+      x = std::getenv("SCIDB4GDAL_HOST");
+      if (x != NULL) {
+	con->host = x;
+	con->ssl = (con->host.substr ( 0, 5 ).compare ( "https" ) == 0 );
+      }
+    
+      x = std::getenv("SCIDB4GDAL_PASSWD");
+      if (x != NULL) con->passwd = x;
+    
+    
+      x = std::getenv("SCIDB4GDAL_USER");
+      if (x != NULL) con->user = x;
+    
+      x = std::getenv("SCIDB4GDAL_PORT");
+      if (x != NULL) con->port = boost::lexical_cast<int>(x);
+      
+     
+    }    
     
 }

@@ -346,7 +346,7 @@ namespace scidb4gdal
             curlEnd();
         }
 
-
+        
         // Parse CSV
         ss.str ( "" );
         vector<string> rows;
@@ -1560,7 +1560,6 @@ namespace scidb4gdal
 
     StatusCode  ShimClient::setArrayMD ( string arrayname, std::map< std::string, std::string > kv, string domain )
     {
-
         stringstream key_array_str;
         stringstream val_array_str;
 
@@ -1581,7 +1580,7 @@ namespace scidb4gdal
         stringstream ss, afl;
         afl << "eo_setmd(" << arrayname << ",'" << key_array_str.str() << "','" << val_array_str.str() << "')";
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape( _curl_handle, afl.str().c_str(), 0 );
         if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -1597,18 +1596,21 @@ namespace scidb4gdal
 
 
     StatusCode ShimClient::getArrayMD ( std::map< string, string > &kv, string arrayname, string domain )
-    {
+    { 
 
         int sessionID = newSession();
+	stringstream ss;
         string response;
         {
             curlBegin();
-            stringstream ss, afl;
+	    ss.str ( "" );
+            stringstream afl;
+	    afl.str("");
             afl << "project(filter(eo_getmd(" << arrayname << "),attribute='' and domain='" << domain << "'), key, value)";
 
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
-            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str()  << "&save=" << "csv";
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 )  << "&save=" << "csv";
             if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -1622,12 +1624,37 @@ namespace scidb4gdal
                 return ERR_READ_UNKNOWN;
             }
             curlEnd();
-
         }
+        
+        
+        /**
+	 * Read data from the request and save it at the variable "response"
+	 */
+        {
 
+            curlBegin();
+            ss.str ( "" );
+            // READ BYTES  ///////////////////////////
+            ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
 
+            response = "";
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+            if ( curlPerform() != CURLE_OK ) {
+                curlEnd();
+                Utils::error ( "Cannot get metadata for array '" + arrayname + "'." );
+                return ERR_READ_UNKNOWN;
+            }
+            curlEnd();
+        }
+        
+
+	
         // Parse CSV
-        stringstream ss;
+        ss.str("");
 
         vector<string> rows;
         boost::split ( rows, response, boost::is_any_of ( "\n" ) );
@@ -1678,7 +1705,7 @@ namespace scidb4gdal
         stringstream ss, afl;
         afl << "eo_setmd(" << arrayname << ",'" << attribute << "','" << key_array_str.str() << "','" << val_array_str.str() << "')";
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape( _curl_handle, afl.str().c_str(), 0 );
         if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -1695,15 +1722,16 @@ namespace scidb4gdal
     StatusCode ShimClient::getAttributeMD ( std::map< std::string, std::string > &kv, std::string arrayname, string attribute, std::string domain )
     {
         int sessionID = newSession();
+	stringstream ss;
         string response;
         {
             curlBegin();
-            stringstream ss, afl;
+            stringstream afl;
             afl << "project(filter(eo_getmd(" << arrayname << "),attribute='" << attribute << "' and domain='" << domain << "'), key, value)";
 
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
-            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str()  << "&save=" << "csv";
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 )  << "&save=" << "csv";
             if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
             curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
             curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
@@ -1720,9 +1748,35 @@ namespace scidb4gdal
 
         }
 
+        
+        /**
+	 * Read data from the request and save it at the variable "response"
+	 */
+        {
+
+            curlBegin();
+            ss.str ( "" );
+            // READ BYTES  ///////////////////////////
+            ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+
+            response = "";
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+            if ( curlPerform() != CURLE_OK ) {
+                curlEnd();
+                Utils::error ( "Cannot get metadata for array '" + arrayname + "'." );
+                return ERR_READ_UNKNOWN;
+            }
+            curlEnd();
+        }
+        
+        
 
         // Parse CSV
-        stringstream ss;
+        ss.str ( "" );
 
         vector<string> rows;
         boost::split ( rows, response, boost::is_any_of ( "\n" ) );
