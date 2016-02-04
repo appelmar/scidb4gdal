@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.6"/>
-<title>SciDB4GDAL: scidb4gdal::ParameterParser Class Reference</title>
+<title>SCIDB4GDAL: scidb4gdal::ParameterParser Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -29,7 +29,7 @@
  <tbody>
  <tr style="height: 56px;">
   <td style="padding-left: 0.5em;">
-   <div id="projectname">SciDB4GDAL
+   <div id="projectname">SCIDB4GDAL
    </div>
   </td>
  </tr>
@@ -105,6 +105,7 @@ $(document).ready(function(){initNavTree('classscidb4gdal_1_1_parameter_parser.h
   <div class="summary">
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pro-methods">Protected Member Functions</a> &#124;
+<a href="#pro-static-methods">Static Protected Member Functions</a> &#124;
 <a href="classscidb4gdal_1_1_parameter_parser-members.html">List of all members</a>  </div>
   <div class="headertitle">
 <div class="title">scidb4gdal::ParameterParser Class Reference</div>  </div>
@@ -160,6 +161,12 @@ Protected Member Functions</h2></td></tr>
 <tr class="memitem:a3999d1bfc9aa0a6ee66f68fa033bf18b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classscidb4gdal_1_1_parameter_parser.html#a3999d1bfc9aa0a6ee66f68fa033bf18b">parseArrayName</a> ()</td></tr>
 <tr class="memdesc:a3999d1bfc9aa0a6ee66f68fa033bf18b"><td class="mdescLeft">&#160;</td><td class="mdescRight">parses the array name for additional information  <a href="#a3999d1bfc9aa0a6ee66f68fa033bf18b">More...</a><br/></td></tr>
 <tr class="separator:a3999d1bfc9aa0a6ee66f68fa033bf18b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-static-methods"></a>
+Static Protected Member Functions</h2></td></tr>
+<tr class="memitem:a1a71363f854233aaf1679ad62427de1c"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classscidb4gdal_1_1_parameter_parser.html#a1a71363f854233aaf1679ad62427de1c">loadParsFromEnv</a> (<a class="el" href="structscidb4gdal_1_1_connection_parameters.html">ConnectionParameters</a> *con)</td></tr>
+<tr class="memdesc:a1a71363f854233aaf1679ad62427de1c"><td class="mdescLeft">&#160;</td><td class="mdescRight">loads the connection string from environment parameters  <a href="#a1a71363f854233aaf1679ad62427de1c">More...</a><br/></td></tr>
+<tr class="separator:a1a71363f854233aaf1679ad62427de1c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>parser for the user input </p>
@@ -305,6 +312,40 @@ Protected Member Functions</h2></td></tr>
 
 <p>checks whether the opening options or the connection string is complete </p>
 <dl class="section return"><dt>Returns</dt><dd>bool </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a1a71363f854233aaf1679ad62427de1c"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void scidb4gdal::ParameterParser::loadParsFromEnv </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structscidb4gdal_1_1_connection_parameters.html">ConnectionParameters</a> *&#160;</td>
+          <td class="paramname"><em>con</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span><span class="mlabel">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>loads the connection string from environment parameters </p>
+<p>If there are no connection parameter explicitly stated, then this function will try to read the connection parameter from the global environment parameter.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">con</td><td>The connection parameters, where the information shall be stored in (in/out) </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
 
 </div>
 </div>
@@ -503,7 +544,7 @@ Protected Member Functions</h2></td></tr>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>scidb4gdal</b></li><li class="navelem"><a class="el" href="classscidb4gdal_1_1_parameter_parser.html">ParameterParser</a></li>
-    <li class="footer">Generated on Fri Jan 22 2016 16:48:02 for SciDB4GDAL by
+    <li class="footer">Generated on Thu Feb 4 2016 18:04:32 for SCIDB4GDAL by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.6 </li>
   </ul>

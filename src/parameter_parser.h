@@ -11,7 +11,7 @@ namespace scidb4gdal
      * supported
      */
     enum SciDBOperation {
-	SCIDB_OPEN, SCIDB_CREATE
+	SCIDB_OPEN, SCIDB_CREATE, SCIDB_DELETE
     };
     
     template <typename T>

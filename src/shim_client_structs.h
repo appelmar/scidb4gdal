@@ -35,7 +35,9 @@ namespace scidb4gdal {
     /** the key for the users password */
     PASSWORD, 
     /** the key for using SSL encryption */
-    SSL
+    SSL,
+    /** the key to confirm the delete preocess */
+    CONFIRM_DELETE
   };
   
   /**
@@ -163,10 +165,13 @@ namespace scidb4gdal {
     /** error code if the connection parameters are invalid */
     int error_code;
     
+    /** Flag whether or not to delete the Array. This value is used to prevent QuietDelete() */
+    bool deleteArray;
+    
     /** 
      * Default constructor to create empty connection parameters
      */
-    ConnectionParameters() : arrayname ( "" ), host ( "" ), port ( 0 ), user ( "" ), passwd ( "" ) {}
+    ConnectionParameters() : arrayname ( "" ), host ( "" ), port ( 0 ), user ( "" ), passwd ( "" ), deleteArray (false) {}
 
     /**
      * @brief Represents the connection parameter in string form

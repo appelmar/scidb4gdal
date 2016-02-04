@@ -30,7 +30,7 @@ namespace scidb4gdal
       //set the resolver a.k.a the key value pairs in the connection / property string or the create / opening options
       _creationTypeResolver.mapping = map_list_of("S",S_ARRAY) ("ST",ST_ARRAY) ("STS",ST_SERIES);
       _propKeyResolver.mapping = map_list_of ("dt",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX) ("bbox",BBOX) ("srs",SRS);
-      _conKeyResolver.mapping = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL)("array",ARRAY);
+      _conKeyResolver.mapping = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL)("array",ARRAY)("confirmDelete",CONFIRM_DELETE);
       
       _scidb_filename = scidbFile;
       _options = optionKVP;
@@ -281,9 +281,9 @@ namespace scidb4gdal
       if (!_con->isValid()) {
 	loadParsFromEnv(_con);
       }
-      if (!_con->isValid()) {
-	throw ERR_GLOBAL_INVALIDCONNECTIONSTRING;
-      }
+//       if (!_con->isValid()) {
+// 	throw ERR_GLOBAL_INVALIDCONNECTIONSTRING;
+//       }
       
       if (_operation == SCIDB_OPEN) {
 	parseOpeningOptions();
@@ -321,6 +321,12 @@ namespace scidb4gdal
 	      break;
 	    case ARRAY:
 	      _con->arrayname = value;
+	      break;
+	    case CONFIRM_DELETE:
+	      boost::algorithm::to_lower<string>(value);
+	      if (strcmp(value.c_str(), "true") == 0 || strcmp(value.c_str(), "1") == 0 || strcmp(value.c_str(), "y") == 0 || strcmp(value.c_str(), "yes") == 0 || strcmp(value.c_str(), "t") == 0) {
+		_con->deleteArray = true;
+	      } 
 	      break;
 	    default:
 	      break;

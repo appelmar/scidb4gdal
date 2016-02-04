@@ -1019,14 +1019,17 @@ namespace scidb4gdal
 
     CPLErr SciDBDataset::Delete ( const char *pszName )
     {
-	ParameterParser p = ParameterParser(pszName, NULL);
-	ConnectionParameters c = p.getConnectionParameters();
-	Utils::debug(c.toString());
-	
-	
-	if (c.isValid()) {
-	  ShimClient client = ShimClient(&c);
-	  client.removeArray(c.arrayname);
+	try {
+	  ParameterParser p = ParameterParser(pszName, NULL, SCIDB_DELETE);
+	  ConnectionParameters c = p.getConnectionParameters();
+	  
+	  if (c.isValid() && c.deleteArray) {
+	    Utils::debug("Deleting array: "+c.arrayname);
+	    ShimClient client = ShimClient(&c);
+	    client.removeArray(c.arrayname);
+	  }
+	} catch (StatusCode e) {
+	  Utils::debug("Error while deleting. Cannot delete image. Continuing.");
 	}
 
         return CE_None;
