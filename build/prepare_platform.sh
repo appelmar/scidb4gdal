@@ -3,6 +3,7 @@
 # Must be executed from the repository root directory!
 
 # 1. install dependencies
+sudo apt-get update -qq
 sudo apt-get install  -y libboost-dev  libcurl4-openssl-dev
 
 # 2. download GDAL source code
