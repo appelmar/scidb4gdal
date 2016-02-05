@@ -59,19 +59,19 @@ namespace scidb4gdal
         curl_global_init ( CURL_GLOBAL_ALL );
     }
     
-//     ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false, SelectProperties *properties = NULL) : 
-//       _host ( host ), 
-//       _port ( port ), 
-//       _user ( user ), 
-//       _passwd ( passwd ), 
-//       _ssl ( ssl ),  
-//       _curl_handle ( 0 ), 
-//       _curl_initialized ( false ), 
-//       _auth ( "" ),
-//       _props(properties)
-//     {
-//         curl_global_init ( CURL_GLOBAL_ALL );
-//     }
+    ShimClient::ShimClient(ConnectionParameters* con)
+    {
+      _host = con->host; 
+      _port = con->port; 
+      _user = con->user; 
+      _passwd = con->passwd; 
+      _ssl = con->ssl;  
+      _curl_handle = 0; 
+      _curl_initialized = false; 
+      _auth = "";
+      curl_global_init ( CURL_GLOBAL_ALL );
+    }
+
     
     ShimClient::~ShimClient()
     {
@@ -80,13 +80,32 @@ namespace scidb4gdal
         _curl_handle = 0;
     }
 
-
+    /**
+     * Handles the cURL callback by creating a string from it.
+     */
+    static size_t responseToStringCallback ( void *ptr, size_t size, size_t count, void *stream )
+    {
+        ( ( string * ) stream )->append ( ( char * ) ptr, 0, size * count );
+        return size * count;
+    }
 
     static size_t responseSilentCallback ( void *ptr, size_t size, size_t count, void *stream )
     {
         return size * count;
     }
 
+    /**
+     * Callback function for receiving scidb binary data
+     */
+    static size_t responseBinaryCallback ( void *ptr, size_t size, size_t count, void *stream )
+    {
+        size_t realsize = size * count;
+        struct SingleAttributeChunk *mem = ( struct SingleAttributeChunk * ) stream;
+        memcpy ( & ( mem->memory[mem->size] ), ptr, realsize );
+        mem->size += realsize;
+        return realsize;
+    }
+    
     void ShimClient::curlBegin()
     {
         if ( _curl_initialized ) curlEnd();
@@ -110,8 +129,6 @@ namespace scidb4gdal
         curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseSilentCallback ); // default silent, otherwise weird number output on stdout
 #endif
     }
-
-
 
 
     void ShimClient::curlEnd()
@@ -140,27 +157,11 @@ namespace scidb4gdal
         }
         return res;
     }
-
-
-
-
-
-
-
-
-    static size_t responseToStringCallback ( void *ptr, size_t size, size_t count, void *stream )
-    {
-        ( ( string * ) stream )->append ( ( char * ) ptr, 0, size * count );
-        return size * count;
-    }
-
-
-
-
-
+    
     StatusCode ShimClient::testConnection()
     {
 
+      
         curlBegin();
 
         stringstream ss;
@@ -180,12 +181,6 @@ namespace scidb4gdal
 
         return SUCCESS;
     }
-
-
-
-
-
-
 
     int ShimClient::newSession()
     {
@@ -243,7 +238,6 @@ namespace scidb4gdal
 
     }
 
-
     void ShimClient::login()
     {
 
@@ -271,7 +265,6 @@ namespace scidb4gdal
         }
     }
 
-
     void ShimClient::logout()
     {
         curlBegin();
@@ -290,23 +283,14 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
-
     StatusCode  ShimClient::getAttributeDesc ( const string &inArrayName, vector< SciDBAttribute > &out )
     {
-
-
         out.clear();
-
 
         int sessionID = newSession();
 
         string response;
         stringstream ss;
-        // EXECUTE QUERY  /////
 
 	/*
 	 * Make a request to fetch the attributes of the data set
@@ -507,13 +491,6 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
-
-
-
     StatusCode ShimClient::getSRSDesc ( const string &inArrayName, SciDBSpatialReference &out )
     {
         int sessionID = newSession();
@@ -524,7 +501,7 @@ namespace scidb4gdal
             curlBegin();
             stringstream ss;
             stringstream afl;
-            afl << "project(st_getsrs(" << inArrayName << "),name,xdim,ydim,srtext,proj4text,A)";  // project(dimensions(chicago2),name,low,high,type)
+            afl << "project(st_getsrs(" << inArrayName << "),name,xdim,ydim,srtext,proj4text,A,auth_name,auth_srid)";  // project(dimensions(chicago2),name,low,high,type)
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "csv";
             if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
@@ -588,9 +565,11 @@ namespace scidb4gdal
                 }
             }
         }
+	//TODO epsg code is an integer and has no quotes (') handle it separately
+	//find last comma and create substring
+	cols.push_back ( row.substr ( row.find_last_of(',')+1, row.length()-1 ) );
 
-
-        if ( cols.size() != 6 ) {
+        if ( cols.size() != 8 ) {
             Utils::warn ( "Cannot extract SRS information from response: "  + response );
             return ERR_SRS_NOSPATIALREFFOUND;
 //             out.affineTransform = * ( new AffineTransform() );
@@ -603,6 +582,8 @@ namespace scidb4gdal
             out.srtext = cols[3];
             out.proj4text = cols[4];
             out.affineTransform = * ( new AffineTransform ( cols[5] ) ); // Should be released
+	    out.auth_name = cols[6];
+	    out.auth_srid = boost::lexical_cast<uint32_t>(cols[7]);
         }
 
         releaseSession ( sessionID );
@@ -695,7 +676,7 @@ namespace scidb4gdal
 
     }
 
-    StatusCode  ShimClient::getArrayDesc ( const string &inArrayName, SciDBSpatioTemporalArray &out )
+    StatusCode  ShimClient::getArrayDesc ( const string &inArrayName, SciDBSpatialArray *&out )
     {
         bool exists;
         arrayExists ( inArrayName, exists );
@@ -703,12 +684,15 @@ namespace scidb4gdal
             Utils::error ( "Array '" + inArrayName + "' does not exist in SciDB database" );
             return ERR_READ_ARRAYUNKNOWN;
         }
-
-
-        out.name = inArrayName;
+        
+	getType(inArrayName, out);
+	if (!out) {
+	  Utils::debug("No array was created");
+	}
+        out->name = inArrayName;
         // Get dimensions: project(dimensions(inArrayName),name,low,high,type)
         StatusCode res;
-        res = getDimensionDesc ( inArrayName, out.dims );
+        res = getDimensionDesc ( inArrayName, out->dims );
         if ( res != SUCCESS ) {
             Utils::error ( "Cannot extract array dimension metadata" );
             return res;
@@ -716,29 +700,31 @@ namespace scidb4gdal
 
 
         // Get attributes: project(attributes(inArrayName),name,type_id,nullable);
-        res = getAttributeDesc ( inArrayName, out.attrs );
+        res = getAttributeDesc ( inArrayName, out->attrs );
         if ( res != SUCCESS ) {
             Utils::error ( "Cannot extract array attribute metadata" );
             return res;
         }
 
-        SciDBSpatialReference srs;
-	SciDBTemporalReference trs;
 	/*
 	 * Make calls for metadata. First try to get the spatial reference system, then try to get the temporal rs
 	 */
-        getSRSDesc ( inArrayName, out );
-	getTRSDesc ( inArrayName, out );
-
-
+        getSRSDesc ( inArrayName, *out );
+	
+	SciDBSpatioTemporalArray* starr_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(out);
+	if (starr_ptr) {
+	  getTRSDesc ( inArrayName, *starr_ptr );
+	}
+	
+	//set the metadata
         MD m;
         getArrayMD ( m, inArrayName, "" );
-        out.md.insert ( pair < string, MD> ( "", m ) ); // TODO: Add domain
+        out->md.insert ( pair < string, MD> ( "", m ) ); // TODO: Add domain
 
-        for ( int i = 0; i < out.attrs.size(); ++i ) {
+        for ( size_t i = 0; i < out->attrs.size(); ++i ) {
             MD ma;
-            getAttributeMD ( ma, inArrayName, out.attrs[i].name, "" ); // TODO: Add domain
-            out.attrs[i].md.insert ( pair < string, MD> ( "", ma ) ); // TODO: Add domain
+            getAttributeMD ( ma, inArrayName, out->attrs[i].name, "" ); // TODO: Add domain
+            out->attrs[i].md.insert ( pair < string, MD> ( "", ma ) ); // TODO: Add domain
         }
 
 
@@ -746,37 +732,96 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
-
-
-
-    /**
-     * Callback function for receiving scidb binary data
-     */
-    static size_t responseBinaryCallback ( void *ptr, size_t size, size_t count, void *stream )
+    StatusCode ShimClient::getType(const string& name, SciDBSpatialArray *&array)
     {
-        size_t realsize = size * count;
-        struct SingleAttributeChunk *mem = ( struct SingleAttributeChunk * ) stream;
-        memcpy ( & ( mem->memory[mem->size] ), ptr, realsize );
-        mem->size += realsize;
-        return realsize;
+	int sessionID = newSession();
+        string response;
+
+
+        {
+            curlBegin();
+            stringstream ss;
+            stringstream afl;
+            afl << "eo_arrays()";
+            Utils::debug ( "Performing AFL Query: " +  afl.str() );
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "csv";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            response = "";
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+            if ( curlPerform() != CURLE_OK ) {
+                curlEnd();
+                Utils::warn ( "Cannot query for spatial or temporal annotated query. SCIDB4GEO module activated in SCIDB?" );
+                return ERR_GLOBAL_NO_SCIDB4GEO;
+            };
+            curlEnd();
+        }
+
+
+        {
+            curlBegin();
+            stringstream ss;
+            // READ BYTES  ////////////////////////////
+            ss.str ( "" );
+            ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+
+            response = "";
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback );
+            curl_easy_setopt ( _curl_handle, CURLOPT_WRITEDATA, &response );
+            if ( curlPerform() != CURLE_OK ) {
+                curlEnd();
+                return ERR_GLOBAL_UNKNOWN;
+            };
+            curlEnd();
+        }
+
+
+        // Parse CSV into string vector
+        vector<string> rows;
+        boost::split ( rows, response, boost::is_any_of ( "\n" ) );
+	
+	if (rows.size() > 2) {
+	  for ( vector<string>::iterator it = ++ ( rows.begin() ); it != rows.end(); ++it ) { // Find items between single quotes 'XXX', only works if all SciDB attributes of query result are strings
+	      vector<string> cols;
+	      boost::split ( cols, *it, boost::is_any_of ( "," ) );
+	      
+	      string n = cols[0].substr ( 1, cols[0].length() - 2 );
+	      if(n == name) {
+		string type = cols[1].substr ( 1, cols[1].length() - 2 );
+		if (type == "s") {
+		  array = new SciDBSpatialArray();
+		  break;
+		} else if (type == "st") {
+		  array = new SciDBSpatioTemporalArray();
+		  break;
+		} else {
+		  Utils::debug("Can't evaluate "+type);
+		  return ERR_GLOBAL_UNKNOWN;
+		}
+	      } else {
+		continue;
+	      }
+	  }
+	}
+
+        releaseSession ( sessionID );
+        return SUCCESS;
     }
 
-
-    StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, int32_t t_index, bool use_subarray, bool emptycheck)
-
+    StatusCode ShimClient::getData ( SciDBSpatialArray &array, uint8_t nband, void *outchunk, int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max, bool use_subarray, bool emptycheck)
     {	
-// 	std::stringstream sstm;
-// 	sstm << "Fire getData in SHIM client with the following image coordinates " << x_min << " " << y_min << " " << x_max << " " << y_max;
-// 	Utils::debug(sstm.str());
-	
-        if ( x_min < array.getXDim().low || x_min > array.getXDim().high ||
-                x_max < array.getXDim().low || x_max > array.getXDim().high ||
-                y_min < array.getYDim().low || y_min > array.getYDim().high ||
-                y_max < array.getYDim().low || y_max > array.getYDim().high ) {
+      
+	int t_index;
+        if ( x_min < array.getXDim()->low || x_min > array.getXDim()->high ||
+                x_max < array.getXDim()->low || x_max > array.getXDim()->high ||
+                y_min < array.getYDim()->low || y_min > array.getYDim()->high ||
+                y_max < array.getYDim()->low || y_max > array.getYDim()->high ) {
             Utils::error ( "Requested array subset is outside array boundaries" );
         }
 
@@ -789,8 +834,6 @@ namespace scidb4gdal
 
         stringstream ss;
         string response;
-        SciDBSpatialReference out;
-
 
 
         int sessionID = newSession();
@@ -806,14 +849,25 @@ namespace scidb4gdal
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID;
 	
 	stringstream tslice;
-	
-	if (t_index < 0) {
-	  tslice << array.name;
-	} else {
+	if (SciDBSpatioTemporalArray* starray = dynamic_cast<SciDBSpatioTemporalArray*>(&array)) {
 	  // if we have a temporal index, we need to slice the data set
-	  //TODO find the temporal dimension id by looking it up in the dimensions of the spatialArray
-	  tslice << "slice(" << array.name << ",t," << t_index << ")";
+	  if (_qp) {
+	    t_index = _qp->temp_index;
+	  } else if (_cp) {
+	    TPoint temp_point = TPoint(_cp->timestamp);
+	    t_index = starray->indexAtDatetime(temp_point);
+	  } else {
+	   //TODO throw error 
+	    t_index = 0;
+	    Utils::debug("Neither query nor creation parameter were found.");
+	  }
+	   
+	  tslice << "slice(" << array.name << ","+starray->tdim+"," << t_index << ")";
+	} else {
+	  //Utils::debug("Cast failed. Skipping the slicing.");
+	  tslice << array.name;
 	}
+	
 	string arr = tslice.str();
 	
         stringstream afl;
@@ -824,8 +878,8 @@ namespace scidb4gdal
                     afl << "(merge(";
                     afl << "project(subarray(" << arr << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
-                        << array.getYDim().name << "=" << 0  << ":" << y_max - y_min  << "," << array.getYDim().chunksize << "," << 0 << ","
-                        << array.getXDim().name << "=" << 0  << ":" << x_max - x_min  << "," << array.getXDim().chunksize << "," << 0 << "],"
+                        << array.getYDim()->name << "=" << 0  << ":" << y_max - y_min  << "," << array.getYDim()->chunksize << "," << 0 << ","
+                        << array.getXDim()->name << "=" << 0  << ":" << x_max - x_min  << "," << array.getXDim()->chunksize << "," << 0 << "],"
                         << Utils::defaultNoDataSciDB ( array.attrs[nband].typeId ) << ")))";
                 }
                 else {
@@ -839,8 +893,8 @@ namespace scidb4gdal
                     afl << "(merge(";
                     afl << "project(between(" << arr << "," << y_min << "," << x_min << "," << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
-                        << array.getYDim().name << "=" << array.getYDim().start  << ":" << array.getYDim().start + array.getYDim().length - 1 << "," << array.getYDim().chunksize << "," << 0 << ","
-                        << array.getXDim().name << "=" << array.getXDim().start  << ":" << array.getXDim().start + array.getXDim().length - 1 << "," << array.getXDim().chunksize << "," << 0 << "],"
+                        << array.getYDim()->name << "=" << array.getYDim()->start  << ":" << array.getYDim()->start + array.getYDim()->length - 1 << "," << array.getYDim()->chunksize << "," << 0 << ","
+                        << array.getXDim()->name << "=" << array.getXDim()->start  << ":" << array.getXDim()->start + array.getXDim()->length - 1 << "," << array.getXDim()->chunksize << "," << 0 << "],"
                         << 0 << ")," << y_min << "," << x_min << "," << y_max << "," << x_max << ")))";
                 }
 
@@ -861,8 +915,8 @@ namespace scidb4gdal
                     afl << "transpose(merge(";
                     afl << "project(subarray(" << arr << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
-                        << array.getXDim().name << "=" << 0  << ":" << x_max - x_min  << "," << array.getXDim().chunksize << "," << 0 << ","
-                        << array.getYDim().name << "=" << 0  << ":" << y_max - y_min  << "," << array.getYDim().chunksize << "," << 0 << "],"
+                        << array.getXDim()->name << "=" << 0  << ":" << x_max - x_min  << "," << array.getXDim()->chunksize << "," << 0 << ","
+                        << array.getYDim()->name << "=" << 0  << ":" << y_max - y_min  << "," << array.getYDim()->chunksize << "," << 0 << "],"
                         << Utils::defaultNoDataSciDB ( array.attrs[nband].typeId ) << ")))";
 
                 }
@@ -876,8 +930,8 @@ namespace scidb4gdal
                     afl << "transpose(merge(";
                     afl << "project(between(" << arr << "," << x_min << "," << y_min << "," << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":" << array.attrs[nband].typeId << "> ["
-                        << array.getXDim().name << "=" << array.getXDim().start  << ":" << array.getXDim().start + array.getXDim().length - 1 << "," << array.getXDim().chunksize << "," << 0 << ","
-                        << array.getYDim().name << "=" << array.getYDim().start  << ":" << array.getYDim().start + array.getYDim().length - 1 << "," << array.getYDim().chunksize << "," << 0 << "],"
+                        << array.getXDim()->name << "=" << array.getXDim()->start  << ":" << array.getXDim()->start + array.getXDim()->length - 1 << "," << array.getXDim()->chunksize << "," << 0 << ","
+                        << array.getYDim()->name << "=" << array.getYDim()->start  << ":" << array.getYDim()->start + array.getYDim()->length - 1 << "," << array.getYDim()->chunksize << "," << 0 << "],"
                         << 0 << ")," << x_min << "," << y_min << "," << x_max << "," << y_max << ")))";
                 }
                 else {
@@ -929,11 +983,8 @@ namespace scidb4gdal
         return SUCCESS;
     }
 
-
-
     StatusCode ShimClient::createTempArray ( SciDBSpatialArray &array )
     {
-
         if ( array.name == "" ) {
             Utils::error ( "Cannot create unnamed arrays" );
             return ERR_CREATE_INVALIDARRAYNAME;
@@ -942,13 +993,10 @@ namespace scidb4gdal
         bool exists;
         arrayExists ( array.name, exists );
         if ( exists ) {
+	  if (!(_cp->type == ST_SERIES || _cp->type == ST_ARRAY || _cp->type == S_ARRAY)) {
             Utils::error ( "Array '" + array.name + "' already exists in SciDB database" );
             return ERR_CREATE_ARRAYEXISTS;
-        }
-
-        if ( array.dims.size() != 2 ) {
-            Utils::error ( "Only two-dimensional arrays can be created currently" );
-            return ERR_CREATE_WRONGDIMENSIONALITY;
+	  }
         }
 
         if ( array.attrs.size() == 0 ) {
@@ -977,7 +1025,14 @@ namespace scidb4gdal
         //Append dimension spec
         afl << " [";
         for ( uint32_t i = 0; i < array.dims.size(); ++i ) {
-            afl << array.dims[i].name << "=" << array.dims[i].low << ":" << array.dims[i].high << "," << array.dims[i].chunksize << "," << 0 ; // TODO: Overlap
+	    string dimHigh = "";
+	    if (array.dims[i].high == INT64_MAX) {
+		dimHigh = "*";
+	    } else {
+	      dimHigh = boost::lexical_cast<string>(array.dims[i].high);
+	    }
+	    
+            afl << array.dims[i].name << "=" << array.dims[i].low << ":" << dimHigh << "," << array.dims[i].chunksize << "," << 0 ; // TODO: Overlap
             if (i != array.dims.size()-1) {
 	      afl << ", ";
 	    } else {
@@ -1013,65 +1068,125 @@ namespace scidb4gdal
         return SUCCESS;
 
     }
-
-
-
-    StatusCode ShimClient::copyArray ( string src, string dest )
+    
+    StatusCode ShimClient::persistArray(string srcArr, string tarArr)
     {
-        if ( dest == "" ) {
-            Utils::error ( "Cannot create unnamed arrays" );
-            return ERR_CREATE_INVALIDARRAYNAME;
-
-        }
-        bool exists;
-        arrayExists ( dest, exists );
-        if ( exists ) {
-            Utils::error ( "Target array '" + dest + "' already exists in SciDB database" );
-            return ERR_CREATE_ARRAYEXISTS;
-        }
-
-        arrayExists ( src, exists );
-        if ( !exists ) {
-            Utils::error ( "Source array '" + src + "' does not exist in SciDB database" );
-            return ERR_CREATE_ARRAYEXISTS;
-        }
+	  //create new array
+	  int sessionID = newSession();
 
 
-
-        int sessionID = newSession();
-
-
-        stringstream afl;
-        afl << "store(" << src << ", " << dest << ")";
-        Utils::debug ( "Performing AFL Query: " +  afl.str() );
+	  stringstream afl;
+	  afl << "store(" << srcArr << ", " << tarArr << ")";
+	  Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
 
-        curlBegin();
-        // EXECUTE QUERY  ////////////////////////////
-        stringstream ss;
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
-        if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
-        curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
-        curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
-        if ( curlPerform() != CURLE_OK ) {
-            curlEnd();
-            return ERR_GLOBAL_UNKNOWN;
-        }
-        curlEnd();
+	  curlBegin();
+	  // EXECUTE QUERY  ////////////////////////////
+	  stringstream ss;
+	  ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+	  if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+	  curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+	  curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+	  if ( curlPerform() != CURLE_OK ) {
+	      curlEnd();
+	      return ERR_GLOBAL_UNKNOWN;
+	  }
+	  curlEnd();
 
-        releaseSession ( sessionID );
+	  releaseSession ( sessionID );
+
+	  return SUCCESS;
+    }
+    
+    StatusCode ShimClient::insertInto(SciDBArray &srcArray, SciDBArray &destArray)
+    {
+      	  //create new array
+	  int sessionID = newSession();
+	  string collArr = destArray.name; //array name in which we want to store the data
+	  string tmpArr = srcArray.name; //array name with the source data
+	  
+	  stringstream castSchema;
+	  castSchema << "<";
+	  
+	  //attributes
+	  for ( uint32_t i = 0; i < srcArray.attrs.size(); i++ ) {
+	      string nullable = (srcArray.attrs[i].nullable) ? " NULL" : "";
+	      castSchema << srcArray.attrs[i].name << ":" << srcArray.attrs[i].typeId << "" << nullable << ",";
+	  }
+	  
+	  // special handling for the over attributes (over_x, over_y, over_t) -> rename them based on the stored names for dimensions in 
+	  // the destination array
+	  if ( SciDBSpatioTemporalArray* starray = dynamic_cast<SciDBSpatioTemporalArray*>(&destArray)) {
+	    castSchema << starray->getXDim()->name <<":int64 NULL, "<< starray->getYDim()->name <<":int64 NULL, "<< starray->getTDim()->name <<":int64 NULL>["; //target attibute names from (over_x, over_y, over_t)
+	  } else if (SciDBSpatialArray* sarray = dynamic_cast<SciDBSpatialArray*>(&destArray)) {
+	    //eo_over creates attributes over_x,over_y AND over_t every time
+	    castSchema << sarray->getXDim()->name <<":int64 NULL, "<< sarray->getYDim()->name <<":int64 NULL, t:int64 NULL>["; //target attibute names from (over_x, over_y, over_t)
+	  } else {
+	     Utils::debug("Cannot cast array to spatial or spatiotemporal. Using standard axis definitions.");
+	     castSchema << "x:int64 NULL, y:int64 NULL, t:int64 NULL>[";
+	  }
+	  
+	  // add dimension statement and rename it with src_{x|y|t}
+	  // [src_x=0:1000,512,0, ...] name=min:max,chunksize,overlap
+	  for ( uint32_t i = 0; i < srcArray.dims.size(); i++ ) {
+	      string dim_name = srcArray.dims[i].name;
+	      string dimHigh;
+	      if (srcArray.dims[i].high == INT64_MAX) {
+		  dimHigh = "*";
+	      } else {
+		  dimHigh = boost::lexical_cast<string>(srcArray.dims[i].high);
+	      }
+	      castSchema << "src_" << dim_name << "=" << srcArray.dims[i].low << ":" << dimHigh  << "," << srcArray.dims[i].chunksize << ",0" ; //TODO change statement for overlap
+	      
+	      if (i < srcArray.dims.size() - 1) {
+		castSchema << ", ";
+	      }
+	  }
+	  
+	  castSchema << "]";
+	  //the dimensions of the src array will be discarded later
+	  
+	  stringstream afl;
+	  //afl << "store(" << srcArr << ", " << tarArr << ")";
+	  //insert(redimension(cast(join(tmpArr, eo_over(tmpArr,collArr)),<>[]),collArr),collArr) *<>[] being the template
+	  string eo_over = "eo_over(" + tmpArr + "," + collArr + ")";
+	  string join = "join("+ tmpArr + ", "+ eo_over + ")";
+	  string cast = "cast("+ join + ", "+ castSchema.str() + ")";
+	  string redimension = "redimension("+ cast +","+ collArr +")";
+	  
+	  afl << "insert(" << redimension << ", " << collArr <<")";
+	  Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
 
-        return SUCCESS;
+	  curlBegin();
+	  // EXECUTE QUERY  ////////////////////////////
+	  stringstream ss;
+	  ss << _host << SHIMENDPOINT_EXECUTEQUERY  << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+	  if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+	  curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+	  curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+	  if ( curlPerform() != CURLE_OK ) {
+	      curlEnd();
+	      return ERR_GLOBAL_UNKNOWN;
+	  }
+	  curlEnd();
+
+	  releaseSession ( sessionID );
+
+	  return SUCCESS;
     }
 
-
-
-
-
-    // This is probably incomplete but should be enough for shim generated filenames on the server
+    /**
+     * @brief Checks for illegal chars for file name use. 
+     * 
+     * This function is used to check bad letters for creating an appropriate file name for the temporary SciDB array. Allowed chars are alpha numeric values
+     * and the following chars: '/', '_', '-' and '.'. All other chars are neglected.
+     * 
+     * @param c char value to be tested
+     */
     bool isIllegalFilenameCharacter ( char c )
     {
+	// This is probably incomplete but should be enough for shim generated filenames on the server
         return ! ( std::isalnum ( c ) || c == '/' || c == '_' || c == '-' || c == '.' );
     }
 
@@ -1160,7 +1275,7 @@ namespace scidb4gdal
             }
             afl << array.attrs[array.attrs.size() - 1].name << ": " << array.attrs[array.attrs.size() - 1].typeId << ">";
             //afl << " [" << "i=0:*," << SCIDB4GDAL_DEFAULT_BLOCKSIZE_X *SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y << ",0]";
-            afl << " [" << "i=0:*," << array.getXDim().chunksize *array.getYDim().chunksize << ",0]";
+            afl << " [" << "i=0:*," << array.getXDim()->chunksize *array.getXDim()->chunksize << ",0]";
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
             curlBegin();
@@ -1244,31 +1359,10 @@ namespace scidb4gdal
 
 
 	/*
+	 * clean up
 	* remove (tempArray);
 	*/
-        {
-   
-            stringstream afl;
-            afl << "remove(" << tempArray << ")";
-            Utils::debug ( "Performing AFL Query: " +  afl.str() );
-
-            curlBegin();
-            ss.str ( "" );
-            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
-            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
-            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
-            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
-            if ( curlPerform() != CURLE_OK ) {
-                curlEnd();
-                Utils::warn ( "Insertion or redimensioning of temporary array '" + tempArray + "' failed. Trying to recover initial state." );
-                if ( removeArray ( tempArray ) != SUCCESS ) { // This is somewhat redundant...
-                    Utils::warn ( "Could not delete temporary load array '" + tempArray + "'. This may result in an inconsistent state, please check in SciDB." );
-                }
-                return ERR_CREATE_UNKNOWN;
-            }
-            curlEnd();
-        }
-
+	removeArray(tempArray);
 
 
         // Release session
@@ -1276,8 +1370,6 @@ namespace scidb4gdal
 
         return SUCCESS;
     }
-
-
 
     StatusCode ShimClient::getAttributeStats ( SciDBSpatialArray &array, uint8_t nband, SciDBAttributeStats &out )
     {
@@ -1343,10 +1435,6 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
     StatusCode ShimClient::arrayExists ( const string &inArrayName, bool &out )
     {
         stringstream ss, afl;
@@ -1404,8 +1492,6 @@ namespace scidb4gdal
 
     }
 
-
-
     StatusCode ShimClient::updateSRS ( SciDBSpatialArray &array )
     {
         // Add spatial reference system information if available
@@ -1420,7 +1506,7 @@ namespace scidb4gdal
             curlBegin();
             // EXECUTE QUERY  ////////////////////////////
             stringstream afl;
-            afl << "st_setsrs(" << array.name << ",'" << array.getXDim().name << "','" << array.getYDim().name << "','" << array.auth_name << "'," << array.auth_srid << ",'" <<  array.affineTransform.toString() << "')";
+            afl << "st_setsrs(" << array.name << ",'" << array.getXDim()->name << "','" << array.getYDim()->name << "','" << array.auth_name << "'," << array.auth_srid << ",'" <<  array.affineTransform.toString() << "')";
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
             stringstream ss;
@@ -1437,13 +1523,12 @@ namespace scidb4gdal
         }
         else {
             // TODO: How to remove SRS information? Is this neccessary at all?
-
+	    Utils::debug("No spatial reference was set. Continuing without SR. Maybe no longer referenceable by GDAL");
 
         }
 
         return SUCCESS;
     }
-
 
     StatusCode ShimClient::removeArray ( const string &inArrayName )
     {
@@ -1455,10 +1540,10 @@ namespace scidb4gdal
         afl << "remove(" << inArrayName << ")";
 	
         Utils::debug ( "Performing AFL Query: " +  afl.str() );
-        createSHIMExecuteString(ss, sessionID, afl);
-// 	ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
-// 	if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
-// 	
+
+	ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str();
+	if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+	
         curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
         curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
         if ( curlPerform() != CURLE_OK ) {
@@ -1471,8 +1556,6 @@ namespace scidb4gdal
         return SUCCESS;
 
     }
-
-
 
 
     StatusCode  ShimClient::setArrayMD ( string arrayname, std::map< std::string, std::string > kv, string domain )
@@ -1510,7 +1593,6 @@ namespace scidb4gdal
         releaseSession ( sessionID );
         return SUCCESS;
     }
-
 
 
     StatusCode ShimClient::getArrayMD ( std::map< string, string > &kv, string arrayname, string domain )
@@ -1600,11 +1682,6 @@ namespace scidb4gdal
 
     }
 
-
-
-
-
-
     StatusCode ShimClient::setAttributeMD ( string arrayname, string attribute, map< string, string > kv, string domain )
     {
 
@@ -1641,12 +1718,6 @@ namespace scidb4gdal
         releaseSession ( sessionID );
         return SUCCESS;
     }
-
-
-
-
-
-
 
     StatusCode ShimClient::getAttributeMD ( std::map< std::string, std::string > &kv, std::string arrayname, string attribute, std::string domain )
     {
@@ -1733,24 +1804,55 @@ namespace scidb4gdal
         return SUCCESS;
     }
 
+    void ShimClient::setCreateParameters(CreationParameters &par)
+    {
+      _cp = &par;
+      if (_cp->dt != "" || _cp->timestamp != "") {
+	Utils::debug("Setting temporal parameters. TRS: "+_cp->dt+" and t:"+_cp->timestamp);
+      }
+    }
+
+    void ShimClient::setConnectionParameters(ConnectionParameters& par)
+    {
+	_conp = &par;
+    }
+    
+    void ShimClient::setQueryParameters(QueryParameters& par)
+    {
+	_qp = &par;
+    }
+
+    StatusCode ShimClient::updateTRS(SciDBTemporalArray &array)
+    {
+        // Add temporal reference system information if available
+        if ( array.getTPoint() != NULL && array.getTInterval() != NULL && array.getTInterval()->toStringISO() != "P") {
+	    
+            int sessionID = newSession();
+
+            curlBegin();
+            // EXECUTE QUERY  ////////////////////////////
+            stringstream afl;
+            afl << "st_settrs(" << array.name << ",'" << array.tdim << "','" << array.getTPoint()->toStringISO() << "','" << array.getTInterval()->toStringISO() << "')";
+            Utils::debug ( "Performing AFL Query: " +  afl.str() );
+
+            stringstream ss;
+            ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape ( _curl_handle, afl.str().c_str(), 0 );
+            if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            curl_easy_setopt ( _curl_handle, CURLOPT_URL, ss.str().c_str() );
+            curl_easy_setopt ( _curl_handle, CURLOPT_HTTPGET, 1 );
+            curlPerform();
+            curlEnd();
 
 
 
+            releaseSession ( sessionID );
+        }
+        else {
+            // TODO: How to remove SRS information? Is this neccessary at all?
+	    return ERR_TRS_INVALID;
 
+        }
 
-
-
-
-
-
-
-  void ShimClient::createSHIMExecuteString(stringstream &base, int &sessionID, stringstream &query)
-  {
-      base << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << query.str();
-      if ( _ssl && !_auth.empty() ) base << "&auth=" << _auth; // Add auth parameter if using ssl
-
-  }
-
-
-
+        return SUCCESS;
+    }
 }

@@ -30,4 +30,5 @@
 # KDE4 files
 *.kdev4
 /.project
-/doc/
+/doc/*.png
+/doc/*.xmi

@@ -25,7 +25,7 @@ The driver offers support for reading and writing SciDB arrays. Update access to
 Similar to other database drivers for GDAL, we need to access a database in order to perform queries. Therefore two strategies can be utilized to do so. The first strategy was introduced by the early database drivers. They used a connection string to access the database. Typically the connection string was passed as the file name.
 The second strategy was introduced as opening options parameter for the GDAL functions with GDAL version 2.0.
 
-Examples for connection strings:
+Examples on connection approaches:
 - file name based: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
 
 - opening option based: `-oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password> -oo "ssl=true"`
@@ -37,27 +37,68 @@ Notice that the file name for SciDB must start with `SCIDB:` in order to let GDA
     <user>     = scidb
     <password> = scidb
 
-Since an array based data base like SciDB allows not only a two dimensional storage, but a multi dimensional storage. Our SciDB plugin extends the image storage for spatial data and also for spatio-temporal data. Internally SciDB uses integer indizes to reference the cells to coordinates. The spatial query can be formed as intended by GDAL functions. 
-Since GDAL was developed primarily in a spatial context, the temporal query proved difficult to realize in the current GDAL version.
-As a solution we allow three different methods:
+One of the benefits of SciDB is that it allows to store not only two dimensional data, but it supports multi-dimensional storage. The scidb4geo plugin, developed also in this context, extends SciDB to store images with a spatial and optional a temporal reference that is annotated to the SciDB arrays as metadata. With this annotations image coordinates (or dimension indices of arrays) can be transformed into real world coordinates and dates. GDAL can already deal with spatial operations like subsetting and image reprojections and therefore the standard parameter for those operations can be also used with SciDBArrays. For example the gdal_translate parameter like `-projwin` or `-srcwin` will work for spatial subsetting and querying an array in SciDB.
 
-1. suffix of the array name: `"SCIDB:array=array_name[t,1]"` or `"SCIDB:array=array_name[t,2015-03-03T10:00:00]"`
-2. as part of a property string within the connection string: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>] [properties=t=<temporal_index>]"`
-3. as part of the opening options: `-oo "t=<temporal_index>"`
+Since GDAL was developed primarily in a spatial context, the temporal query proved difficult to realize in the current GDAL version. For this purpose we introduced several ways to state the temporal context, when querying a temporally referenced array.
 
-To address the temporal component the identifier "t" is used in most cases. "t" requires either an integer value (temporal index) or a valid timestamp string according to ISO 8601. The latter is currently only supported in the "suffix" strategy.
+There are three major approaches to do this:
+
+1. suffix of the array name: `"SCIDB:array=array_name[i,1]"` or `"SCIDB:array=array_name[t,2015-03-03T10:00:00]"`
+2. as part of a property string within the connection string: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>] [properties=i=<temporal_index>]"`
+3. as part of the opening options: `-oo "i=<temporal_index>"`
+
+To address the temporal component the identifiers "t" and "i" are used. "t" refers to a string representation of a data or data/time that is a valid string representation according to ISO 8601. With the identifier "i" the temporal index of an image is addressed. The temporal index refers to the discrete dimension value of the assigned temporal dimension. This means i=0 would query for the image that was inserted at the starting date of the time series. A value higher then zero would mean that SciDB would try to access the i*dt image from the start (dt being the time resolution stated with the temporal reference).
 
 When using "gdal_translate" to access spatio-temporally references imagery in SciDB note that exactly one image will be returned. With this in mind the temporal request is limited to search with one time component, meaning that no interval query is currently supported. The temporal query will return the temporally nearest image that is found in the data base.
 
-The following examples demonstrate how you can use gdal_translate to load / read imagery to / from SciDB: 
+## Image injection into SciDB
+If you want to load an image into SciDB, we consider three different array representations. Those array representation are important to create the correct array structure in SciDB, meaning that if the image shall have a temporal component that an additional dimension needs to be assigned.
+The preferred mechanism to pass user defined settings is to use GDALs Create Options (-co flag). Each setting of the create options has to be a key-value pair that is separated by "=". 
 
-- Array metadata: `gdalinfo "SCIDB:array=sample_array_gdal"`
+1. Spatial Array
+The spatial array is the default case of spatial image representation. This representation just assigns two dimensions for the spatial components and it attaches the spatial reference system that is stated in the metadata of the source file to the SciDB array. When creating this representation you should use the key-value pair `"type=S"`.
 
-- Exporting SciDB arrays: `gdal_translate [-oo ...] -of GTiff "SCIDB:array=sample_array[t,1] [...]" sample.tif`
+2. Spatio-temporal Array
+The spatio temporal array is a representation where the spatial image has also a time stamp. For this purpose the driver will assign one additional temporal dimension to the array and it assigns a user defined temporal reference system (TRS). The temporal reference system consists of the starting date and the temporal resolution. The starting date needs to be written as a date or date/time string according to ISO 8601 and the temporal resolution is a temporal period string. For example one possible valid TRS statement would look like `"t=2014-08-10T10:00"` and `"dt=P1D"` meaning that this reference starts at 2014-08-10 and has a temporal resolution of one day. To create this array type use `"type=ST"`. Please be advised that this type refers simply to exactly one point in time. There is no way to add later images into this array. The minimum and maximum of the temporal dimension for this array will be set to zero.
 
-- Writing GDAL datasets to SciDB: `gdal_translate -of SciDB sample.tif "SCIDB:array=sample_array_gdal"`
+3. Spatio-temporal Series
+This array type is very similar to the Spatio-temporal Array, but it removes the restriction of the temporal dimension on carrying only one image. To be more concrete: This type only starts a time series. Additional images can then be inserted into this array by using the same array name and by using a Spatio-temporal Array. In order to start the spatio-temporal series, please use `"type=STS"`.
 
-In terms of loading spatial imagery into SciDB, we currently support simple uploads of images. The temporal differentiation of data is currently under development. We assume that the images imported into a single SciDB array using the same spatial reference system and they are assumed as being in the same temporal resolution. Other than that you can import multiple images into one array if the afore mentioned requirements are met.
+Now that we have covered the main types, there is another addition in creating SciDB arrays. The before mentioned types will restrict the spatial dimension to the images boundary. This means that if it not explicitly stated otherwise the spatial boundaries will be fixed to that extent. But to allow later insertion of images into in an existing array, a bounding box and its coordinates reference system need to be stated, when creating the image (the first upload). We use the parameter keys "bbox" and "srs" for this purpose. By setting an alternate bounding box we will refer to the data stored as a coverage, whereas before the data represented the original image. Here is also an example on setting a valid coverage statement: `"bbox=443000 4650000 455000 4629000"` and `"srs=EPSG:26716"`. Note that the spatial reference system is addressed to by stating the authority name and the systems id.
+
+In the following we will give some explicit gdal_translate statements on how to create arrays:
+Create a spatial image from a file:
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "type=S" -of SciDB input_image.tif "SCIDB:array=test_spatial"`
+
+Create a spatial coverage from multiple files:
+1. Start a coverage by stating a bounding box with SRS
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "bbox=443000 4650000 455000 4629000" -co "srs=EPSG:26716" -co "type=S" -of SciDB part1.tif "SCIDB:array=test_spatial_coverage"`
+
+2. Insert an image into the coverage
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "type=S" -of SciDB part2.tif "SCIDB:array=test_spatial_coverage"`
+
+Create a Spatio-Temporal Array:
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=ST" -of SciDB input_image.tif "SCIDB:array=test_spatio_temporal"`
+
+Create a Spatio-Temporal Series:
+1. Start series
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=STS" -of SciDB input_image_15.tif "SCIDB:array=test_spatio_temporal_series"`
+
+2. Insert an image to another time index after the starting date
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-16" -co "type=ST" -of SciDB input_image_16.tif "SCIDB:array=test_spatio_temporal_series"`
+
+Create a Spatio-Temporal Series with larger boundaries:
+1. Start series and stating an additional extent
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "bbox=443000 4650000 455000 4629000" -co "srs=EPSG:26716" -co "type=STS" -of SciDB input_image_15.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
+2. Add image into the image of the 15th october
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=ST" -of SciDB input_image_15_2.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
+3. Add image at another date
+`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-17" -co "type=ST" -of SciDB input_image_17.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
+
+If a coverage is used please make sure that the coordinates of the images refer to the same spatial reference system. It is also important that all images that are inserted into a coverage are within the initially stated boundary!
+
+## Deleting arrays
+In order to allow GDAL to delete arrays, we enabled this particular feature via gdalmanage. Since gdalmanage does not support opening options, the connection string approach must be used, e.g. `gdalmanage delete "SCIDB:array=test_spatial host=https://your.host.de port=31000 user=user password=passwd confirmDelete=Y"`. This command completely removes the array from the database. Please be sure that the array is gone once this command is executed. An additional parameter "confirmDelete" was introduced in order to prevent accidental deletion of an array. This is due to GDALs QuietDelete function that is called on each gdal_translate call. As values the following strings are allowed (case-insensitive): YES, Y, TRUE, T or 1.
 
 ## Dependencies
 - At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers

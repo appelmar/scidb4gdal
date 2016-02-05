@@ -70,7 +70,7 @@ namespace scidb4gdal
         void debug ( const string &msg )
         {
             //std::cout << "(" << getCurDatetime() << ") DEBUG: " << msg << std::endl;
-             CPLDebug ( "scidb4gdal", msg.c_str(), "" );
+	  CPLDebug ( "scidb4gdal", msg.c_str(), "" );
         }
 
         GDALDataType scidbTypeIdToGDALType ( const string &typeId )
