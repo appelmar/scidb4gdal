@@ -3,12 +3,14 @@
 A GDAL driver for SciDB arrays
 
 ## Description
-This is a preliminary version of a [GDAL](http://www.gdal.org) driver for SciDB. Spatial reference of arrays is maintained if the SciDB database uses the [scidb4geo plugin](https://github.com/mappl/scidb4geo).
+This is a preliminary version of a [GDAL](http://www.gdal.org) driver for the array database system SciDB. Spatial reference of arrays is maintained if the SciDB database uses the [scidb4geo plugin](https://github.com/mappl/scidb4geo).
 Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensional arrays to a variety of image formats supported by GDAL. 
 
-The driver offers support for reading and writing SciDB arrays. Update access to existing arrays is currently not implemented but planned for future releases.
+The driver offers support for reading and writing SciDB arrays. A single SciDB array may or may not be constructed from multiple (tiled) files. To build three-dimensional spacetime arrays, imagery can be automatically added to existing arrays based on its temporal snapshot (see details below).  
 
 ## News
+- (2016-02-05)
+    - Major update to automatically add imagery to existing spacetime arrays 
 - (2015-09-01)
     - Driver now compiles under Windows
 - (2015-08-27)
@@ -22,24 +24,52 @@ The driver offers support for reading and writing SciDB arrays. Update access to
     - Improved performance for both read and write access
 
 ## Getting Started
-Similar to other database drivers for GDAL, we need to access a database in order to perform queries. Therefore two strategies can be utilized to do so. The first strategy was introduced by the early database drivers. They used a connection string to access the database. Typically the connection string was passed as the file name.
-The second strategy was introduced as opening options parameter for the GDAL functions with GDAL version 2.0.
+Similar to other database drivers for GDAL, we define a connection string to address a SciDB array as a GDAL dataset. The connection string must contain an array name and may have further arguments like connection details of the database. With release of GDAL version 2.0, we added opening and create options to specify database connection details. Examples below demonstrate how a SciDB array can be accessed using gdalinfo.
 
-Examples on connection approaches:
-- file name based: `"SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
 
-- opening option based: `-oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password> -oo "ssl=true"`
+Examples how to address a SciDB array:
 
-Notice that the file name for SciDB must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. Default values for parameters, if additional information is provided, are the following:
+- identifier based: `gdalinfo "SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
+
+- opening option based: `gdalinfo -oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password> -oo "ssl=true" "SCIDB:array=<arrayname>"`
+
+Notice that the dataset identifier must start with `SCIDB:` in order to let GDAL identify the dataset as a SciDB array. Default values for connection arguments are the following:
 
     <host>     = https://localhost
     <port>     = 8083
     <user>     = scidb
     <password> = scidb
 
-One of the benefits of SciDB is that it allows to store not only two dimensional data, but it supports multi-dimensional storage. The scidb4geo plugin, developed also in this context, extends SciDB to store images with a spatial and optional a temporal reference that is annotated to the SciDB arrays as metadata. With this annotations image coordinates (or dimension indices of arrays) can be transformed into real world coordinates and dates. GDAL can already deal with spatial operations like subsetting and image reprojections and therefore the standard parameter for those operations can be also used with SciDBArrays. For example the gdal_translate parameter like `-projwin` or `-srcwin` will work for spatial subsetting and querying an array in SciDB.
+Alternatively, these parameters may be set as environment variables `SCIDB4GDAL_HOST`, `SCIDB4GDAL_PORT`, `SCIDB4GDAL_USER`, `SCIDB4GDAL_PASSWD`.
 
-Since GDAL was developed primarily in a spatial context, the temporal query proved difficult to realize in the current GDAL version. For this purpose we introduced several ways to state the temporal context, when querying a temporally referenced array.
+
+### Simple array download
+The following examples demonstrate how to download simple two-dimensional arrays using the [gdal_translate](http://www.gdal.org/gdal_translate.html) utility. 
+
+1. Download the whole array
+`gdal_translate "SCIDB:array=hello_scidb" "hello_scidb.tif"`
+
+2. Download a subset based on array coordinates
+`gdal_translate -srcwin 0 0 100 100 "SCIDB:array=hello_scidb" "hello_scidb_subset.tif"`
+
+3. Download a spatial subset based on spatial coordinates (assuming WGS84) and only the first array attribute (band 1)
+`gdal_translate -proj_win 7.1 52.2 7.6 51.9 -b 1 "SCIDB:array=hello_scidb" "hello_scidb_subset.tif"`
+
+
+### Simple array upload
+The following examples demonstrate how to upload single images to simple two-dimensional arrays using the [gdal_translate](http://www.gdal.org/gdal_translate.html) utility. 
+
+1. Upload the whole array
+`gdal_translate -of SciDB "hello_scidb.tif" "SCIDB:array=hello_scidb"`
+
+
+
+
+## Details
+
+One of the benefits of SciDB is that it allows to store not only two dimensional data, but it supports multi-dimensional storage. The [scidb4geo](https://github.com/mappl/scidb4geo) plugin, extends SciDB to store images with spatial and temporal reference that is annotated to the SciDB arrays as metadata. With this annotations image coordinates (or dimension indices of arrays) can be transformed into real world coordinates and dates. GDAL can already deal with spatial operations like subsetting and image reprojections and  standard parameters for those operations can be also used with SciDB arrays. For example the gdal_translate parameter like `-projwin` or `-srcwin` will work for spatial subsetting and querying an array in SciDB.
+
+We introduced several ways to state the temporal context, when querying a temporally referenced array.
 
 There are three major approaches to do this:
 
@@ -51,8 +81,9 @@ To address the temporal component the identifiers "t" and "i" are used. "t" refe
 
 When using "gdal_translate" to access spatio-temporally references imagery in SciDB note that exactly one image will be returned. With this in mind the temporal request is limited to search with one time component, meaning that no interval query is currently supported. The temporal query will return the temporally nearest image that is found in the data base.
 
-## Image injection into SciDB
-If you want to load an image into SciDB, we consider three different array representations. Those array representation are important to create the correct array structure in SciDB, meaning that if the image shall have a temporal component that an additional dimension needs to be assigned.
+
+### Image ingestion into SciDB
+If you want to load an image into SciDB, we consider three different array representations. Those array representations are important to create the correct array structure in SciDB, meaning that if the image shall have a temporal component that an additional dimension needs to be assigned.
 The preferred mechanism to pass user defined settings is to use GDALs Create Options (-co flag). Each setting of the create options has to be a key-value pair that is separated by "=". 
 
 1. Spatial Array
@@ -97,8 +128,10 @@ Create a Spatio-Temporal Series with larger boundaries:
 
 If a coverage is used please make sure that the coordinates of the images refer to the same spatial reference system. It is also important that all images that are inserted into a coverage are within the initially stated boundary!
 
-## Deleting arrays
+### Deleting arrays
 In order to allow GDAL to delete arrays, we enabled this particular feature via gdalmanage. Since gdalmanage does not support opening options, the connection string approach must be used, e.g. `gdalmanage delete "SCIDB:array=test_spatial host=https://your.host.de port=31000 user=user password=passwd confirmDelete=Y"`. This command completely removes the array from the database. Please be sure that the array is gone once this command is executed. An additional parameter "confirmDelete" was introduced in order to prevent accidental deletion of an array. This is due to GDALs QuietDelete function that is called on each gdal_translate call. As values the following strings are allowed (case-insensitive): YES, Y, TRUE, T or 1.
+
+
 
 ## Dependencies
 - At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers

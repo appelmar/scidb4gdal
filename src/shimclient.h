@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015 Marius Appel <marius.appel@uni-muenster.de> and
+Copyright (c) 2016 Marius Appel <marius.appel@uni-muenster.de> and
 Florian Lahn <florian.lahn@uni.muenster.de>
 
 This file is part of scidb4gdal. scidb4gdal is licensed under the MIT license.

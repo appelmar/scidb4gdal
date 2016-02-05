@@ -1,5 +1,16 @@
-sudo: required
 language: cpp
 compiler: gcc
+
+addons:
+  apt:
+    packages:
+	    - libboost-dev
+
+matrix:
+  include:
+    - os: linux
+	  dist: trusty
+	  sudo: required
+
 install: chmod +x build/prepare_platform.sh && build/prepare_platform.sh
 script: cd gdal-2.0.1 && ./configure && make

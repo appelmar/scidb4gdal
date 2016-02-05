@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015 Marius Appel <marius.appel@uni-muenster.de>
+Copyright (c) 2016 Marius Appel <marius.appel@uni-muenster.de>
 
 This file is part of scidb4gdal. scidb4gdal is licensed under the MIT license.
 
@@ -137,7 +137,8 @@ namespace scidb4gdal
 	    
 
             // Read  and fetch data
-            bool use_subarray = ! ( ( xmin % ( int ) _array->getXDim()->chunksize == 0 ) && ( ymin % ( int ) _array->getYDim()->chunksize == 0 ) );
+	    bool use_subarray = true; // This is safer, between might lead to inconsistent results in some instances
+            //bool use_subarray = ! ( ( xmin % ( int ) _array->getXDim()->chunksize == 0 ) && ( ymin % ( int ) _array->getYDim()->chunksize == 0 ) );
 
             tile.size = nBlockXSize * nBlockYSize * Utils::scidbTypeIdBytes ( _array->attrs[nBand - 1].typeId ); // Always allocate full block size
             tile.data = malloc ( tile.size ); // will be freed automatically by cache

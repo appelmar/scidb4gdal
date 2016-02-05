@@ -29,17 +29,17 @@ fi
 #passwd="scidb"
 #host="https://localhost"
 #port=31000
-srs="EPSG:26716"
+
 
 ## uncomment the following to test the setting of global environment variables. make sure the data is correct.
-# SCIDB4GDAL_USER="scidb"
-# SCIDB4GDAL_PASSWD="scidb"
-# SCIDB4GDAL_HOST="https://localhost"
-# SCIDB4GDAL_PORT=31000
-# export SCIDB4GDAL_USER
-# export SCIDB4GDAL_PASSWD
-# export SCIDB4GDAL_HOST
-# export SCIDB4GDAL_PORT
+: ${SCIDB4GDAL_USER:=$user}
+: ${SCIDB4GDAL_PASSWD:=$passwd}
+: ${SCIDB4GDAL_HOST:=$host}
+: ${SCIDB4GDAL_PORT:=$port}
+export SCIDB4GDAL_USER
+export SCIDB4GDAL_PASSWD
+export SCIDB4GDAL_HOST
+export SCIDB4GDAL_PORT
 
 
 #scidb array names
