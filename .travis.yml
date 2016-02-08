@@ -1,13 +1,20 @@
 language: cpp
 compiler: gcc
-
 sudo: required
 dist: trusty
-
 addons:
   apt:
     packages:
-      - libboost-dev
+    - libboost-dev
+    - doxygen
+    - graphviz
+    
+before_install:
+- openssl aes-256-cbc -K $encrypted_4ff85298f34d_key -iv $encrypted_4ff85298f34d_iv
+  -in build/travisci_rsa.enc -out build/travisci_rsa -d
+- chmod 0600 build/travisci_rsa
+- cp build/travisci_rsa ~/.ssh/id_rsa
 
 install: chmod +x build/prepare_platform.sh && build/prepare_platform.sh
-script: cd gdal-2.0.1 && ./configure && make
+script: chmod +x build/build_minimal.sh && build/build_minimal.sh
+after_success: chmod +x build/make_doc.sh && build/make_doc.sh
