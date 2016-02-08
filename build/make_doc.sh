@@ -6,19 +6,18 @@ sudo apt-get update -qq
 sudo apt-get install -y --no-install-recommends -y doxygen graphviz
 
 
-# 2. Make documentation and push to gh-pages branch
-rm -Rf doc/html
+# 2. Make documentation 
+rm -rf doc/html
 mkdir -p doc/html
-git clone -b gh-pages --single-branch "git@github.com:mappl/scidb4gdal.git" doc/html
-
-rm -Rf doc/html/*
 cd src && doxygen Doxyfile
 
-
-cd doc/html
-git add .
+cd ../doc/html
+git init
 git config user.name "Travis CI Documentation Builder"
 git config user.email "marius.appel@uni-muenster.de"
+git add .
 git commit -m "Automated documentation build[ci skip]"
-git push origin gh-pages
-cd -
+git push --force --quiet "https://${GH_TOKEN}@${GH_REF}" master:gh-pages
+
+
+
