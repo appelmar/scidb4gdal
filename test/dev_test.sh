@@ -85,6 +85,7 @@ chicago_part2="./chicago_2.tif"
 chicago_part3="./chicago_3.tif"
 chicago_part4="./chicago_4.tif"
 chicago_na="./chicago_na.tif"
+srs="EPSG:26716"
 
 # echo rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
 # rm -f $chicago_part1 $chicago_part2 $chicago_part3 $chicago_part4 $chicago_na
