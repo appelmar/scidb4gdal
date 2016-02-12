@@ -459,35 +459,38 @@ namespace scidb4gdal
 	      //  gdalMDtoMap(  poSrcDS->GetRasterBand ( i + 1 )->GetMetadata(), kv2);
 	      stringstream s;
 	      double v;
-	      int *ret = NULL;
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
+	      int ret = -1;
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( &ret );
+	           
+	      Utils::debug ( "Reading metadata from source dataset" );
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
 	      }
+	   
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( ret ) ;
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( &ret ) ;
+	      if ( ret != 0) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "OFFSET", s.str() ) );
 		  s.str ( "" );
 	      }
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( ret ) ;
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( &ret ) ;
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
 		  s.str ( "" );
 	      }
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( &ret );
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "MIN", s.str() ) );
 	      }
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( &ret );
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "MAX", s.str() ) );
 	      }
