@@ -287,8 +287,13 @@ namespace scidb4gdal
     {
         kv.clear();
 
+	if (strlist == NULL) {
+	    Utils::debug("Could not find a string list for metadata in the source data set.");
+	    return;
+	}
         int i = 0;
         char *it = strlist[0];
+	
         while ( it != NULL ) {
             string s ( strlist[i] );
             size_t p = string::npos;
@@ -467,7 +472,7 @@ namespace scidb4gdal
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
 	      }
-	   
+
 	      s.str ( "" );
 	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( &ret ) ;
 	      if ( ret != 0) {
@@ -482,6 +487,7 @@ namespace scidb4gdal
 		  kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
 		  s.str ( "" );
 	      }
+	      
 	      s.str ( "" );
 	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( &ret );
 	      if ( ret != 0 ) {
