@@ -132,6 +132,9 @@ If a coverage is used please make sure that the coordinates of the images refer 
 In order to allow GDAL to delete arrays, we enabled this particular feature via gdalmanage. Since gdalmanage does not support opening options, the connection string approach must be used, e.g. `gdalmanage delete "SCIDB:array=test_spatial host=https://your.host.de port=31000 user=user password=passwd confirmDelete=Y"`. This command completely removes the array from the database. Please be sure that the array is gone once this command is executed. An additional parameter "confirmDelete" was introduced in order to prevent accidental deletion of an array. This is due to GDALs QuietDelete function that is called on each gdal_translate call. As values the following strings are allowed (case-insensitive): YES, Y, TRUE, T or 1.
 
 
+### NA (no-data) value handling
+The SciDB driver evaluates and handles assigned no data values and stores them as metadata in SciDB. To get the benefits of this feature, make sure that the NA value are assigned in the source dataset (e.g. by using `gdal_translate -a_nodata=0 ...`). The assgined no-data value will also be used to prevent SciDB to overwrite already existing cells in the array with no data values. SciDB will evaluate the cells in a way that if at least one band shows a no-data value, then those cells are neglected from insertion. Otherwise SciDB will always overwrite existing cells with the values of an array added afterwards in case there is an overlap. At the moment there is no way to prevent this behavior. Please make sure to add images or tiles to an array in a specific order to get the best coverage results.
+
 
 ## Dependencies
 - At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers
