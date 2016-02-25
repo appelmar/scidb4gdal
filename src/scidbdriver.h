@@ -206,9 +206,10 @@ namespace scidb4gdal
        * 
        * @param poSrcDS a pointer to a GDALDataset
        * @param array a SciDBSpatialArray that will be modified (output)
+       * @param options The scidb4gdal::CreationParameters
        * @return void
        */
-      static void copyMetadataToArray(GDALDataset* poSrcDS, SciDBSpatialArray &array);
+      static void copyMetadataToArray(GDALDataset* poSrcDS, SciDBSpatialArray &array,CreationParameters* options);
       
       /**
        * @brief Transmits and stores an image into a temporal SciDB array

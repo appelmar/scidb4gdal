@@ -44,7 +44,7 @@ namespace scidb4gdal {
    * Enum for a switch-case statement when parsing the properties part of a connection string
    */
   enum Properties {
-    T_INDEX, TRS, TIMESTAMP, TYPE, BBOX, SRS
+    T_INDEX, TRS, TIMESTAMP, TYPE, BBOX, SRS,CHUNKSIZE_SPATIAL, CHUNKSIZE_TEMPORAL
   };
   
   /** 
@@ -92,6 +92,10 @@ namespace scidb4gdal {
     bool hasBBOX;
     /** error code if validation fails */
     StatusCode error;
+    /** the chunksize for each of the spatial dimensions*/
+    int chunksize_spatial = -1;
+    /** the blocksize for the temporal dimension */
+    int chunksize_temporal = -1;
     
     /**
      * @brief validates the parameters for completenes

@@ -29,7 +29,9 @@ namespace scidb4gdal
     {
       //set the resolver a.k.a the key value pairs in the connection / property string or the create / opening options
       _creationTypeResolver.mapping = map_list_of("S",S_ARRAY) ("ST",ST_ARRAY) ("STS",ST_SERIES);
-      _propKeyResolver.mapping = map_list_of ("dt",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX) ("bbox",BBOX) ("srs",SRS);
+      
+      _propKeyResolver.mapping = map_list_of ("dt",TRS) ("timestamp",TIMESTAMP) ("t",TIMESTAMP) ("type",TYPE)("i", T_INDEX) ("bbox",BBOX) ("srs",SRS) ("CHUNKSIZE_SP",CHUNKSIZE_SPATIAL)("chunksize_sp",CHUNKSIZE_SPATIAL)("CHUNKSIZE_T",CHUNKSIZE_TEMPORAL)("chunksize_t",CHUNKSIZE_TEMPORAL);
+      
       _conKeyResolver.mapping = map_list_of ("host", HOST)("port", PORT) ("user",USER) ("password", PASSWORD) ("ssl",SSL)("array",ARRAY)("confirmDelete",CONFIRM_DELETE);
       
       _scidb_filename = scidbFile;
@@ -381,6 +383,22 @@ namespace scidb4gdal
 	    _create->hasBBOX = true;
 	    break;    
 	  }
+	  case CHUNKSIZE_SPATIAL:
+	    try {
+	      _create->chunksize_spatial = boost::lexical_cast<int>(value);
+	    } catch (boost::bad_lexical_cast e) {
+		Utils::debug(e.what());
+		throw ERR_GLOBAL_PARSE;
+	    }
+	    break;
+	  case CHUNKSIZE_TEMPORAL:
+	    try {
+	      _create->chunksize_temporal = boost::lexical_cast<int>(value);
+	    } catch (boost::bad_lexical_cast e) {
+	      Utils::debug(e.what());
+	      throw ERR_GLOBAL_PARSE;
+	    }
+	    break;
 	}
     }
     void ParameterParser::assignQueryParameter(string key, string value)

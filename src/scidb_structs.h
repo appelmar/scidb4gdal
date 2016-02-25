@@ -383,7 +383,7 @@ namespace scidb4gdal
 	      dimt.low = 0;
 	      dimt.high = 0;
 	      dimt.name = SCIDB4GDAL_DEFAULT_TDIMNAME;
-	      dimt.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE;
+	      dimt.chunksize = SCIDB4GDAL_DEFAULT_TDIM_BLOCKSIZE;
 	      dimt.typeId = "int64";
 	      
 	      dims.push_back ( dimt );

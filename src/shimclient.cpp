@@ -1264,19 +1264,22 @@ namespace scidb4gdal
 
         {
             /*
-             * CREATE ARRAY tempArray < ... > [i=0:*,SCIDB4GDAL_DEFAULT_BLOCKSIZE_X*SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y,0];
+             * CREATE TEMP ARRAY tempArray < ... > [i=0:*,SCIDB4GDAL_DEFAULT_BLOCKSIZE_X*SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y,0];
+	     * i is line number
              */
 
             stringstream afl;
             afl << "CREATE TEMP ARRAY " << tempArray;
             afl << " <";
+	    // add definition for all attributes
             for ( uint32_t i = 0; i < array.attrs.size() - 1; ++i ) {
                 afl << array.attrs[i].name << ": " << array.attrs[i].typeId << ",";
             }
             afl << array.attrs[array.attrs.size() - 1].name << ": " << array.attrs[array.attrs.size() - 1].typeId << ">";
             //afl << " [" << "i=0:*," << SCIDB4GDAL_DEFAULT_BLOCKSIZE_X *SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y << ",0]";
-            afl << " [" << "i=0:*," << array.getXDim()->chunksize *array.getXDim()->chunksize << ",0]";
+            afl << " [" << "i=0:*," << array.getXDim()->chunksize *array.getYDim()->chunksize << ",0]";
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
+	    // tempload array is one dimensional (concatenated binary string), but has all attributes
 
             curlBegin();
             ss.str ( "" );
@@ -1299,6 +1302,7 @@ namespace scidb4gdal
         {
             /*
              * load(tempArray,'remoteFilename', -2, 'format');
+	     * load the uploaded binary string into the tempload array
              */
             stringstream afl;
             afl << "load(" << tempArray << ",'" << remoteFilename.c_str() << "', -2, '" << format << "')"; // TODO: Add error checking, max errors, and shadow array
@@ -1320,22 +1324,66 @@ namespace scidb4gdal
             curlEnd();
         }
 
-	 /* insert
+	 /* 
 	  * insert(
 	  *     redimension(
-	  *         apply(TEMP_ARRAY, array.dims[xidx].name,  (int64)xmin +  ((int64)i % (int64)nx),          array.dims[yidx].name,  (int64)ymin +  (int64)((int64)i / (int64)ny))
-	  *         ,array.name)
-	  *     ,a)
+	  *         apply(TEMPLOAD_ARRAY, xdim.name,  (int64)xmin +  ((int64)i % (int64)nx), 
+	  * 	    ydim.name,  (int64)ymin +  (int64)((int64)i / (int64)ny)), TEMP_ARRAY)
+	  *         ,TEMP_ARRAY)
+	  * 
+	  * redimension the one dimensional array into a two dimensional array
 	*/
         {
             stringstream afl;
-            afl << "insert(redimension(apply(" << tempArray << ","; // TODO: Check dimension indices + ordering...
-
-            afl << array.dims[array.getXDimIdx()].name << "," << "int64(" << x_min  << ") + int64(i) % int64(" << nx << ")";
-            afl << ",";
-            afl << array.dims[array.getYDimIdx()].name << "," << "int64(" << y_min  << ") + int64(int64(i) / int64(" << nx << "))";
-            afl << "), " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << "), " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << ")";
-
+//             afl << "insert(redimension(apply(" << tempArray << ","; // TODO: Check dimension indices + ordering...
+//             afl << array.dims[array.getXDimIdx()].name << "," << "int64(" << x_min  << ") + int64(i) % int64(" << nx << ")";
+//             afl << ",";
+//             afl << array.dims[array.getYDimIdx()].name << "," << "int64(" << y_min  << ") + int64(int64(i) / int64(" << nx << "))";
+//             afl << "), " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << "), " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << ")";
+	    stringstream redimensionStatement;
+	    redimensionStatement << "redimension(apply(" << tempArray << ","; // TODO: Check dimension indices + ordering...
+            redimensionStatement << array.dims[array.getXDimIdx()].name << "," << "int64(" << x_min  << ") + int64(i) % int64(" << nx << ")";
+            redimensionStatement << ",";
+            redimensionStatement << array.dims[array.getYDimIdx()].name << "," << "int64(" << y_min  << ") + int64(int64(i) / int64(" << nx << "))";
+            redimensionStatement << "), " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << ")";
+	    
+	    stringstream filterNonNAStatement, boolStatement;
+	    
+	    //for each attribute get name and assigned NA value and add them to the boolean statement (if NO_DATA was set)
+	    //check if NODATA value exists...
+	    int noNA = 0;
+	    for ( uint32_t i = 0; i < array.attrs.size(); i++ ) {
+		string naVal = "";
+		naVal = array.attrs[i].md[""]["NODATA"]; //if not exists then an empty string will be returned in this case
+		if (naVal == "") {
+		  noNA++;
+		  continue;
+		}
+		
+                boolStatement << array.attrs[i].name << " = " << naVal;
+		if (i != array.attrs.size()-1) {
+		  boolStatement << " OR ";
+		}
+            }
+	    if (noNA != array.attrs.size()) {
+		//at least one nodata value was set
+	      
+		//making sure that it does not end with " OR "
+		string bs = boolStatement.str();
+		size_t pos = bs.find_last_of(" OR "); //returns the position of the last character of the given pattern
+		if (pos == bs.size()-1) {
+		  bs = bs.substr(0,bs.size()-4);
+		}
+		
+		filterNonNAStatement << "filter(" << redimensionStatement.str() << ", NOT ("<< bs <<"))"; 
+		afl << "insert("<< filterNonNAStatement.str() << ", " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << ")";
+	    } else {
+		afl << "insert("<< redimensionStatement.str() << ", " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << ")";
+	    }
+	    
+	    
+	    
+	    
             Utils::debug ( "Performing AFL Query: " +  afl.str() );
 
 
