@@ -263,7 +263,14 @@ namespace scidb4gdal
         this->nRasterXSize = 1 + _array.getXDim()->high - _array.getXDim()->low ;
         this->nRasterYSize = 1 + _array.getYDim()->high - _array.getYDim()->low ;
 
-
+	map <string, string> kv;
+        _client->getArrayMD ( kv, _array.name, "" ); //get metadata of default domain
+	map<string, string>::const_iterator itr;
+	
+        for (itr = kv.begin(); itr != kv.end(); ++itr) {
+	  this->SetMetadataItem((*itr).first.c_str(),(*itr).second.c_str());
+	}
+	  
 
         // Create GDAL Bands
         for ( uint32_t i = 0; i < _array.attrs.size(); ++i )
@@ -271,9 +278,26 @@ namespace scidb4gdal
 
 
         this->SetDescription ( _array.toString().c_str() );
-
+	
+	SciDBSpatialArray* arr_ptr = &this->_array;
+	SciDBSpatioTemporalArray* st_arr_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(arr_ptr);
+	
+	if (st_arr_ptr) {
+	  int tindex = -1;
+	  if (_client->_qp->hasTemporalIndex) {
+	    tindex = _client->_qp->temp_index; //TODO find the place where the temporal index is stored in the array
+	  } else {
+	    tindex = 0;
+	  }
+	  
+	  if (tindex >= 0) {
+	    TPoint time = st_arr_ptr->datetimeAtIndex(tindex);
+	    this->SetMetadataItem("DATE_TIME", time.toStringISO().c_str());
+	  }
+	}
+	
         // Set Metadata
-        //this->SetMetadataItem("NODATA_VALUES", "0", "");
+        
 
 
         // TODO: Overviews?
@@ -346,6 +370,7 @@ namespace scidb4gdal
         return _array.srtext.c_str();
     }
     
+    /*
     char **SciDBDataset::GetMetadata ( const char *pszDomain )
     {
         map <string, string> kv;
@@ -356,6 +381,8 @@ namespace scidb4gdal
 //         else {
 //             _client->getArrayMD ( kv, _array.name, pszDomain );
 //         }
+
+	//check if there are also  
         return mapToGdalMD ( kv );
     }
 
@@ -373,7 +400,8 @@ namespace scidb4gdal
         return kv.find ( pszName )->second.c_str();
 
     }
-
+    */
+    
     ShimClient* SciDBDataset::getClient() {
 	return _client;
     }
@@ -1016,11 +1044,7 @@ namespace scidb4gdal
 	  
 	  return new SciDBDataset(*src_array, client);
 	} catch (StatusCode e) {
-	    if (client) delete client; 
-	    if (con_pars) delete con_pars;
-	    if (create_pars) delete create_pars ;
-	    if (src_array)delete src_array;
-	    if (tar_arr) delete tar_arr;
+
 	    //catch exceptions and give information back to the user
 	    switch (e) {
 	      case ERR_GLOBAL_PARSE:  
@@ -1177,8 +1201,9 @@ namespace scidb4gdal
 	      
 	      //get dimension for time
 	      SciDBDimension *dim;
-	      dim = &starray_ptr->dims[starray_ptr->getTDimIdx()];
-
+	      //dim = &starray_ptr->dims[starray_ptr->getTDimIdx()];
+	      dim = starray_ptr->getTDim();
+	      
 	      if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
 		  Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
 		  ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + starray_ptr->datetimeAtIndex(dim->low).toStringISO() + "), " +
@@ -1187,9 +1212,6 @@ namespace scidb4gdal
 		  return NULL;
 	      }
 	  }
-
-
-	  delete con_pars;
 
 
 	  // Create the dataset

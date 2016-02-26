@@ -103,7 +103,8 @@ namespace scidb4gdal
     {
 
     public:
-
+	
+	friend class SciDBDataset;
         /**
          * @brief Basic constructor
 	 * 
