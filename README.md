@@ -135,10 +135,11 @@ In order to allow GDAL to delete arrays, we enabled this particular feature via 
 SciDB manages its data in so called chunks. Pradigm4 suggests for those chunks to select sizes so that each chunk uses about 10 to 20 MB storage. Important to know is also that the chunks are stored for each attribute individually that are combined by a process called vertical partioning [link] (http://paradigm4.com/HTMLmanual/13.3/scidb_ug/ch04s05s02.htmlhttp://paradigm4.com/HTMLmanual/13.3/scidb_ug/ch04s05s02.html). In order to chose a suitable size this plugin will calculate chunksizes based on the spatial dimensions, the temporal dimension (if set) and the attributes data type sizes. Also we allow the setting of custom chunksizes with the create option keys "CHUNKSIZE_SP" and "CHUNKSIZE_T". The values that are required in this key-value pairs are the number of cells (integer value). If just one chunksize is stated the missing one will be calculated using the default total chunk size of 32MB and the biggest data type of the bands. In the case you don't specify a chunksize the default temporal chunksize of 1 is assumed and the spatial chunksize will be treated as missing and therefore calculated.
 
 Examples:
-`gdal_translate (...) -co "CHUNKSIZE_SP=3000" -co "CHUNKSIZE_T=1" -of SciDB input.tif "SCIDB:array=targetArray"`
-`gdal_translate (...) -co "CHUNKSIZE_SP=6000" -of SciDB input.tif "SCIDB:array=targetArray"`
-`gdal_translate (...) -co -co "CHUNKSIZE_T=10" -of SciDB input.tif "SCIDB:array=targetArray"`
-
+```
+gdal_translate (...) -co "CHUNKSIZE_SP=3000" -co "CHUNKSIZE_T=1" -of SciDB input.tif "SCIDB:array=targetArray"
+gdal_translate (...) -co "CHUNKSIZE_SP=6000" -of SciDB input.tif "SCIDB:array=targetArray"
+gdal_translate (...) -co -co "CHUNKSIZE_T=10" -of SciDB input.tif "SCIDB:array=targetArray"
+```
 ## Dependencies
 - At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers
 - [ST plugin] (https://github.com/mappl/scidb4geo) for SciDB
