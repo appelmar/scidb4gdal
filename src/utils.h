@@ -37,6 +37,7 @@ SOFTWARE.
 //#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y 512
 
 #define SCIDB4GDAL_DEFAULT_BLOCKSIZE 512
+#define SCIDB4GDAL_DEFAULT_TDIM_BLOCKSIZE 1
 #define SCIDB4GEO_DEFAULT_CHUNKSIZE_MB 32 // This is an upper limit, SciDB recommends smaller chunks ~ 10 MB, but for ingestion and download, larger chunks turned out to be faster.
 
 

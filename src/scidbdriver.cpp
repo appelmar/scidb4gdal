@@ -287,8 +287,13 @@ namespace scidb4gdal
     {
         kv.clear();
 
+	if (strlist == NULL) {
+	    Utils::debug("Could not find a string list for metadata in the source data set.");
+	    return;
+	}
         int i = 0;
         char *it = strlist[0];
+	
         while ( it != NULL ) {
             string s ( strlist[i] );
             size_t p = string::npos;
@@ -373,7 +378,7 @@ namespace scidb4gdal
 	return _client;
     }
 
-    void SciDBDataset::copyMetadataToArray(GDALDataset* poSrcDS, SciDBSpatialArray& array)
+    void SciDBDataset::copyMetadataToArray(GDALDataset* poSrcDS, SciDBSpatialArray& array, CreationParameters* options)
     {
       // Attributes
 	  size_t pixelsize = 0; // size in bytes of one pixel, i.e. sum of attribute sizes
@@ -383,7 +388,12 @@ namespace scidb4gdal
 	      a.nullable = false; // TODO
 	      a.typeId = Utils::gdalTypeToSciDBTypeId ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() ); // All attribtues must have the same data type
 	      stringstream aname;
-	      pixelsize += Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
+	      //pixelsize += Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
+	      
+	      //scidb stores attributes in separate chunks, so simply use the highest data type storage value
+	      size_t byte = Utils::gdalTypeBytes ( poSrcDS->GetRasterBand ( i + 1 )->GetRasterDataType() );
+	      if (byte > pixelsize) pixelsize = byte;
+	      
 	      aname << "band" << i + 1;
 	      //aname << poSrcDS->GetRasterBand ( i + 1 )->GetDescription();
 	      a.name = aname.str();
@@ -391,18 +401,60 @@ namespace scidb4gdal
 	  }
 	  array.attrs = attrs;
 
-
-
+	  //overwrite the dimension chunksizes with the ones stated in the create options or recalculate them
+	  SciDBSpatialArray* array_ptr = &array;
+	  SciDBSpatioTemporalArray* st_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(array_ptr);
+	  bool isST = (st_ptr) ? true : false;
+	  
 	  // Dimensions
+	  if (options->chunksize_spatial > 0 && options->chunksize_temporal > 0) {
+	    Utils::debug("Using assigned spatial and temporal chunksizes.");
+	      //use both chunksizes, because both are stated / probably do nothing
+	  } else if (options->chunksize_spatial > 0 && options->chunksize_temporal < 0 && isST) {
+	    stringstream ss;
+	    ss << "Calculating temporal chunksize: ";
+	    
+	    //recalculate temporal chunksize based on the MB restriction
+	    int t_calc = (int) (( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 )/ (options->chunksize_spatial * options->chunksize_spatial * pixelsize));
+	    options->chunksize_temporal = t_calc;
+	    ss << "t=" << t_calc;
+	    
+	    Utils::debug(ss.str());
+	  } else if (options->chunksize_spatial < 0 && options->chunksize_temporal > 0) {
+	    stringstream ss;
+	    //recalculate the spatial chunksizes
+	    ss << "Calculating spatial chunksize: s=";
+	   
+	    int divident = (isST) ? (options->chunksize_temporal * pixelsize) : (pixelsize);
+	    int s_calc = (int) sqrt(( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 )/divident);
+	    options->chunksize_spatial = s_calc;
+	    ss << s_calc;
+	    Utils::debug(ss.str());
+	  } else if (options->chunksize_spatial < 0 && options->chunksize_temporal < 0) {
+	    //calculate both or use defaults
+	    Utils::debug("Calculating spatial chunksize and taking the default temporal chunksize (t=1).");
+	    int divident = (isST) ? (SCIDB4GDAL_DEFAULT_TDIM_BLOCKSIZE * pixelsize) : (pixelsize);
+	    
+	    uint32_t blocksize = Utils::nextPow2 ( ( uint32_t ) sqrt ( ( ( ( double ) ( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 ) ) / ( ( double ) (divident) ) ) ) ) / 2;
+	    stringstream ss;
+	    ss << "Using chunksize " << blocksize << "x" << blocksize << " --> " << ( int ) ( ( ( double ) ( blocksize * blocksize * pixelsize ) ) / ( ( double ) 1024.0 ) ) << " kilobytes";
+	    Utils::debug ( ss.str() );
+	    
+	    options->chunksize_spatial = blocksize;
+	    
+	    if (isST) options->chunksize_temporal = SCIDB4GDAL_DEFAULT_TDIM_BLOCKSIZE;
+	  }
+	  
 
-	  //vector<SciDBDimension> dims;
+	  
+	  
+	  if (isST) {
+	    st_ptr->getTDim()->chunksize = options->chunksize_temporal;
+	  } 
 
 	  // Derive chunksize from attribute sizes
 	  //TODO adapt for t dim as well
-	  uint32_t blocksize = Utils::nextPow2 ( ( uint32_t ) sqrt ( ( ( ( double ) ( SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024 ) ) / ( ( double ) ( pixelsize ) ) ) ) ) / 2;
-	  stringstream ss;
-	  ss << "Using chunksize " << blocksize << "x" << blocksize << " --> " << ( int ) ( ( ( double ) ( blocksize * blocksize * pixelsize ) ) / ( ( double ) 1024.0 ) ) << " kilobytes";
-	  Utils::debug ( ss.str() );
+	  
 	  
 	  SciDBDimension* dimx;
 	  SciDBDimension* dimy;
@@ -411,13 +463,12 @@ namespace scidb4gdal
 	  dimx =  array.getXDim();
 	  dimx->high = poSrcDS->GetRasterXSize() - 1;
 	  dimx->length = poSrcDS->GetRasterXSize();
-	  dimx->chunksize = blocksize;
+	  dimx->chunksize = options->chunksize_spatial;
 
 	  dimy = array.getYDim();
 	  dimy->high = poSrcDS->GetRasterYSize() - 1;
 	  dimy->length = poSrcDS->GetRasterYSize();
-	  dimy->chunksize = blocksize;
-
+	  dimy->chunksize = options->chunksize_spatial;
 	  
 	  //extracting SRS information from source
 	  double padfTransform[6];
@@ -459,35 +510,39 @@ namespace scidb4gdal
 	      //  gdalMDtoMap(  poSrcDS->GetRasterBand ( i + 1 )->GetMetadata(), kv2);
 	      stringstream s;
 	      double v;
-	      int *ret = NULL;
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
+	      int ret = -1;
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetNoDataValue ( &ret );
+	           
+	      Utils::debug ( "Reading metadata from source dataset" );
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "NODATA", s.str() ) );
 	      }
+
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( ret ) ;
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetOffset ( &ret ) ;
+	      if ( ret != 0) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "OFFSET", s.str() ) );
 		  s.str ( "" );
 	      }
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( ret ) ;
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetScale ( &ret ) ;
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "SCALE", s.str() ) );
 		  s.str ( "" );
 	      }
+	      
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMinimum ( &ret );
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "MIN", s.str() ) );
 	      }
 	      s.str ( "" );
-	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( ret );
-	      if ( ret != NULL && *ret != 0 ) {
+	      v = poSrcDS->GetRasterBand ( i + 1 )->GetMaximum ( &ret );
+	      if ( ret != 0 ) {
 		  s <<  std::setprecision ( numeric_limits< double >::digits10 ) << v;
 		  kv2.insert ( pair<string, string> ( "MAX", s.str() ) );
 	      }
@@ -724,7 +779,6 @@ namespace scidb4gdal
 		break;
 	      case ST_SERIES:
 		src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
-		//TODO recalculate the chunksizes
 		((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
 		Utils::debug("SciDBSpatioTemporalArray created with open temporal dimension (spatiotemporal series)");
 		break;
@@ -734,7 +788,7 @@ namespace scidb4gdal
 	  src_array->name = con_pars->arrayname;
 	  
 	  Utils::debug("** Fetch metadata from the source image and copy it to the source array representation **");
-	    copyMetadataToArray(poSrcDS, *src_array); //copies the information from the source data file into the ST_Array representation
+	    copyMetadataToArray(poSrcDS, *src_array,create_pars); //copies the information from the source data file into the ST_Array representation
 	    Utils::debug("Testing metadata copy: "+src_array->toString());
 	  Utils::debug("-- DONE");
 	  
@@ -775,6 +829,7 @@ namespace scidb4gdal
 		  ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = 0;
 		  break;
 	      } 
+	      
 	      //create "bigger" array
 	      SciDBDimension* x = tar_arr->getXDim();
 	      SciDBDimension* y = tar_arr->getYDim();

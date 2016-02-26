@@ -50,6 +50,7 @@ targetArrayMetaNA=test_chicago_s_meta_na
 targetArraySCov=test_chicago_s_cov
 targetArraySTSCov=test_chicago_sts_cov
 targetArrayConEnv=test_chicago_con_env
+target_var_chunk=test_chicago_chunk
 
 #output file names
 rm -f ./test_*.tif
@@ -178,6 +179,9 @@ time {
   echo gdalmanage delete \"SCIDB:array=${targetArraySTSCov} host=${host} port=${port} user=${user} password=${passwd} confirmDelete=y\"
   gdalmanage delete "SCIDB:array=${targetArraySTSCov} host=${host} port=${port} user=${user} password=${passwd} confirmDelete=y"
   echo ""
+  echo gdalmanage delete \"SCIDB:array=${targetArrayNACov} confirmDelete=y\"
+  gdalmanage delete "SCIDB:array=${target_var_chunk} confirmDelete=y"
+  echo ""
 }
 echo "" 
 echo "###########################################"
@@ -211,6 +215,14 @@ time {
   echo gdal_translate --debug ON -co \"type=S\" -of SciDB ${chicago} \"SCIDB:array=${targetArrayConEnv}\"
   gdal_translate --debug ON -co "type=S" -of SciDB "${chicago}" "SCIDB:array=${targetArrayConEnv}"
   check $?
+}
+echo ""
+
+TIMEFORMAT='Upload of chicago image with adaptible chunksizes took %R seconds to complete'
+time {
+  echo "****** uploading image with adaptible chunksizes"
+  echo gdal_translate --debug ON -co \"type=ST\" -co \"t=2015-02-25\" -co \"dt=P1D\" -co \"CHUNKSIZE_SP=3000\" -of SciDB ${chicago_na} \"SCIDB:array=${target_var_chunk}\"
+  gdal_translate --debug ON -co "type=ST" -co "t=2015-02-25" -co "dt=P1D" -co "CHUNKSIZE_SP=3000" -of SciDB "${chicago_na}" "SCIDB:array=${target_var_chunk}"
 }
 echo ""
 
