@@ -258,6 +258,7 @@ namespace scidb4gdal
 	    _t0 = new TPoint(t0);
 	    _dt = new TInterval(dt);
 	    _r = _dt->_resolution;
+	    _t0->_resolution = _r;
 	}
 	
 	/**
@@ -281,6 +282,9 @@ namespace scidb4gdal
 	void setTInterval(TInterval *interval) {
 	    _dt = interval;
 	    _r = interval->_resolution;
+	    if (_t0) {
+		_t0->_resolution = _r;
+	    }
 	}
 	
 	/**

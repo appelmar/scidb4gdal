@@ -93,9 +93,26 @@ namespace scidb4gdal {
     /** error code if validation fails */
     StatusCode error;
     /** the chunksize for each of the spatial dimensions*/
-    int chunksize_spatial = -1;
+    int chunksize_spatial;
     /** the blocksize for the temporal dimension */
-    int chunksize_temporal = -1;
+    int chunksize_temporal;
+    
+    CreationParameters() {
+      _init();
+    }
+    
+    /**
+     * @brief initializes the CreationParameters with default values
+     * 
+     * This function is intended to be called on constructing this structure and it initializes some attributes with default values
+     */
+    void _init() {
+      chunksize_spatial = -1;
+      chunksize_temporal = -1;
+      timestamp = "";
+      dt = "";
+      hasBBOX = false;
+    }
     
     /**
      * @brief validates the parameters for completenes

@@ -259,14 +259,17 @@ namespace scidb4gdal
      */
     SciDBDataset::SciDBDataset ( SciDBSpatialArray &array, ShimClient *client) : _array ( array ), _client ( client )
     {
-
+	//TODO check if the +1 is really needed or if this leeds to the one pixel borders
         this->nRasterXSize = 1 + _array.getXDim()->high - _array.getXDim()->low ;
         this->nRasterYSize = 1 + _array.getYDim()->high - _array.getYDim()->low ;
 
 	map <string, string> kv;
+
+	//TODO check if this is needed or if metadata is already stored in the array (it should be), this would save one unnecessary scidb call
         _client->getArrayMD ( kv, _array.name, "" ); //get metadata of default domain
 	map<string, string>::const_iterator itr;
 	
+	//when constructing the data set set each of the stored metadata coming from scidb
         for (itr = kv.begin(); itr != kv.end(); ++itr) {
 	  this->SetMetadataItem((*itr).first.c_str(),(*itr).second.c_str());
 	}
@@ -282,6 +285,7 @@ namespace scidb4gdal
 	SciDBSpatialArray* arr_ptr = &this->_array;
 	SciDBSpatioTemporalArray* st_arr_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(arr_ptr);
 	
+	// check if dynamic cast was successfull. if so then check for the temporal index and then calculate the timestamp according to the resolution
 	if (st_arr_ptr) {
 	  int tindex = -1;
 	  if (_client->_qp->hasTemporalIndex) {
@@ -292,12 +296,19 @@ namespace scidb4gdal
 	  
 	  if (tindex >= 0) {
 	    TPoint time = st_arr_ptr->datetimeAtIndex(tindex);
-	    this->SetMetadataItem("DATE_TIME", time.toStringISO().c_str());
+	    time._resolution = st_arr_ptr->getTInterval()->_resolution;
+// 	    stringstream ss; 
+// 	    ss << "Checking the TPoint of the st_array:\n" << st_arr_ptr->getTPoint()->toStringISO() << "\n";
+// 	    ss << "Checking the TInterval of the st_array:\n" << st_arr_ptr->getTInterval()->toStringISO() << "\n";
+// 	    ss << "Checking the TResolution of the st_array:\n" << st_arr_ptr->getTInterval()->_resolution << "\n";
+// 	    ss << "Checking the TResolution of the TPoint:\n" << st_arr_ptr->getTPoint()->_resolution;
+// 	    Utils::debug(ss.str());
+	    this->SetMetadataItem("TIMESTAMP", time.toStringISO().c_str());
 	  }
 	}
 	
+	
         // Set Metadata
-        
 
 
         // TODO: Overviews?
@@ -434,7 +445,7 @@ namespace scidb4gdal
 	  SciDBSpatioTemporalArray* st_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(array_ptr);
 	  bool isST = (st_ptr) ? true : false;
 	  
-	  // Dimensions
+	  // create Dimensions // Derive chunksize from attribute sizes
 	  if (options->chunksize_spatial > 0 && options->chunksize_temporal > 0) {
 	    Utils::debug("Using assigned spatial and temporal chunksizes.");
 	      //use both chunksizes, because both are stated / probably do nothing
@@ -480,8 +491,7 @@ namespace scidb4gdal
 	    st_ptr->getTDim()->chunksize = options->chunksize_temporal;
 	  } 
 
-	  // Derive chunksize from attribute sizes
-	  //TODO adapt for t dim as well
+	  
 	  
 	  
 	  SciDBDimension* dimx;
@@ -530,6 +540,34 @@ namespace scidb4gdal
 	  // Get Metadata // TODO: Add domains
 	  map<string, string> kv;
 	  gdalMDtoMap ( poSrcDS->GetMetadata(), kv );
+	  
+	  //in case the temporal information was stated in the image metadata parse the metadata now  and assign it to the create options and the spatio temporal array
+	  if (st_ptr && options->timestamp == "" && options->dt == "") {
+	    //find TIMESTAMP and TINTERVAL in the metadata
+	    string timestamp = "";
+	    string dt = "";
+	    
+	    for (std::map<string,string>::iterator itr = kv.begin(); itr != kv.end(); ++itr) {
+		if (itr->first == "TIMESTAMP") {
+		  timestamp = itr->second;
+		  kv.erase(itr);
+		  continue;
+		}
+		
+		if (itr->first == "TINTERVAL") {
+		  dt = itr->second;
+		  kv.erase(itr);
+		  continue;
+		}
+	    }
+	    //assign it to the create options
+	    options->timestamp = timestamp;
+	    options->dt = dt;
+	    
+	    //create the TPoint and TInterval from those information and assign it to the SpatioTemporal array
+	    st_ptr->createTRS(timestamp,dt);
+	  } 
+	  
 	  array.md.insert ( pair<string, MD> ( "", kv ) );
 	  
 
@@ -748,6 +786,7 @@ namespace scidb4gdal
 	string connstr = pszFilename;
 	ConnectionParameters *con_pars;
 	CreationParameters *create_pars;
+	QueryParameters *query_pars = new QueryParameters();
 	ParameterParser *pp;
 	ShimClient *client;
 	SciDBSpatialArray* src_array;
@@ -777,6 +816,10 @@ namespace scidb4gdal
 	    client = new ShimClient (con_pars); //connection parameters are set
 	    
 	    client->setCreateParameters(*create_pars); //create parameters regarding time
+	    
+	    //in order to open the array after creation the temporal information needs to be transferred also
+	    query_pars->timestamp = create_pars->timestamp;
+	    client->setQueryParameters(*query_pars);
 	  Utils::debug("-- DONE");
 	  
 	  Utils::debug("** Check if array already exists in the database **");
@@ -802,11 +845,19 @@ namespace scidb4gdal
 		Utils::debug("SciDBSpatialArray created.");
 		break;
 	      case ST_ARRAY:
-		src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		if (create_pars->timestamp == "" && create_pars->dt == "") {
+		  src_array = new SciDBSpatioTemporalArray();
+		} else {
+		  src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		}
 		Utils::debug("SciDBSpatioTemporalArray created.");
 		break;
 	      case ST_SERIES:
-		src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		if (create_pars->timestamp == "" && create_pars->dt == "") {
+		  src_array = new SciDBSpatioTemporalArray();
+		} else {
+		  src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		}
 		((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
 		Utils::debug("SciDBSpatioTemporalArray created with open temporal dimension (spatiotemporal series)");
 		break;
@@ -819,7 +870,7 @@ namespace scidb4gdal
 	    copyMetadataToArray(poSrcDS, *src_array,create_pars); //copies the information from the source data file into the ST_Array representation
 	    Utils::debug("Testing metadata copy: "+src_array->toString());
 	  Utils::debug("-- DONE");
-	  
+
 	  //prepare the target array
 	  Utils::debug("** Prepare the target array representation **");
 	  if (exists) {

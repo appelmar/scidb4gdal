@@ -370,7 +370,7 @@ namespace scidb4gdal
 	  case BBOX:
 	  { 
 	    vector<string> coords;
-	    
+	    Utils::debug("Got a bbox statement.");
 	    boost::split(coords,value,boost::is_any_of(" "));
 	    if (coords.size() != 4) {
  	      throw ERR_READ_BBOX;
