@@ -283,6 +283,11 @@ namespace scidb4gdal
       if (!_con->isValid()) {
 	loadParsFromEnv(_con);
       }
+      if(!_con->isValid()) {
+	stringstream s;
+	s << "Failed to extract connection information. host: "<< _con->host << ", array: " << _con->arrayname;
+	Utils::error(s.str());
+      }
 //       if (!_con->isValid()) {
 // 	throw ERR_GLOBAL_INVALIDCONNECTIONSTRING;
 //       }

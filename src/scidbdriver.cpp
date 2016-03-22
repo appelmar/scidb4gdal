@@ -179,14 +179,25 @@ namespace scidb4gdal
 
     double SciDBRasterBand::GetNoDataValue ( int *pbSuccess )
     {
-        string key = "NODATA";
-        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
-        if ( md.find ( key ) == md.end() ) {
+	string key = "NODATA";
+	double result;
+        MD md = _array->attrs[nBand - 1].md[""];
+        if ( md.find ( key ) == md.end()) {
             if ( pbSuccess != NULL ) *pbSuccess = false;
             return Utils::defaultNoDataGDAL ( this->GetRasterDataType() );
         }
+        string value = md[key];
+	boost::algorithm::trim(value);
+	
+	if (value.length() == 0) {
+	    if ( pbSuccess != NULL ) *pbSuccess = false;
+            return Utils::defaultNoDataGDAL ( this->GetRasterDataType() );
+	}
+        
+        //it is assured that there is an entry for NODATA
         if ( pbSuccess != NULL ) *pbSuccess = true;
-        return boost::lexical_cast<double> ( md[key] );
+	result = boost::lexical_cast<double> ( value );
+        return result;
     }
 
     double SciDBRasterBand::GetMaximum ( int *pbSuccess )
@@ -297,12 +308,6 @@ namespace scidb4gdal
 	  if (tindex >= 0) {
 	    TPoint time = st_arr_ptr->datetimeAtIndex(tindex);
 	    time._resolution = st_arr_ptr->getTInterval()->_resolution;
-// 	    stringstream ss; 
-// 	    ss << "Checking the TPoint of the st_array:\n" << st_arr_ptr->getTPoint()->toStringISO() << "\n";
-// 	    ss << "Checking the TInterval of the st_array:\n" << st_arr_ptr->getTInterval()->toStringISO() << "\n";
-// 	    ss << "Checking the TResolution of the st_array:\n" << st_arr_ptr->getTInterval()->_resolution << "\n";
-// 	    ss << "Checking the TResolution of the TPoint:\n" << st_arr_ptr->getTPoint()->_resolution;
-// 	    Utils::debug(ss.str());
 	    this->SetMetadataItem("TIMESTAMP", time.toStringISO().c_str());
 	  }
 	}
@@ -335,7 +340,9 @@ namespace scidb4gdal
             p = ( s.find ( '=' ) != string::npos ) ? s.find ( '=' ) : p;
             p = ( s.find ( ':' ) != string::npos ) ? s.find ( ':' ) : p;
             if ( p != string::npos ) {
-                kv.insert ( pair<string, string> ( s.substr ( 0, p ), s.substr ( p + 1, s.length() - p - 1 ) ) );
+		string key = s.substr ( 0, p );
+		string value = s.substr ( p + 1, s.length() - p - 1 );
+		if (value.length() > 0) kv.insert ( pair<string, string> ( key, value ));
             }
             it = strlist[++i];
 
@@ -534,6 +541,7 @@ namespace scidb4gdal
 	      }
 	  }
 
+	  
 
 	  Utils::debug ( "Reading metadata from source dataset" );
 
