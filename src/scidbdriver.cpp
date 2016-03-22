@@ -298,17 +298,27 @@ namespace scidb4gdal
 	
 	// check if dynamic cast was successfull. if so then check for the temporal index and then calculate the timestamp according to the resolution
 	if (st_arr_ptr) {
+	  int tmin = st_arr_ptr->getTDim()->low;
+	  int tmax = st_arr_ptr->getTDim()->high;
 	  int tindex = -1;
 	  if (_client->_qp->hasTemporalIndex) {
 	    tindex = _client->_qp->temp_index; //TODO find the place where the temporal index is stored in the array
-	  } else {
-	    tindex = 0;
-	  }
-	  
-	  if (tindex >= 0) {
+	    
 	    TPoint time = st_arr_ptr->datetimeAtIndex(tindex);
 	    time._resolution = st_arr_ptr->getTInterval()->_resolution;
 	    this->SetMetadataItem("TIMESTAMP", time.toStringISO().c_str());
+	  } else {
+	    TPoint start = st_arr_ptr->datetimeAtIndex(tmin);
+	    start._resolution = st_arr_ptr->getTInterval()->_resolution;
+	    this->SetMetadataItem("TS_START", start.toStringISO().c_str());
+	    
+	    if (tmin != tmax) {
+	      TPoint end = st_arr_ptr->datetimeAtIndex(tmax);
+	      end._resolution = st_arr_ptr->getTInterval()->_resolution;
+	      this->SetMetadataItem("TS_END", end.toStringISO().c_str());
+	      this->SetMetadataItem("TINTERVAL",st_arr_ptr->getTInterval()->toStringISO().c_str());
+	    }
+	    
 	  }
 	}
 	
@@ -1159,6 +1169,7 @@ namespace scidb4gdal
     CPLErr SciDBDataset::Delete ( const char *pszName )
     {
 	try {
+
 	  ParameterParser p = ParameterParser(pszName, NULL, SCIDB_DELETE);
 	  ConnectionParameters c = p.getConnectionParameters();
 	  
@@ -1208,6 +1219,12 @@ namespace scidb4gdal
 
 	  query_pars = &pp.getQueryParameters();
 	  con_pars = &pp.getConnectionParameters();
+	  
+	  stringstream out;
+	  out << "Query parameter control:\n\thasTemporalIndex: ";
+	  (query_pars->hasTemporalIndex) ? out << "TRUE" : out << "FALSE";
+	  out << "\n\ttemp_index: "<<query_pars->temp_index << "\n\ttimestamp: " << query_pars->timestamp;
+	  Utils::debug(out.str());
 	    
 	  // 2. Check validity of connection parameters
 	  if ( !con_pars->isValid()) {
@@ -1237,6 +1254,7 @@ namespace scidb4gdal
 	    Utils::debug("Type Cast OK. Start setting up temporal information");
 	      //check if the temporal index was set or if a timestamp was used
 	      if (query_pars->hasTemporalIndex) {
+		Utils::debug("Has index...");
 		char* t_index_key = new char[1];
 		t_index_key[0] = 't';
 		if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
@@ -1247,11 +1265,13 @@ namespace scidb4gdal
 		} 
 	      } else {
 		//convert date to temporal index
-		if (query_pars->timestamp == "") {
+		Utils::debug("Converting date to index");
+		if (query_pars->timestamp.length() == 0) {
 		  Utils::debug("No temporal index and no timestamp provided. Using first temporal index instead");
-		  query_pars->temp_index = 0;
-		  query_pars->hasTemporalIndex = true;
+		  query_pars->temp_index = -1;
+		  query_pars->hasTemporalIndex = false;
 		} else {
+		  Utils::debug("Transform date to index");
 		  TPoint time = TPoint(query_pars->timestamp);
 		  query_pars->temp_index = starray_ptr->indexAtDatetime(time);
 		  query_pars->hasTemporalIndex = true;
@@ -1263,13 +1283,19 @@ namespace scidb4gdal
 	      //dim = &starray_ptr->dims[starray_ptr->getTDimIdx()];
 	      dim = starray_ptr->getTDim();
 	      
-	      if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
-		  Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
-		  ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + starray_ptr->datetimeAtIndex(dim->low).toStringISO() + "), " +
-		    "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + starray_ptr->datetimeAtIndex(dim->high).toStringISO() + ")"
-		  );
-		  return NULL;
-	      }
+	      if (query_pars->hasTemporalIndex) {
+		if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
+		    Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
+		    ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + starray_ptr->datetimeAtIndex(dim->low).toStringISO() + "), " +
+		      "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + starray_ptr->datetimeAtIndex(dim->high).toStringISO() + ")"
+		    );
+		    return NULL;
+		}
+	      } /*else {
+		//set the temporal index to 0 (the first one, if no query parameter was stated)
+		query_pars->temp_index = starray_ptr->getTDim()->low;
+		query_pars->hasTemporalIndex = true;
+	      }*/
 	  }
 
 

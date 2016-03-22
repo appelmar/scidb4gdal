@@ -9,6 +9,11 @@ Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensi
 The driver offers support for reading and writing SciDB arrays. A single SciDB array may or may not be constructed from multiple (tiled) files. To build three-dimensional spacetime arrays, imagery can be automatically added to existing arrays based on its temporal snapshot (see details below).  
 
 ## News
+- (2016-03-22)
+    - Annotating date-time statement when downloading a spatio-temporal array from SciDB
+    - Reading of time and temporal resolution from metadata of input file
+- (2016-02-26)
+    - Chunksizes can be manually configured
 - (2016-02-05)
     - Major update to automatically add imagery to existing spacetime arrays 
 - (2015-09-01)
@@ -87,44 +92,55 @@ If you want to load an image into SciDB, we consider three different array repre
 The preferred mechanism to pass user defined settings is to use GDALs Create Options (-co flag). Each setting of the create options has to be a key-value pair that is separated by "=". 
 
 1. Spatial Array
-The spatial array is the default case of spatial image representation. This representation just assigns two dimensions for the spatial components and it attaches the spatial reference system that is stated in the metadata of the source file to the SciDB array. When creating this representation you should use the key-value pair `"type=S"`.
+
+   The spatial array is the default case of spatial image representation. This representation just assigns two dimensions for the spatial components and it attaches the spatial reference system that is stated in the metadata of the source file to the SciDB array. When creating this representation you should use the key-value pair `"type=S"`.
 
 2. Spatio-temporal Array
-The spatio temporal array is a representation where the spatial image has also a time stamp. For this purpose the driver will assign one additional temporal dimension to the array and it assigns a user defined temporal reference system (TRS). The temporal reference system consists of the starting date and the temporal resolution. The starting date needs to be written as a date or date/time string according to ISO 8601 and the temporal resolution is a temporal period string. For example one possible valid TRS statement would look like `"t=2014-08-10T10:00"` and `"dt=P1D"` meaning that this reference starts at 2014-08-10 and has a temporal resolution of one day. To create this array type use `"type=ST"`. Please be advised that this type refers simply to exactly one point in time. There is no way to add later images into this array. The minimum and maximum of the temporal dimension for this array will be set to zero.
+
+   The spatio temporal array is a representation where the spatial image has also a time stamp. For this purpose the driver will assign one additional temporal dimension to the array and it assigns a user defined temporal reference system (TRS). The temporal reference system consists of the starting date and the temporal resolution. The starting date needs to be written as a date or date/time string according to ISO 8601 and the temporal resolution is a temporal period string. For example one possible valid TRS statement would look like `"t=2014-08-10T10:00"` and `"dt=P1D"` meaning that this reference starts at 2014-08-10 and has a temporal resolution of one day. To create this array type use `"type=ST"`. Please be advised that this type refers simply to exactly one point in time. There is no way to add later images into this array. The minimum and maximum of the temporal dimension for this array will be set to zero.
 
 3. Spatio-temporal Series
-This array type is very similar to the Spatio-temporal Array, but it removes the restriction of the temporal dimension on carrying only one image. To be more concrete: This type only starts a time series. Additional images can then be inserted into this array by using the same array name and by using a Spatio-temporal Array. In order to start the spatio-temporal series, please use `"type=STS"`.
+
+   This array type is very similar to the Spatio-temporal Array, but it removes the restriction of the temporal dimension on carrying only one image. To be more concrete: This type only starts a time series. Additional images can then be inserted into this array by using the same array name and by using a Spatio-temporal Array. In order to start the spatio-temporal series, please use `"type=STS"`.
 
 Now that we have covered the main types, there is another addition in creating SciDB arrays. The before mentioned types will restrict the spatial dimension to the images boundary. This means that if it not explicitly stated otherwise the spatial boundaries will be fixed to that extent. But to allow later insertion of images into in an existing array, a bounding box and its coordinates reference system need to be stated, when creating the image (the first upload). We use the parameter keys "bbox" and "srs" for this purpose. By setting an alternate bounding box we will refer to the data stored as a coverage, whereas before the data represented the original image. Here is also an example on setting a valid coverage statement: `"bbox=443000 4650000 455000 4629000"` and `"srs=EPSG:26716"`. Note that the spatial reference system is addressed to by stating the authority name and the systems id.
 
 In the following we will give some explicit gdal_translate statements on how to create arrays:
-Create a spatial image from a file:
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "type=S" -of SciDB input_image.tif "SCIDB:array=test_spatial"`
 
-Create a spatial coverage from multiple files:
-1. Start a coverage by stating a bounding box with SRS
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "bbox=443000 4650000 455000 4629000" -co "srs=EPSG:26716" -co "type=S" -of SciDB part1.tif "SCIDB:array=test_spatial_coverage"`
+**Create a spatial image from a file:**
 
-2. Insert an image into the coverage
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "type=S" -of SciDB part2.tif "SCIDB:array=test_spatial_coverage"`
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "type=S" -of SciDB input_image.tif "SCIDB:array=test_spatial"`
 
-Create a Spatio-Temporal Array:
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=ST" -of SciDB input_image.tif "SCIDB:array=test_spatio_temporal"`
+**Create a spatial coverage from multiple files:**
 
-Create a Spatio-Temporal Series:
-1. Start series
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=STS" -of SciDB input_image_15.tif "SCIDB:array=test_spatio_temporal_series"`
+1. Start a coverage by stating a bounding box with SRS  
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "bbox=443000 4650000 455000 4629000" -co "srs=EPSG:26716" -co "type=S" -of SciDB part1.tif "SCIDB:array=test_spatial_coverage"`
 
-2. Insert an image to another time index after the starting date
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-16" -co "type=ST" -of SciDB input_image_16.tif "SCIDB:array=test_spatio_temporal_series"`
+2. Insert an image into the coverage  
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "type=S" -of SciDB part2.tif "SCIDB:array=test_spatial_coverage"`
 
-Create a Spatio-Temporal Series with larger boundaries:
-1. Start series and stating an additional extent
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "bbox=443000 4650000 455000 4629000" -co "srs=EPSG:26716" -co "type=STS" -of SciDB input_image_15.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
-2. Add image into the image of the 15th october
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=ST" -of SciDB input_image_15_2.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
-3. Add image at another date
-`gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-17" -co "type=ST" -of SciDB input_image_17.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
+**Create a Spatio-Temporal Array:**
+
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=ST" -of SciDB input_image.tif "SCIDB:array=test_spatio_temporal"`
+
+**Create a Spatio-Temporal Series:**
+
+1. Start series  
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=STS" -of SciDB input_image_15.tif "SCIDB:array=test_spatio_temporal_series"`
+
+2. Insert an image to another time index after the starting date  
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-16" -co "type=ST" -of SciDB input_image_16.tif "SCIDB:array=test_spatio_temporal_series"`
+
+**Create a Spatio-Temporal Series with larger boundaries:**
+
+1. Start series and stating an additional extent  
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "bbox=443000 4650000 455000 4629000" -co "srs=EPSG:26716" -co "type=STS" -of SciDB input_image_15.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
+
+2. Add image into the image of the 15th october  
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-15" -co "type=ST" -of SciDB input_image_15_2.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
+   
+3. Add image at another date  
+   `gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "dt=P1D" -co "t=2015-10-17" -co "type=ST" -of SciDB input_image_17.tif "SCIDB:array=test_spatio_temporal_series_coverage"`
 
 If a coverage is used please make sure that the coordinates of the images refer to the same spatial reference system. It is also important that all images that are inserted into a coverage are within the initially stated boundary!
 
@@ -140,6 +156,22 @@ gdal_translate (...) -co "CHUNKSIZE_SP=3000" -co "CHUNKSIZE_T=1" -of SciDB input
 gdal_translate (...) -co "CHUNKSIZE_SP=6000" -of SciDB input.tif "SCIDB:array=targetArray"
 gdal_translate (...) -co -co "CHUNKSIZE_T=10" -of SciDB input.tif "SCIDB:array=targetArray"
 ```
+
+### Using file metadata for time statements
+If an image was uploaded into SciDB with a temporal reference, then the downloaded image file will also carry date-time information. The metadata tag *TIMESTAMP* has the temporal information in the ISO 8601 format. Similarly you can use the tags *TIMESTAMP* and *TINTERVAL* to state the date of the image and the intended temporal resolution. If this metadata attachment is set, it will be used instead of the same create options (*t* and *dt*).
+
+Using gdal_translates assign metadata flag will help you to set the temporal metadata accordingly. Note that the naming of metadata tags is case-sensitive, which means that `TIMESTAMP` and `TINTERVAL` need to be written as stated.
+
+```
+#prepare input image
+gdal_translate -mo "TIMESTAMP=2016-03-01" -mo "TINTERVAL=P1D" input.tif temporal.tif
+
+#upload to scidb w/o date and resolution in create options
+gdal_translate -co "host=https://your.host.de" -co "port=31000" -co "user=user" -co "password=passwd" -co "type=ST" -of SciDB temporal.tif "SCIDB:array=test_spatio_temporal"
+```
+
+The metadata for spatial-timeseries will look similar, but here the temporal extent and the temporal resolution will be attached instead of a simple date-time. *TS_START* marks the date of the first entry. *TS_END* marks the last date of the entry and *TINTERVAL* states the used temporal resolution. This is a special case, when `gdalinfo` was called on a SciDB array (type STS) simply make no restriction of the query in the temporal domain and then it will show the temporal extent.
+
 ## Dependencies
 - At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers
 - [ST plugin] (https://github.com/mappl/scidb4geo) for SciDB

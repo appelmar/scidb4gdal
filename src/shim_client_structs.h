@@ -159,7 +159,7 @@ namespace scidb4gdal {
     /** flag whether or not the temporal index was set */
     bool hasTemporalIndex;
     
-    QueryParameters(): temp_index(-1) {}
+    QueryParameters(): temp_index(-1),hasTemporalIndex(false) {}
   };
   
   /**

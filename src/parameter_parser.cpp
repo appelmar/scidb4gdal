@@ -225,7 +225,9 @@ namespace scidb4gdal
 	      //temporal index
 	      _query->temp_index = boost::lexical_cast<int>(t_interval);
 	    }
-	    _query->hasTemporalIndex = true;
+	    if (_query->temp_index > 0) {
+	      _query->hasTemporalIndex = true;
+	    }
 	  }
 	} else {
 	  Utils::error("No temporal information stated");
@@ -412,6 +414,7 @@ namespace scidb4gdal
 	switch(enumKey) {
 	  case T_INDEX:
 	    //this T_INDEX is for query only!
+	    Utils::debug("Assign query parameter for temporal index");
 	    _query->temp_index = boost::lexical_cast<int>(value);
 	    _query->hasTemporalIndex = true;
 	    //TODO maybe we allow also selecting multiple slices (that will later be saved separately as individual files)
