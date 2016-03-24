@@ -225,7 +225,9 @@ namespace scidb4gdal
 	      //temporal index
 	      _query->temp_index = boost::lexical_cast<int>(t_interval);
 	    }
-	    _query->hasTemporalIndex = true;
+	    if (_query->temp_index > 0) {
+	      _query->hasTemporalIndex = true;
+	    }
 	  }
 	} else {
 	  Utils::error("No temporal information stated");
@@ -282,6 +284,11 @@ namespace scidb4gdal
       //TODO check if connection parameter are set. if not then try to parse parameter from global environment
       if (!_con->isValid()) {
 	loadParsFromEnv(_con);
+      }
+      if(!_con->isValid()) {
+	stringstream s;
+	s << "Failed to extract connection information. host: "<< _con->host << ", array: " << _con->arrayname;
+	Utils::error(s.str());
       }
 //       if (!_con->isValid()) {
 // 	throw ERR_GLOBAL_INVALIDCONNECTIONSTRING;
@@ -370,7 +377,7 @@ namespace scidb4gdal
 	  case BBOX:
 	  { 
 	    vector<string> coords;
-	    
+	    Utils::debug("Got a bbox statement.");
 	    boost::split(coords,value,boost::is_any_of(" "));
 	    if (coords.size() != 4) {
  	      throw ERR_READ_BBOX;
@@ -407,6 +414,7 @@ namespace scidb4gdal
 	switch(enumKey) {
 	  case T_INDEX:
 	    //this T_INDEX is for query only!
+	    Utils::debug("Assign query parameter for temporal index");
 	    _query->temp_index = boost::lexical_cast<int>(value);
 	    _query->hasTemporalIndex = true;
 	    //TODO maybe we allow also selecting multiple slices (that will later be saved separately as individual files)

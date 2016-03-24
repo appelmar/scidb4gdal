@@ -179,14 +179,25 @@ namespace scidb4gdal
 
     double SciDBRasterBand::GetNoDataValue ( int *pbSuccess )
     {
-        string key = "NODATA";
-        MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
-        if ( md.find ( key ) == md.end() ) {
+	string key = "NODATA";
+	double result;
+        MD md = _array->attrs[nBand - 1].md[""];
+        if ( md.find ( key ) == md.end()) {
             if ( pbSuccess != NULL ) *pbSuccess = false;
             return Utils::defaultNoDataGDAL ( this->GetRasterDataType() );
         }
+        string value = md[key];
+	boost::algorithm::trim(value);
+	
+	if (value.length() == 0) {
+	    if ( pbSuccess != NULL ) *pbSuccess = false;
+            return Utils::defaultNoDataGDAL ( this->GetRasterDataType() );
+	}
+        
+        //it is assured that there is an entry for NODATA
         if ( pbSuccess != NULL ) *pbSuccess = true;
-        return boost::lexical_cast<double> ( md[key] );
+	result = boost::lexical_cast<double> ( value );
+        return result;
     }
 
     double SciDBRasterBand::GetMaximum ( int *pbSuccess )
@@ -259,11 +270,21 @@ namespace scidb4gdal
      */
     SciDBDataset::SciDBDataset ( SciDBSpatialArray &array, ShimClient *client) : _array ( array ), _client ( client )
     {
-
+	//TODO check if the +1 is really needed or if this leeds to the one pixel borders
         this->nRasterXSize = 1 + _array.getXDim()->high - _array.getXDim()->low ;
         this->nRasterYSize = 1 + _array.getYDim()->high - _array.getYDim()->low ;
 
+	map <string, string> kv;
 
+	//TODO check if this is needed or if metadata is already stored in the array (it should be), this would save one unnecessary scidb call
+        _client->getArrayMD ( kv, _array.name, "" ); //get metadata of default domain
+	map<string, string>::const_iterator itr;
+	
+	//when constructing the data set set each of the stored metadata coming from scidb
+        for (itr = kv.begin(); itr != kv.end(); ++itr) {
+	  this->SetMetadataItem((*itr).first.c_str(),(*itr).second.c_str());
+	}
+	  
 
         // Create GDAL Bands
         for ( uint32_t i = 0; i < _array.attrs.size(); ++i )
@@ -271,9 +292,38 @@ namespace scidb4gdal
 
 
         this->SetDescription ( _array.toString().c_str() );
-
+	
+	SciDBSpatialArray* arr_ptr = &this->_array;
+	SciDBSpatioTemporalArray* st_arr_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(arr_ptr);
+	
+	// check if dynamic cast was successfull. if so then check for the temporal index and then calculate the timestamp according to the resolution
+	if (st_arr_ptr) {
+	  int tmin = st_arr_ptr->getTDim()->low;
+	  int tmax = st_arr_ptr->getTDim()->high;
+	  int tindex = -1;
+	  if (_client->_qp->hasTemporalIndex) {
+	    tindex = _client->_qp->temp_index; //TODO find the place where the temporal index is stored in the array
+	    
+	    TPoint time = st_arr_ptr->datetimeAtIndex(tindex);
+	    time._resolution = st_arr_ptr->getTInterval()->_resolution;
+	    this->SetMetadataItem("TIMESTAMP", time.toStringISO().c_str());
+	  } else {
+	    TPoint start = st_arr_ptr->datetimeAtIndex(tmin);
+	    start._resolution = st_arr_ptr->getTInterval()->_resolution;
+	    this->SetMetadataItem("TS_START", start.toStringISO().c_str());
+	    
+	    if (tmin != tmax) {
+	      TPoint end = st_arr_ptr->datetimeAtIndex(tmax);
+	      end._resolution = st_arr_ptr->getTInterval()->_resolution;
+	      this->SetMetadataItem("TS_END", end.toStringISO().c_str());
+	      this->SetMetadataItem("TINTERVAL",st_arr_ptr->getTInterval()->toStringISO().c_str());
+	    }
+	    
+	  }
+	}
+	
+	
         // Set Metadata
-        //this->SetMetadataItem("NODATA_VALUES", "0", "");
 
 
         // TODO: Overviews?
@@ -300,7 +350,9 @@ namespace scidb4gdal
             p = ( s.find ( '=' ) != string::npos ) ? s.find ( '=' ) : p;
             p = ( s.find ( ':' ) != string::npos ) ? s.find ( ':' ) : p;
             if ( p != string::npos ) {
-                kv.insert ( pair<string, string> ( s.substr ( 0, p ), s.substr ( p + 1, s.length() - p - 1 ) ) );
+		string key = s.substr ( 0, p );
+		string value = s.substr ( p + 1, s.length() - p - 1 );
+		if (value.length() > 0) kv.insert ( pair<string, string> ( key, value ));
             }
             it = strlist[++i];
 
@@ -346,6 +398,7 @@ namespace scidb4gdal
         return _array.srtext.c_str();
     }
     
+    /*
     char **SciDBDataset::GetMetadata ( const char *pszDomain )
     {
         map <string, string> kv;
@@ -356,6 +409,8 @@ namespace scidb4gdal
 //         else {
 //             _client->getArrayMD ( kv, _array.name, pszDomain );
 //         }
+
+	//check if there are also  
         return mapToGdalMD ( kv );
     }
 
@@ -373,7 +428,8 @@ namespace scidb4gdal
         return kv.find ( pszName )->second.c_str();
 
     }
-
+    */
+    
     ShimClient* SciDBDataset::getClient() {
 	return _client;
     }
@@ -406,7 +462,7 @@ namespace scidb4gdal
 	  SciDBSpatioTemporalArray* st_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(array_ptr);
 	  bool isST = (st_ptr) ? true : false;
 	  
-	  // Dimensions
+	  // create Dimensions // Derive chunksize from attribute sizes
 	  if (options->chunksize_spatial > 0 && options->chunksize_temporal > 0) {
 	    Utils::debug("Using assigned spatial and temporal chunksizes.");
 	      //use both chunksizes, because both are stated / probably do nothing
@@ -452,8 +508,7 @@ namespace scidb4gdal
 	    st_ptr->getTDim()->chunksize = options->chunksize_temporal;
 	  } 
 
-	  // Derive chunksize from attribute sizes
-	  //TODO adapt for t dim as well
+	  
 	  
 	  
 	  SciDBDimension* dimx;
@@ -496,12 +551,41 @@ namespace scidb4gdal
 	      }
 	  }
 
+	  
 
 	  Utils::debug ( "Reading metadata from source dataset" );
 
 	  // Get Metadata // TODO: Add domains
 	  map<string, string> kv;
 	  gdalMDtoMap ( poSrcDS->GetMetadata(), kv );
+	  
+	  //in case the temporal information was stated in the image metadata parse the metadata now  and assign it to the create options and the spatio temporal array
+	  if (st_ptr && options->timestamp == "" && options->dt == "") {
+	    //find TIMESTAMP and TINTERVAL in the metadata
+	    string timestamp = "";
+	    string dt = "";
+	    
+	    for (std::map<string,string>::iterator itr = kv.begin(); itr != kv.end(); ++itr) {
+		if (itr->first == "TIMESTAMP") {
+		  timestamp = itr->second;
+		  kv.erase(itr);
+		  continue;
+		}
+		
+		if (itr->first == "TINTERVAL") {
+		  dt = itr->second;
+		  kv.erase(itr);
+		  continue;
+		}
+	    }
+	    //assign it to the create options
+	    options->timestamp = timestamp;
+	    options->dt = dt;
+	    
+	    //create the TPoint and TInterval from those information and assign it to the SpatioTemporal array
+	    st_ptr->createTRS(timestamp,dt);
+	  } 
+	  
 	  array.md.insert ( pair<string, MD> ( "", kv ) );
 	  
 
@@ -720,6 +804,7 @@ namespace scidb4gdal
 	string connstr = pszFilename;
 	ConnectionParameters *con_pars;
 	CreationParameters *create_pars;
+	QueryParameters *query_pars = new QueryParameters();
 	ParameterParser *pp;
 	ShimClient *client;
 	SciDBSpatialArray* src_array;
@@ -749,6 +834,10 @@ namespace scidb4gdal
 	    client = new ShimClient (con_pars); //connection parameters are set
 	    
 	    client->setCreateParameters(*create_pars); //create parameters regarding time
+	    
+	    //in order to open the array after creation the temporal information needs to be transferred also
+	    query_pars->timestamp = create_pars->timestamp;
+	    client->setQueryParameters(*query_pars);
 	  Utils::debug("-- DONE");
 	  
 	  Utils::debug("** Check if array already exists in the database **");
@@ -774,11 +863,19 @@ namespace scidb4gdal
 		Utils::debug("SciDBSpatialArray created.");
 		break;
 	      case ST_ARRAY:
-		src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		if (create_pars->timestamp == "" && create_pars->dt == "") {
+		  src_array = new SciDBSpatioTemporalArray();
+		} else {
+		  src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		}
 		Utils::debug("SciDBSpatioTemporalArray created.");
 		break;
 	      case ST_SERIES:
-		src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		if (create_pars->timestamp == "" && create_pars->dt == "") {
+		  src_array = new SciDBSpatioTemporalArray();
+		} else {
+		  src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,create_pars->dt);
+		}
 		((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = INT64_MAX; //set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
 		Utils::debug("SciDBSpatioTemporalArray created with open temporal dimension (spatiotemporal series)");
 		break;
@@ -791,7 +888,7 @@ namespace scidb4gdal
 	    copyMetadataToArray(poSrcDS, *src_array,create_pars); //copies the information from the source data file into the ST_Array representation
 	    Utils::debug("Testing metadata copy: "+src_array->toString());
 	  Utils::debug("-- DONE");
-	  
+
 	  //prepare the target array
 	  Utils::debug("** Prepare the target array representation **");
 	  if (exists) {
@@ -1016,11 +1113,7 @@ namespace scidb4gdal
 	  
 	  return new SciDBDataset(*src_array, client);
 	} catch (StatusCode e) {
-	    if (client) delete client; 
-	    if (con_pars) delete con_pars;
-	    if (create_pars) delete create_pars ;
-	    if (src_array)delete src_array;
-	    if (tar_arr) delete tar_arr;
+
 	    //catch exceptions and give information back to the user
 	    switch (e) {
 	      case ERR_GLOBAL_PARSE:  
@@ -1076,6 +1169,7 @@ namespace scidb4gdal
     CPLErr SciDBDataset::Delete ( const char *pszName )
     {
 	try {
+
 	  ParameterParser p = ParameterParser(pszName, NULL, SCIDB_DELETE);
 	  ConnectionParameters c = p.getConnectionParameters();
 	  
@@ -1125,6 +1219,12 @@ namespace scidb4gdal
 
 	  query_pars = &pp.getQueryParameters();
 	  con_pars = &pp.getConnectionParameters();
+	  
+	  stringstream out;
+	  out << "Query parameter control:\n\thasTemporalIndex: ";
+	  (query_pars->hasTemporalIndex) ? out << "TRUE" : out << "FALSE";
+	  out << "\n\ttemp_index: "<<query_pars->temp_index << "\n\ttimestamp: " << query_pars->timestamp;
+	  Utils::debug(out.str());
 	    
 	  // 2. Check validity of connection parameters
 	  if ( !con_pars->isValid()) {
@@ -1154,6 +1254,7 @@ namespace scidb4gdal
 	    Utils::debug("Type Cast OK. Start setting up temporal information");
 	      //check if the temporal index was set or if a timestamp was used
 	      if (query_pars->hasTemporalIndex) {
+		Utils::debug("Has index...");
 		char* t_index_key = new char[1];
 		t_index_key[0] = 't';
 		if (CSLFindName(poOpenInfo->papszOpenOptions,t_index_key) >= 0) {
@@ -1164,11 +1265,13 @@ namespace scidb4gdal
 		} 
 	      } else {
 		//convert date to temporal index
-		if (query_pars->timestamp == "") {
+		Utils::debug("Converting date to index");
+		if (query_pars->timestamp.length() == 0) {
 		  Utils::debug("No temporal index and no timestamp provided. Using first temporal index instead");
-		  query_pars->temp_index = 0;
-		  query_pars->hasTemporalIndex = true;
+		  query_pars->temp_index = -1;
+		  query_pars->hasTemporalIndex = false;
 		} else {
+		  Utils::debug("Transform date to index");
 		  TPoint time = TPoint(query_pars->timestamp);
 		  query_pars->temp_index = starray_ptr->indexAtDatetime(time);
 		  query_pars->hasTemporalIndex = true;
@@ -1177,19 +1280,23 @@ namespace scidb4gdal
 	      
 	      //get dimension for time
 	      SciDBDimension *dim;
-	      dim = &starray_ptr->dims[starray_ptr->getTDimIdx()];
-
-	      if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
-		  Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
-		  ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + starray_ptr->datetimeAtIndex(dim->low).toStringISO() + "), " +
-		    "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + starray_ptr->datetimeAtIndex(dim->high).toStringISO() + ")"
-		  );
-		  return NULL;
-	      }
+	      //dim = &starray_ptr->dims[starray_ptr->getTDimIdx()];
+	      dim = starray_ptr->getTDim();
+	      
+	      if (query_pars->hasTemporalIndex) {
+		if (query_pars->temp_index < dim->low || query_pars->temp_index > dim->high) {
+		    Utils::error ( "Specified temporal index out of bounce. Temporal Index stated or calculated: " + boost::lexical_cast<string>(query_pars->temp_index) +
+		    ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" + starray_ptr->datetimeAtIndex(dim->low).toStringISO() + "), " +
+		      "Upper bound: " + boost::lexical_cast<string>(dim->high) + " (" + starray_ptr->datetimeAtIndex(dim->high).toStringISO() + ")"
+		    );
+		    return NULL;
+		}
+	      } /*else {
+		//set the temporal index to 0 (the first one, if no query parameter was stated)
+		query_pars->temp_index = starray_ptr->getTDim()->low;
+		query_pars->hasTemporalIndex = true;
+	      }*/
 	  }
-
-
-	  delete con_pars;
 
 
 	  // Create the dataset

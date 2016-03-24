@@ -42,23 +42,23 @@ namespace scidb4geo
      */
     enum TResolution {
       /** no temporal resoultion */
-      NONE, 
+      NONE=0, 
       /** temporal resoultion of one year */
-      YEAR, 
+      YEAR=1, 
       /** temporal resolution of one month */
-      MONTH, 
+      MONTH=2, 
       /** temporal resoultion of one week */
-      WEEK,
+      WEEK=3,
       /** temporal resolution of one day */
-      DAY, 
+      DAY=4, 
       /** temporal resolution of one hour */
-      HOUR, 
+      HOUR=5, 
       /** temporal resolution of one minute */
-      MINUTE, 
+      MINUTE=6, 
       /** temporal resolution of one second */
-      SECOND, 
+      SECOND=7, 
       /** temporal resolution of the fraction of a second */
-      FRACTION
+      FRACTION=8
     };
 
     // Forward declarations

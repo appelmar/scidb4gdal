@@ -143,7 +143,7 @@ namespace scidb4gdal
 	 * @param pszDomain the domain of interest. Use "" or NULL for the default domain
 	 * @return char** NULL or a string list. 
 	 */
-	char ** GetMetadata ( const char * pszDomain = "");
+	//char ** GetMetadata ( const char * pszDomain = "");
 	
 	/**
 	 * @brief Set single metadata item. 
@@ -153,7 +153,7 @@ namespace scidb4gdal
 	 * @param pszDomain the value to assign to the key. 
 	 * @return const char*
 	 */
-	const char * GetMetadataItem (const char * pszName, const char * pszDomain = "");
+	//const char * GetMetadataItem (const char * pszName, const char * pszDomain = "");
 
         /**
         * Function for creating a new SciDB array based on an existing GDAL dataset.

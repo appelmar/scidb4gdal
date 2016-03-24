@@ -78,7 +78,6 @@ namespace scidb4geo
         int ndig = 0;
         int pos = 0;
         int len = str.length();
-
         boost::algorithm::trim ( str );
 
         while ( pos < len && !isdigit ( str[pos] ) ) ++pos;
@@ -264,14 +263,14 @@ namespace scidb4geo
     string TPoint::toStringISO()
     {
         //return to_iso_extended_string(_pt);
-
+	
         stringstream s;
-        s << setw ( 4 ) << std::setfill ( '0' ) << _pt.date().year();
-        s << "-" << setw ( 2 ) << std::setfill ( '0' ) << _pt.date().month().as_number();
-        s << "-" << setw ( 2 ) << std::setfill ( '0' ) << _pt.date().day().as_number();
-        s << "T" << setw ( 2 ) << std::setfill ( '0' ) << _pt.time_of_day().hours();
-        s << ":" << setw ( 2 ) << std::setfill ( '0' ) << _pt.time_of_day().minutes();
-        s << ":" << setw ( 2 ) << std::setfill ( '0' ) << _pt.time_of_day().seconds();
+	if (this->_resolution >= YEAR) s << setw ( 4 ) << std::setfill ( '0' ) << _pt.date().year();
+        if (this->_resolution >= MONTH) s << "-" << setw ( 2 ) << std::setfill ( '0' ) << _pt.date().month().as_number();
+        if (this->_resolution >= DAY) s << "-" << setw ( 2 ) << std::setfill ( '0' ) << _pt.date().day().as_number();
+        if (this->_resolution >= HOUR) s << "T" << setw ( 2 ) << std::setfill ( '0' ) << _pt.time_of_day().hours();
+        if (this->_resolution >= MINUTE) s << ":" << setw ( 2 ) << std::setfill ( '0' ) << _pt.time_of_day().minutes();
+        if (this->_resolution >= SECOND) s << ":" << setw ( 2 ) << std::setfill ( '0' ) << _pt.time_of_day().seconds();
         s.flush();
         return s.str();
 
