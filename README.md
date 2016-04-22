@@ -9,6 +9,8 @@ Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensi
 The driver offers support for reading and writing SciDB arrays. A single SciDB array may or may not be constructed from multiple (tiled) files. To build three-dimensional spacetime arrays, imagery can be automatically added to existing arrays based on its temporal snapshot (see details below).  
 
 ## News
+- (2016-04-22)
+    - Python tool for batch uploading images into a spatio-temporal series
 - (2016-03-22)
     - Annotating date-time statement when downloading a spatio-temporal array from SciDB
     - Reading of time and temporal resolution from metadata of input file
@@ -67,7 +69,8 @@ The following examples demonstrate how to upload single images to simple two-dim
 1. Upload the whole array
 `gdal_translate -of SciDB "hello_scidb.tif" "SCIDB:array=hello_scidb"`
 
-
+Note:
+There are limitation on [naming the SciDB Array](http://paradigm4.com/HTMLmanual/13.3/scidb_ug/ch04s01.html). Allowed are alphanumerical values and the Underscore sign ("_"). 
 
 
 ## Details
