@@ -145,6 +145,13 @@ namespace scidb4gdal
     {
 
         CURLcode res = curl_easy_perform ( _curl_handle );
+		
+		/* 2016-04-27: Added a second perform() for HTTP digest auth */
+		long response_code;
+		curl_easy_getinfo (_curl_handle,CURLINFO_RESPONSE_CODE, &response_code);
+		if (response_code == 401) res = curl_easy_perform ( _curl_handle );
+		
+	
         for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
             stringstream s;
             s << "Connection error, retrying ... " << "(#" << i << ")";
