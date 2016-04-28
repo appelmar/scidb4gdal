@@ -37,7 +37,7 @@ def printHelp():
     print '\t-w\t\t\t The users password'
     print "\t\t--pwd="
     print ""
-    print "\t\t--border=\t The size of the border in percent. Default 0.1% = 0.001"
+    print "\t\t--border=\t The size of the border in percent. Default 0.5% = 0.005"
     print ""
     print "\t\t--chunk_sp=\t The spatial chunksize for the target array"
     print ""
@@ -45,7 +45,7 @@ def printHelp():
     print ""
     print "\t\t--t_srs=\t The target reference system in case the images have different spatial reference systems"
     print ""
-    print "\t\t--add=\t Boolean value to mark if whether or not the images shall be uploaded into an existing SciDB array."
+    print "\t\t--add=\t\t Boolean value to mark if whether or not the images shall be uploaded into an existing SciDB array."
     sys.exit()
 
 # http://gis.stackexchange.com/questions/57834/how-to-get-raster-corner-coordinates-using-python-gdal-bindings
@@ -78,7 +78,7 @@ def gdal_error_handler(err_class, err_num, err_msg):
 def warp(file,authority,srs):
     warp_append="_warped"
     path,ending=os.path.splitext(file)
-    warped_file = path+warp_append+ending
+    warped_file = path+warp_append+".tif"
     if (not os.path.isfile(warped_file)):
 	warp_command = ["gdalwarp","-t_srs", authority+":"+srs, "-r", "bilinear", "-of", "GTiff", file, warped_file]
 	#print ("gdalwarp -t_srs "+authority+":"+srs+" -r bilinear -of GTiff "+file+" "+warped_file)
