@@ -10,7 +10,7 @@ There are several prerequisites that have to be met before you can upload the da
 
 ### Software
 
-For the script you need the SciDB-driver extension for GDAL and also on the server site, you need a SciDB database (>= version 12) with the SCIDB4GEO extension. For GDAL, please make sure that the PATH variables are set, meaning that you can call for example `gdalinfo` without further path suffix. Here, we provide some links on how to [install GDAL from source](https://trac.osgeo.org/gdal/wiki/BuildHints) and how to [install the SciDB driver](https://github.com/mappl/scidb4gdal/blob/master/README.md).
+For the script you need the SciDB-driver extension for GDAL and also on the server site, you need a SciDB database (>= version 14.12) with the SCIDB4GEO extension. For GDAL, please make sure that the PATH variables are set, meaning that you can call for example `gdalinfo` without further path suffix. Here, we provide some links on how to [install GDAL from source](https://trac.osgeo.org/gdal/wiki/BuildHints) and how to [install the SciDB driver](https://github.com/mappl/scidb4gdal/blob/master/README.md).
 This script also needs Python v2.7 or newer.
 
 ### Data
@@ -41,6 +41,7 @@ The script can be configured by using different parameters. The following table 
 | --chunk_t= | | no | The temporal chunksize for the target array. As a default assumed to be 1 for optimal upload performance. |
 | --t_srs= | | no | The target spatial reference system in case the images have different spatial reference systems |
 | --add= | | no | Boolean value to mark, whether or not the images shall be uploaded into an existing SciDB array. Allowed case-insensitive variables (T,TRUE,1,Y,YES) otherwise it is marked as false. |
+| --type=| | yes | The type of the array that needs to be created. Use 'S' to create a purely spatial array (no temporal dimension) or use 'ST' or 'STS' to create a spatio-temporal array. |
 
 Note: The connection details (host, port, user and password) are required! However, it is not necessary to use the parameters to do so. The SciDB driver for GDAL also allows the use of environment variables. In case they are set, explicitly stated parameters will be treated as the preferred information source.
 
@@ -96,21 +97,21 @@ batch_upload.py -d /your/image/path -a target_array --t_srs EPSG:3395 --border=0
 
 Minimal with environment connection variables
 ```
-batch_upload.py -d /your/image/path -a target_array 
+batch_upload.py -d /your/image/path -a target_array --type=ST
 ```
 
 Minimal w/o environment connection variables
 ```
-batch_upload.py -h https://www.host.net/ -p 32000 -u user -w password -d /your/image/path -a target_array 
-batch_upload.py --host=https://www.host.net/ --port=32000 --user=user --pwd=password --dir=/your/image/path --array=target_array 
+batch_upload.py -h https://www.host.net/ -p 32000 -u user -w password -d /your/image/path -a target_array --type=ST
+batch_upload.py --host=https://www.host.net/ --port=32000 --user=user --pwd=password --dir=/your/image/path --array=target_array --type=ST
 ```
 
 Adding to existing array
 ```
-batch_upload.py -d /your/image/path -a target_array --add=T
-batch_upload.py -d /your/image/path -a target_array --add=TRUE
-batch_upload.py -d /your/image/path -a target_array --add=YES
-batch_upload.py -d /your/image/path -a target_array --add=Y
-batch_upload.py -d /your/image/path -a target_array --add=1
+batch_upload.py -d /your/image/path -a target_array --type=S --add=T
+batch_upload.py -d /your/image/path -a target_array --type=S --add=TRUE
+batch_upload.py -d /your/image/path -a target_array --type=S --add=YES
+batch_upload.py -d /your/image/path -a target_array --type=S --add=Y
+batch_upload.py -d /your/image/path -a target_array --type=S --add=1
 ```
 

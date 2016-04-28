@@ -46,6 +46,9 @@ def printHelp():
     print "\t\t--t_srs=\t The target reference system in case the images have different spatial reference systems"
     print ""
     print "\t\t--add=\t\t Boolean value to mark if whether or not the images shall be uploaded into an existing SciDB array."
+    print ""
+    print "\t\t--type=\t The type of the array that needs to be created. Use 'S' to create a purely spatial array (no temporal dimension) or use 'ST' or 'STS' to create a spatio-temporal array."
+    print "\t\t--product=\t LANDSAT or MODIS. If set then the temporal information will be extracted from the well defined file name for those products."
     sys.exit()
 
 # http://gis.stackexchange.com/questions/57834/how-to-get-raster-corner-coordinates-using-python-gdal-bindings
@@ -106,12 +109,18 @@ def parseParameter(argv):
   global ch_t
   global t_srs
   global add
+  global spatial
+  global test
+  global product
   array=None
   directory=None
   host=port=user=pwd=t_srs=None
   con=0
   border=ch_sp=ch_t=None
   add = False
+  spatial=None
+  test=False
+  product=None
   
   #if no parameters are provided return the help text
   if (len(argv) == 0):
@@ -120,7 +129,7 @@ def parseParameter(argv):
   
   # otherwise try to read and assign the function parameter
   try:
-      opts, args = getopt.getopt(argv,"h:d:a:p:u:w:",["help=","dir=","array=","host=","port=","user=","pwd=","border=","chunk_sp=","chunk_t=","t_srs=","add="])
+      opts, args = getopt.getopt(argv,"h:d:a:p:u:w:",["help=","dir=","array=","host=","port=","user=","pwd=","border=","chunk_sp=","chunk_t=","t_srs=","add=","type=","test=","product="])
   except getopt.GetoptError:
       printHelp()
       sys.exit(2)
@@ -154,6 +163,22 @@ def parseParameter(argv):
 	 t_srs = arg
       elif opt in ("--add"):
 	 add = True if (arg.lower()=="true" or arg=="1" or arg.lower()=="t" or arg.lower()=="y" or arg.lower()=="yes") else False
+      elif opt in ("--type"):
+	 if (arg.lower()=="s"):
+	    spatial = True
+	 elif (arg.lower()=="sts" or arg.lower() == "st"):
+	    spatial = False
+	 else:
+	    sys.exit("Error: The used value for parameter 'type' is not supported. Please use: S, ST or STS")
+      elif opt in ("--test"):
+	 test = True if (arg.lower()=="true" or arg=="1" or arg.lower()=="t" or arg.lower()=="y" or arg.lower()=="yes") else False
+      elif opt in ("--product"):
+	  if (arg.lower() == "landsat" or arg.lower()=="modis"):
+	    product=arg.lower()
+	  else:
+	    sys.exit("Error: Product not supported.")
+	 
+	    
 
 def multi_delete(list_, args):
     indexes = sorted(args, reverse=True)
@@ -178,8 +203,25 @@ def  printConnectionString():
   return "host="+host+" port="+str(port)+" user="+user+" password="+pwd
 
 def getTime(item):
-  return item[2]
+  return item[1].GetMetadataItem("TIMESTAMP")
+  #return item[2]
 
+def extractTemporalInformation(product,name):
+  
+  if (product=="landsat"):
+      start=9
+      length=7
+      time = name[start:start+length]
+      time = time[:4]+"-"+time[4:]
+      interval="P1D"
+  elif (product == "modis"):
+      start=10
+      length=7
+      time = name[start:start+length]
+      time = time[:4]+"-"+time[4:]
+      interval="P1D"
+  
+  return (time,interval)
 
 #
 # The main method of this script
@@ -189,12 +231,18 @@ if __name__ == "__main__":
   gdal.PushErrorHandler(gdal_error_handler)
 
   parseParameter(sys.argv[1:])
+  
+  #check required parameter
   if (directory is None):
     sys.exit('ERROR: Directory or file is missing.')
   
   if (array is None):
      sys.exit('ERROR: No target array specified.')
   
+  if (spatial is None):
+    sys.exit("Error: Cannot distinguish if a spatial or spatio-temporal array shall be created. Please use parameter --type to state the type of the array")
+    
+    
   #after the commandline parameter are checked, check environment variables for connection information
   #in case some information are missing. If they are create an error.
   if (con > -4):
@@ -217,7 +265,6 @@ if __name__ == "__main__":
       sys.exit("Error: No password stated.")
     else: 
       con += 1
-
  
   version_num = int(gdal.VersionInfo('VERSION_NUM'))
   if version_num < 1100000:
@@ -240,24 +287,34 @@ if __name__ == "__main__":
 	  img = gdal.Open(path)
       except:
 	  continue
-	
+      
       if (not(img is None)):
-	# check if the temporal information was set and if the temporal interval is the same in all images, if not throw an error
-	if (img.GetMetadataItem("TIMESTAMP") is None):
-	  gdal.Error(3, ++error_count, "An image does not have a time stamp meta data tag.")
-	  
-	timestamp=img.GetMetadataItem("TIMESTAMP")
-	  
-	if (img.GetMetadataItem("TINTERVAL") is None):
-	  gdal.Error(3, ++error_count, "An image does not have a temporal interval meta data tag.")
-	  
-	if (file_list.index(f) == 0):
-	  interval=img.GetMetadataItem("TINTERVAL")
-	  
-	elif (img.GetMetadataItem("TINTERVAL") != interval):
-	  gdal.Error(3, ++error_count, "One or more images have a different temporal interval meta data entry.")
-	  
-	table.append((path,img,timestamp)) 
+	if (not spatial):
+	    if (product is None):
+	      # check if the temporal information was set and if the temporal interval is the same in all images, if not throw an error
+	      if (img.GetMetadataItem("TIMESTAMP") is None):
+		gdal.Error(3, ++error_count, "An image does not have a time stamp meta data tag.")
+		
+	      timestamp=img.GetMetadataItem("TIMESTAMP")
+		
+	      if (img.GetMetadataItem("TINTERVAL") is None):
+		gdal.Error(3, ++error_count, "An image does not have a temporal interval meta data tag.")
+		
+	      if (file_list.index(f) == 0):
+		interval=img.GetMetadataItem("TINTERVAL")
+		
+	      elif (img.GetMetadataItem("TINTERVAL") != interval):
+		gdal.Error(3, ++error_count, "One or more images have a different temporal interval meta data entry.")
+		
+	      table.append((path,img,timestamp)) 
+	    else:
+	      t,tint=extractTemporalInformation(product,f)
+	      img.SetMetadataItem("TIMESTAMP",t)
+	      img.SetMetadataItem("TINTERVAL",tint)
+	      
+	      table.append((path,img,t))
+	else:
+	    table.append((path,img))
       else:
 	gdal.Error(1,++error_count, "No driver for \""+path+"\" found. Skipping file.")
 	continue
@@ -266,6 +323,9 @@ if __name__ == "__main__":
 
   authority = code = None
   
+  #sort the table based on the timestamp
+  if (not spatial):
+    table = sorted(table,key=getTime)
 
   cleaning = []
   
@@ -297,7 +357,15 @@ if __name__ == "__main__":
 	p = warp(tupl[0],authority,code)
 	if (not(p is None)):
 	    t=gdal.Open(p)
-	    table.append((p,t,tupl[2]))
+	    time= img.GetMetadataItem("TIMESTAMP")
+	    tint= img.GetMetadataItem("TINTERVAL")
+	    
+	    t.SetMetadataItem("TIMESTAMP",time)
+	    t.SetMetadataItem("TINTERVAL",tint)
+	    if (not spatial):
+	      table.append((p,t,tupl[2]))
+	    else:
+	      table.append((p,t))
 	
 	index = table.index(tupl)
 	cleaning.append(index)
@@ -307,9 +375,15 @@ if __name__ == "__main__":
   #remove the old files that have been warped  
   table=multi_delete(table,cleaning)
   
+  #get the maximum extent for the bounding box
   for tupl in table:
       img = tupl[1]
       proj = img.GetProjectionRef()
+      
+      timestamp=img.GetMetadataItem("TIMESTAMP")
+      tint=img.GetMetadataItem("TINTERVAL")
+      print timestamp+tint
+      
       src = osr.SpatialReference()
       src.ImportFromWkt(proj)
       s_auth= src.GetAttrValue("authority",0)
@@ -337,11 +411,8 @@ if __name__ == "__main__":
 	  right = img_right if (img_right > right) else right
 	  top = img_top if (img_top > top) else top
 	  bottom = img_bottom if (img_bottom < bottom) else bottom
-      
       #end of loop
-
-  table = sorted(table,key=getTime)
-  
+      
   #apply some boundary uncertainty to make sure the bbox is not too small by a little amount
   if (border is None):
     border=0.005 #0.5% border
@@ -354,8 +425,10 @@ if __name__ == "__main__":
   #if the command has got some connection information rather than storing it as environment parameter, then use the connection string method of GDAL
   useConStr=(con<0)
   failedUploads = []
-  nofails=0
+  nofails=0 #number of failed uploads
   
+  if (test):
+      sys.exit("Test Modus with no command execution")
   
   #if the array shall be created fresh (not adding) then remove the old one first
   if (not add):
@@ -376,20 +449,32 @@ if __name__ == "__main__":
       command.append("SciDB")
       
       if (i == 0 and not add):
+	  # this is for creating the array for the first time
 	  command.append("-co")
-	  command.append("type=STS")
+	  if (spatial) :
+	    command.append("type=S")
+	  else:
+	    command.append("type=STS")
+	    command.append("-co")
+	    command.append("t="+table[i][1].GetMetadataItem("TIMESTAMP"))
+	    command.append("-co")
+	    command.append("dt="+table[i][1].GetMetadataItem("TINTERVAL"))
+	    
 	  command.append("-co")
 	  command.append("bbox="+str(left)+" "+ str(bottom) + " "+ str(right) + " "+ str(top))
 	  command.append("-co")
 	  command.append("srs="+authority+":"+str(code)) 	  
       else:
+	  # at this point we are simply adding images to the array
 	  command.append("-co")
-	  command.append("type=ST")
-      
-      command.append("-co")
-      command.append("t="+table[i][1].GetMetadataItem("TIMESTAMP"))
-      command.append("-co")
-      command.append("dt="+table[i][1].GetMetadataItem("TINTERVAL"))
+	  if (spatial) :
+	    command.append("type=S")
+	  else:
+	    command.append("type=ST")
+	    command.append("-co")
+	    command.append("t="+table[i][1].GetMetadataItem("TIMESTAMP"))
+	    command.append("-co")
+	    command.append("dt="+table[i][1].GetMetadataItem("TINTERVAL"))
       
       if (not (ch_sp is None)):
 	command.append("-co")
