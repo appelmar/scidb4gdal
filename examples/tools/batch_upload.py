@@ -4,7 +4,7 @@
 # parts were taken from the tutorial at https://pcjericks.github.io/py-gdalogr-cookbook/gdal_general.html
 #
 
-import sys, math, getopt, time
+import sys, math, getopt, time, re
 try:
     from osgeo import ogr, osr, gdal
     from subprocess import call
@@ -48,7 +48,14 @@ def printHelp():
     print "\t\t--add=\t\t Boolean value to mark if whether or not the images shall be uploaded into an existing SciDB array."
     print ""
     print "\t\t--type=\t The type of the array that needs to be created. Use 'S' to create a purely spatial array (no temporal dimension) or use 'ST' or 'STS' to create a spatio-temporal array."
-    print "\t\t--product=\t LANDSAT or MODIS. If set then the temporal information will be extracted from the well defined file name for those products."
+    print ""
+    print "\t\t--product=\t LANDSAT / MODIS or CUSTOM. If set then the temporal information will be extracted from the well defined file name for those products."
+    print ""
+    print "\t\t--regexp=\t In case you want to use a custom regular expression to read the temporal information, then use regexp, replacement and t_interval. Please, use group naming in order to address groups for the replace statement"
+    print ""
+    print "\t\t--replace=\t Another regular expression that will be used to transform the file name with the regular expression into a valid ISO 8601 date-time string"
+    print ""
+    print "\t\t--t_interval=\t The temporal resolution that will be used passed as a valid ISO 8601 interval string."
     sys.exit()
 
 # http://gis.stackexchange.com/questions/57834/how-to-get-raster-corner-coordinates-using-python-gdal-bindings
@@ -112,6 +119,9 @@ def parseParameter(argv):
   global spatial
   global test
   global product
+  global fileregexp
+  global temp_interval
+  global replacement
   array=None
   directory=None
   host=port=user=pwd=t_srs=None
@@ -121,6 +131,7 @@ def parseParameter(argv):
   spatial=None
   test=False
   product=None
+  fileregexp=temp_interval=replacement=None
   
   #if no parameters are provided return the help text
   if (len(argv) == 0):
@@ -129,7 +140,7 @@ def parseParameter(argv):
   
   # otherwise try to read and assign the function parameter
   try:
-      opts, args = getopt.getopt(argv,"h:d:a:p:u:w:",["help=","dir=","array=","host=","port=","user=","pwd=","border=","chunk_sp=","chunk_t=","t_srs=","add=","type=","test=","product="])
+      opts, args = getopt.getopt(argv,"h:d:a:p:u:w:",["help=","dir=","array=","host=","port=","user=","pwd=","border=","chunk_sp=","chunk_t=","t_srs=","add=","type=","test=","product=","regexp=","t_interval=","replace="])
   except getopt.GetoptError:
       printHelp()
       sys.exit(2)
@@ -173,10 +184,16 @@ def parseParameter(argv):
       elif opt in ("--test"):
 	 test = True if (arg.lower()=="true" or arg=="1" or arg.lower()=="t" or arg.lower()=="y" or arg.lower()=="yes") else False
       elif opt in ("--product"):
-	  if (arg.lower() == "landsat" or arg.lower()=="modis"):
+	  if (arg.lower() == "landsat" or arg.lower()=="modis" or arg.lower() == "custom"):
 	    product=arg.lower()
 	  else:
 	    sys.exit("Error: Product not supported.")
+      elif opt in ("--regexp"):
+	 fileregexp = arg
+      elif opt in ("--replace"):
+	 replacement = arg
+      elif opt in ("--t_interval"):
+	 temp_interval = arg
 	 
 	    
 
@@ -208,20 +225,25 @@ def getTime(item):
 
 def extractTemporalInformation(product,name):
   
-  if (product=="landsat"):
-      start=9
-      length=7
-      time = name[start:start+length]
-      time = time[:4]+"-"+time[4:]
-      interval="P1D"
-  elif (product == "modis"):
-      start=10
-      length=7
-      time = name[start:start+length]
-      time = time[:4]+"-"+time[4:]
-      interval="P1D"
-  
-  return (time,interval)
+    if (fileregexp is None and replacement is None):
+	if (product=="landsat"):
+	    pattern = "^L(?P<sensor>[A-Z]{1})(?P<satellite>[\d]{1})(?P<wrsPath>[\d]{3})(?P<wrsRow>[\d]{3})(?P<year>[\d]{4})(?P<dayOfYear>[\d]{3})(?P<gsi>[A-Z]{3})(?P<version>[\d]{2}).*"
+	    comp = re.compile(pattern)
+	    time = comp.sub("\g<year>-\g<dayOfYear>",name)
+	    interval="P1D" if (temp_interval is None) else temp_interval
+	elif (product == "modis"):
+	    pattern = "^[\w]{8}\.A(?P<year>[\d]{4})(?P<dayOfYear>[\d]{3})\.((?P<hour>[\d]{2})(?P<minutes>[\d]{2})\.)?(?P<version>[\w]{3})\.(?P<productionDateTime>[\d]{13})"
+	    comp = re.compile(pattern)
+	    time = comp.sub("\g<year>-\g<dayOfYear>",name)
+	    interval="P1D" if (temp_interval is None) else temp_interval
+	
+	return (time,interval)
+    elif (not(fileregexp is None) and not(replacement is None) and not(temp_interval is None) ):
+	comp = re.compile(fileregexp)
+	time = comp.sub(replacement,name)
+	return (time,temp_interval)
+    else:
+	sys.exit("ERROR: Unsufficient REGEXP information to extract temporal information from file name")
 
 #
 # The main method of this script
@@ -240,7 +262,7 @@ if __name__ == "__main__":
      sys.exit('ERROR: No target array specified.')
   
   if (spatial is None):
-    sys.exit("Error: Cannot distinguish if a spatial or spatio-temporal array shall be created. Please use parameter --type to state the type of the array")
+    sys.exit("ERROR: Cannot distinguish if a spatial or spatio-temporal array shall be created. Please use parameter --type to state the type of the array")
     
     
   #after the commandline parameter are checked, check environment variables for connection information
@@ -281,7 +303,7 @@ if __name__ == "__main__":
       path = join(directory,f)
       path_cap,ending = os.path.splitext(path)
       
-      if (ending == ".bak"):
+      if (ending == ".bak" or ending == ".xml"):
 	  continue
       try:
 	  img = gdal.Open(path)
@@ -382,7 +404,6 @@ if __name__ == "__main__":
       
       timestamp=img.GetMetadataItem("TIMESTAMP")
       tint=img.GetMetadataItem("TINTERVAL")
-      print timestamp+tint
       
       src = osr.SpatialReference()
       src.ImportFromWkt(proj)
