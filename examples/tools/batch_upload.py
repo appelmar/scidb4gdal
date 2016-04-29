@@ -4,7 +4,7 @@
 # parts were taken from the tutorial at https://pcjericks.github.io/py-gdalogr-cookbook/gdal_general.html
 #
 
-import sys, math, getopt, time, re
+import sys, math, getopt, time, re, glob
 try:
     from osgeo import ogr, osr, gdal
     from subprocess import call
@@ -298,7 +298,11 @@ if __name__ == "__main__":
   interval = None
   
   # list all files in the directory and try to open them, if GDAL cannot open a file it will be skipped.
-  file_list=os.listdir(directory)
+  if (directory.endswith("/")):
+      directory += "*"
+  file_list = glob.glob(directory)
+
+  
   for f in file_list:
       path = join(directory,f)
       path_cap,ending = os.path.splitext(path)

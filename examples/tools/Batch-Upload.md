@@ -47,9 +47,9 @@ The script can be configured by using different parameters. The following table 
 | --replace= | | no *2 | Another regular expression that will be used to transform the file name with the regular expression into a valid ISO 8601 date-time string |
 | --t_interval= | | no *2 | The temporal resolution that will be used passed as a valid ISO 8601 interval string. |
 
-Note 1: The connection details (host, port, user and password) are required! However, it is not necessary to use the parameters to do so. The SciDB driver for GDAL also allows the use of environment variables. In case they are set, explicitly stated parameters will be treated as the preferred information source.
+*Note 1: The connection details (host, port, user and password) are required! However, it is not necessary to use the parameters to do so. The SciDB driver for GDAL also allows the use of environment variables. In case they are set, explicitly stated parameters will be treated as the preferred information source.*
 
-Note 2: If you use a custom regular expression, make sure to use all parameters: product=CUSTOM, regexp, replace and t_interval.
+*Note 2: If you use a custom regular expression, make sure to use all parameters: product=CUSTOM, regexp, replace and t_interval.*
 
 ### Information on automated spatial transformation
 The automated transformation is a simplified transformation and as that the following parameter and settings for the `gdalwarp` command are fixed:
@@ -75,7 +75,7 @@ The following examples shall be used as an orientation on how to perform certain
 gdal_merge.py -separate -of GTiff -a_nodata 0 -o <foldername>.tif <foldername>/*_band1.tif <foldername>/*_band2.tif <foldername>/*_band3.tif <foldername>/*_band4.tif <foldername>/*_band5.tif <foldername>/*_band61.tif <foldername>/*_band62.tif <foldername>/*_band7.tif
 ```
 
-Note: <foldername> needs to be replaced by the actual folder name and also the 'bandX' suffix may differ from your data. Further information on how to use `gdal_merge` you can find [here](http://www.gdal.org/gdal_merge.html).
+*Note: <foldername> needs to be replaced by the actual folder name and also the 'bandX' suffix may differ from your data. Further information on how to use `gdal_merge` you can find [here](http://www.gdal.org/gdal_merge.html).*
 
 ### Annotating temporal information to an image
 
@@ -83,7 +83,7 @@ Note: <foldername> needs to be replaced by the actual folder name and also the '
 gdal_edit.py -mo TIMESTAMP=2016-04-20 -mo TINTERVAL=P1D your_file.tif
 ```
 
-Note: The keys 'TIMESTAMP' and 'TINTERVAL' are essential and they need to be written in capital letters. The timestamp and the temporal interval need to be formulated as a valid ISO 8601 string. Also further information on how to use gdal_edit, you can find [here](http://www.gdal.org/gdal_edit.html).
+*Note: The keys 'TIMESTAMP' and 'TINTERVAL' are essential and they need to be written in capital letters. The timestamp and the temporal interval need to be formulated as a valid ISO 8601 string. Also further information on how to use gdal_edit, you can find [here](http://www.gdal.org/gdal_edit.html).*
 
 ### Manual Spatial Transformation
 
@@ -91,7 +91,7 @@ Note: The keys 'TIMESTAMP' and 'TINTERVAL' are essential and they need to be wri
 gdalwarp -of GTiff -t_srs EPSG:4326 -r bilinear input.tif output.tif
 ```
 
-Note: More information on gdalwarp you can find [here](http://www.gdal.org/gdalwarp.html). In order to minimize distortions due to the spatial reference system, you should consider global reference systems (like EPSG:4326 or EPSG:3395) for long-range coverage and other suitable systems for medium (e.g. NAD27 or UTM) and local coverage. Please choose the reference system wisely according to your intended observation area.
+*Note: More information on gdalwarp you can find [here](http://www.gdal.org/gdalwarp.html). In order to minimize distortions due to the spatial reference system, you should consider global reference systems (like EPSG:4326 or EPSG:3395) for long-range coverage and other suitable systems for medium (e.g. NAD27 or UTM) and local coverage. Please choose the reference system wisely according to your intended observation area.*
 
 ### Automated Spatial Transformation
 
@@ -101,18 +101,18 @@ batch_upload.py -d /your/image/path -a target_array --t_srs EPSG:3395 --border=0
 
 ### Batch Upload Examples
 
-Minimal with environment connection variables
+**Minimal with environment connection variables**
 ```
 batch_upload.py -d /your/image/path -a target_array --type=ST
 ```
 
-Minimal w/o environment connection variables
+**Minimal w/o environment connection variables**
 ```
 batch_upload.py -h https://www.host.net/ -p 32000 -u user -w password -d /your/image/path -a target_array --type=ST
 batch_upload.py --host=https://www.host.net/ --port=32000 --user=user --pwd=password --dir=/your/image/path --array=target_array --type=ST
 ```
 
-Adding to existing array
+**Adding to existing array**
 ```
 batch_upload.py -d /your/image/path -a target_array --type=S --add=T
 batch_upload.py -d /your/image/path -a target_array --type=S --add=TRUE
@@ -121,18 +121,28 @@ batch_upload.py -d /your/image/path -a target_array --type=S --add=Y
 batch_upload.py -d /your/image/path -a target_array --type=S --add=1
 ```
 
-Using file names as temporal information
-    ```
-    ./batch_upload.py -d /your/image/path -a target_array --type=ST --regexp="^.{9}(?P<y>[\d]{4})(?P<doy>[\d]{3}).*" --replace="\g<y>-\g<doy>" --t_interval=P1D --product=CUSTOM
-    ```
-    This command will use a custom version of the temporal information extraction by filename. It will use the regular expression of `regexp` to match each filename. By using named groups (?P<parameter_name>) the second regular expression provided by `replace` can call the named groups, so that a ISO 8601 conform date or date-time string can be created.
+**Using file names as temporal information**
+
+```
+./batch_upload.py -d /your/image/path -a target_array --type=ST --regexp="^.{9}(?P<y>[\d]{4})(?P<doy>[\d]{3}).*" --replace="\g<y>-\g<doy>" --t_interval=P1D --product=CUSTOM
+```
+
+This command will use a custom version of the temporal information extraction by filename. It will use the regular expression of `regexp` to match each filename. By using named groups (?P<parameter_name>) the second regular expression provided by `replace` can call the named groups, so that a ISO 8601 conform date or date-time string can be created.
+
+You can also use predefined products like MODIS or LANDSAT, since the filenaming for those products follows a certain standard.
+
+```
+./batch_upload.py -d /your/image/path -a target_array --type=ST --product=MODIS
+./batch_upload.py -d /your/image/path -a target_array --type=ST --product=LANDSAT
+./batch_upload.py -d /your/image/path -a target_array --type=ST --product=LANDSAT --t_interval=P16D
+```
+
+As a default the temporal resolution for those products is one day ("P1D"), but with `t_interval` you can change this according to your data set.
+
+Please make sure you use valid RegExpression, because those will not be validated in the code. To get started with regular expression you might want to use [this](https://en.wikipedia.org/wiki/Regular_expression) or [this](https://docs.python.org/2/library/re.html) as a starting point.
     
-    You can also use predefined products like MODIS or LANDSAT, since the filenaming for those products follows a certain standard.
-    ```
-    ./batch_upload.py -d /your/image/path -a target_array --type=ST --product=MODIS
-    ./batch_upload.py -d /your/image/path -a target_array --type=ST --product=LANDSAT
-    ./batch_upload.py -d /your/image/path -a target_array --type=ST --product=LANDSAT --t_interval=P16D
-    ```
-    As a default the temporal resolution for those products is one day ("P1D"), but with `t_interval` you can change this according to your data set.
-    
-    Please make sure you use valid RegExpression, because those will not be validated in the code. To get started with regular expression you might want to use [this](https://en.wikipedia.org/wiki/Regular_expression) or [this](https://docs.python.org/2/library/re.html) as a starting point.
+**Select images in directory by using wildcards and regular expressions**
+```
+./batch_upload.py -d "/your/img/path/*_band1.tif" -a target_array --type=ST --product=LANDSAT
+```
+*Note: Whenever you use wildcards or similar make sure to use quotation marks.*
