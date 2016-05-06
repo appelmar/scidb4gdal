@@ -9,6 +9,8 @@ Otherwise, the GDAL driver might be still useful e.g. for converting two-dimensi
 The driver offers support for reading and writing SciDB arrays. A single SciDB array may or may not be constructed from multiple (tiled) files. To build three-dimensional spacetime arrays, imagery can be automatically added to existing arrays based on its temporal snapshot (see details below).  
 
 ## News
+- (2016-04-22)
+    - Python tool for batch uploading images into a spatio-temporal series
 - (2016-03-22)
     - Annotating date-time statement when downloading a spatio-temporal array from SciDB
     - Reading of time and temporal resolution from metadata of input file
@@ -67,7 +69,8 @@ The following examples demonstrate how to upload single images to simple two-dim
 1. Upload the whole array
 `gdal_translate -of SciDB "hello_scidb.tif" "SCIDB:array=hello_scidb"`
 
-
+Note:
+There are limitation on [naming the SciDB Array](http://paradigm4.com/HTMLmanual/13.3/scidb_ug/ch04s01.html). Allowed are alphanumerical values and the Underscore sign ("_"). 
 
 
 ## Details
@@ -145,7 +148,7 @@ In the following we will give some explicit gdal_translate statements on how to 
 If a coverage is used please make sure that the coordinates of the images refer to the same spatial reference system. It is also important that all images that are inserted into a coverage are within the initially stated boundary!
 
 ### Deleting arrays
-In order to allow GDAL to delete arrays, we enabled this particular feature via gdalmanage. Since gdalmanage does not support opening options, the connection string approach must be used, e.g. `gdalmanage delete "SCIDB:array=test_spatial host=https://your.host.de port=31000 user=user password=passwd confirmDelete=Y"`. This command completely removes the array from the database. Please be sure that the array is gone once this command is executed. An additional parameter "confirmDelete" was introduced in order to prevent accidental deletion of an array. This is due to GDALs QuietDelete function that is called on each gdal_translate call. As values the following strings are allowed (case-insensitive): YES, Y, TRUE, T or 1.
+In order to allow GDAL to delete arrays, we enabled this particular feature via gdalmanage. Since gdalmanage does not support opening options, the connection string approach must be used, e.g. `gdalmanage delete "SCIDB:array=test_spatial host=https://your.host.de port=31000 user=user password=passwd confirmDelete=Y"`. This command completely removes the array from the database. Please be sure that the array is gone once this command is executed. An additional parameter "confirmDelete" was introduced in order to prevent accidental deletion of an array. This is due to GDALs QuietDelete function that is called on each gdal_translate call. As values the following strings are allowed (case-insensitive): YES, Y, TRUE, T or 1. Rather than explicitly stating the connection parameters you can also use the afore mentioned environment parameter, however `the confirmDelete` parameter is required to be set explicitly.
 
 ### Adjusting chunksizes manually
 SciDB manages its data in so called chunks. Pradigm4 suggests for those chunks to select sizes so that each chunk uses about 10 to 20 MB storage. Important to know is also that the chunks are stored for each attribute individually that are combined by a process called vertical partioning [link] (http://paradigm4.com/HTMLmanual/13.3/scidb_ug/ch04s05s02.htmlhttp://paradigm4.com/HTMLmanual/13.3/scidb_ug/ch04s05s02.html). In order to chose a suitable size this plugin will calculate chunksizes based on the spatial dimensions, the temporal dimension (if set) and the attributes data type sizes. Also we allow the setting of custom chunksizes with the create option keys "CHUNKSIZE_SP" and "CHUNKSIZE_T". The values that are required in this key-value pairs are the number of cells (integer value). If just one chunksize is stated the missing one will be calculated using the default total chunk size of 32MB and the biggest data type of the bands. In the case you don't specify a chunksize the default temporal chunksize of 1 is assumed and the spatial chunksize will be treated as missing and therefore calculated.
