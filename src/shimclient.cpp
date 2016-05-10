@@ -44,6 +44,13 @@ namespace scidb4gdal
       _auth ( "" )
     {
         curl_global_init ( CURL_GLOBAL_ALL );
+#ifdef CURL_ADDPORTTOURL
+      /* 2016-05-10: Fix problems with digest authentification. The port is simply added to the base URL because 
+      * libcurl automatically uses default ports (443,80) in 2nd digest auth requests (as a result of 401 responses). */
+      stringstream ss;
+      ss << _host << ":" << _port;
+      _host = ss.str();
+#endif
     }
     
     ShimClient::ShimClient ( string host, uint16_t port, string user, string passwd, bool ssl = false) : 
@@ -57,6 +64,13 @@ namespace scidb4gdal
       _auth ( "" )
     {
         curl_global_init ( CURL_GLOBAL_ALL );
+#ifdef CURL_ADDPORTTOURL
+      /* 2016-05-10: Fix problems with digest authentification. The port is simply added to the base URL because 
+      * libcurl automatically uses default ports (443,80) in 2nd digest auth requests (as a result of 401 responses). */
+      stringstream ss;
+      ss << _host << ":" << _port;
+      _host = ss.str();
+#endif
     }
     
     ShimClient::ShimClient(ConnectionParameters* con)
@@ -70,6 +84,13 @@ namespace scidb4gdal
       _curl_initialized = false; 
       _auth = "";
       curl_global_init ( CURL_GLOBAL_ALL );
+#ifdef CURL_ADDPORTTOURL
+      /* 2016-05-10: Fix problems with digest authentification. The port is simply added to the base URL because 
+       * libcurl automatically uses default ports (443,80) in 2nd digest auth requests (as a result of 401 responses). */
+      stringstream ss;
+      ss << _host << ":" << _port;
+      _host = ss.str();
+#endif
     }
 
     
@@ -146,10 +167,10 @@ namespace scidb4gdal
 
         CURLcode res = curl_easy_perform ( _curl_handle );
 		
-		/* 2016-04-27: Added a second perform() for HTTP digest auth */
-		long response_code;
-		curl_easy_getinfo (_curl_handle,CURLINFO_RESPONSE_CODE, &response_code);
-		if (response_code == 401) res = curl_easy_perform ( _curl_handle );
+	/* 2016-04-27: Added a second perform() for HTTP digest auth */
+	long response_code;
+	curl_easy_getinfo (_curl_handle,CURLINFO_RESPONSE_CODE, &response_code);
+	if (response_code == 401) res = curl_easy_perform ( _curl_handle );
 		
 	
         for ( int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i ) {
@@ -1232,7 +1253,11 @@ namespace scidb4gdal
         // UPLOAD FILE ////////////////////////////
         stringstream ss;
         ss.str ( "" );
-        ss << _host << ":" << _port <<  SHIMENDPOINT_UPLOAD_FILE; // neccessary to put port in URL due to  HTTP 100-continue
+ #ifdef CURL_ADDPORTTOURL
+        ss << _host <<  SHIMENDPOINT_UPLOAD_FILE; 
+ #else     
+        ss << _host << ":" << _port <<  SHIMENDPOINT_UPLOAD_FILE; 
+ #endif
         ss << "?" << "id=" << sessionID;
         if ( _ssl && !_auth.empty() ) ss << "&auth=" << _auth; // Add auth parameter if using ssl
 

@@ -53,6 +53,7 @@ SOFTWARE.
 
 #define CURL_RETRIES 3
 //#define CURL_VERBOSE  // Uncomment this line if you want to debug CURL requests and responses
+#define CURL_ADDPORTTOURL // if defined, appends :PORT to the base URL. This is a simple workaround to not use standard ports in successive curl requests with digest authentification
 
 namespace scidb4gdal
 {
