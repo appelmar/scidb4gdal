@@ -4,6 +4,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
+#include <string>
 
 namespace scidb4gdal
 {
@@ -189,7 +190,7 @@ namespace scidb4gdal
         size_t t_start = _con->arrayname.find_first_of('[');
         size_t t_end = _con->arrayname.find_last_of(']');
 
-        if (t_start < 0 || t_end < 0) {
+        if (t_start == std::string::npos|| t_end == std::string::npos) {
             Utils::error("No or invalid temporal information in array name.");
             return;
         }

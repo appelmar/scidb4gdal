@@ -9,9 +9,6 @@ cd gdaldev
             --with-curl \
             --without-geos \
             --without-libtool \
-            --with-libz=internal \
-            --with-libtiff=internal \
-            --with-geotiff=internal \
             --without-gif \
             --without-pg \
             --without-grass \
@@ -19,9 +16,6 @@ cd gdaldev
             --without-cfitsio \
             --without-pcraster \
             --without-netcdf \
-            --without-png \
-            --without-jpeg \
-            --without-gif \
             --without-ogdi \
             --without-fme \
             --without-hdf4 \
