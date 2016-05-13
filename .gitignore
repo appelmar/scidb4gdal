@@ -27,6 +27,8 @@
 *.out
 *.app
 
+gdaldev
+
 # KDE4 files
 *.kdev4
 /.project
