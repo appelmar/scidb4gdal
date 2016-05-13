@@ -31,10 +31,7 @@ An reproducible example with MODIS and SRTM data can be found in a recent blog-p
     - Improved performance for both read and write access
 
 ## Getting Started
-Similar to other database drivers for GDAL, we define a connection string to address a SciDB array as a GDAL dataset. The connection string must contain an array name and may have further arguments like connection details of the database. With release of GDAL version 2.0, we added opening and create options to specify database connection details. Examples below demonstrate how a SciDB array can be accessed using gdalinfo.
-
-
-Examples how to reference a SciDB array:
+Similar to other database drivers for GDAL, we define a connection string to reference SciDB arrays. The connection string must contain an array name and may have further arguments like connection details of the database. With release of GDAL version 2.0, we added opening and create options to specify database connection details. Examples below demonstrate how a SciDB array can be referenced using gdalinfo.
 
 - identifier based: `gdalinfo "SCIDB:array=<arrayname> [host=<host> port=<port> user=<user> password=<password>]"`
 
@@ -63,9 +60,9 @@ The following examples demonstrate how to upload single images to simple two-dim
 `gdal_translate -of SciDB "hello_scidb.tif" "SCIDB:array=hello_scidb"`
 
 ## Dependencies
-- At the moment the driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. In the future, this may or may not be changed to connecting directly to SciDB sockets using Google's protocol buffers
-- [ST plugin] (https://github.com/mappl/scidb4geo) for SciDB
-- We use [cURL](http://curl.haxx.se/) to interface with SciDB's web service shim
+- The driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. 
+- [Spacetime extension] (https://github.com/mappl/scidb4geo) for SciDB
+- [cURL](http://curl.haxx.se/) to communicate with SciDB's HTTP web service shim
 - Some [Boost](http://www.boost.org) header-only libraries (no external libraries required for linking) for string functions
 
 
