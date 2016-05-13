@@ -52,16 +52,17 @@ SOFTWARE.
 
 #define CURL_RETRIES 3
 //#define CURL_VERBOSE  // Uncomment this line if you want to debug CURL
-//requests and responses
-#define CURL_ADDPORTTOURL  // if defined, appends :PORT to the base URL. This is
-                           // a simple workaround to not use standard ports in
-                           // successive curl requests with digest
-                           // authentification
+// requests and responses
+#define CURL_ADDPORTTOURL // if defined, appends :PORT to the base URL. This is
+                          // a simple workaround to not use standard ports in
+                          // successive curl requests with digest
+                          // authentification
 
-namespace scidb4gdal {
-using namespace std;
+namespace scidb4gdal
+{
+    using namespace std;
 
-/**
+    /**
  * @brief Basic Shim client class
  *
  * SciDB allows for two major interfaces to interact with the database. One is
@@ -77,7 +78,8 @@ using namespace std;
  * of function to either create, manipulate or delete SciDB arrays.
  * To perform all those interaction the SHIM client representation needs
  * authentication credentials and other task dependent information, that are
- * captured in the scidb4gdal::ConnectionParameters, scidb4gdal::QueryParameters and
+ * captured in the scidb4gdal::ConnectionParameters, scidb4gdal::QueryParameters
+ *and
  * scidb4gdal::CreationParameters, which will be created by the
  * scidb4gdal::ParameterParser
  * that reads and evaluates the parameters from the command.
@@ -112,18 +114,19 @@ using namespace std;
  * @author Marius Appel, IfGI Muenster
  * @author Florian Lahn, IfGI Muenster
  */
-class ShimClient {
- public:
-  friend class SciDBDataset;
-  /**
+    class ShimClient
+    {
+      public:
+        friend class SciDBDataset;
+        /**
    * @brief Basic constructor
    *
    * Default constructor for the Shim client, initializes all members with
    *default values.
    */
-  ShimClient();
+        ShimClient();
 
-  /**
+        /**
    * Custom constructor for the Shim client providing connection information as
    * arguments.
    * Currently, only HTTP digest authentification is supported, HTTPS with PAM
@@ -133,9 +136,9 @@ class ShimClient {
    * @param user username
    * @param passwd password
    */
-  ShimClient(string host, uint16_t port, string user, string passwd, bool ssl);
+        ShimClient(string host, uint16_t port, string user, string passwd, bool ssl);
 
-  /**
+        /**
    * @brief Constructor with scidb4gdal::ConnectionParameters
    *
    * Creates a new SHIM client by passing the authentication parameters for the
@@ -143,14 +146,14 @@ class ShimClient {
    *
    * @param scidb4gdal::ConnectionParameters
    */
-  ShimClient(ConnectionParameters *con);
+        ShimClient(ConnectionParameters* con);
 
-  /**
+        /**
    * Default destructor f Shim clients.
    */
-  ~ShimClient();
+        ~ShimClient();
 
-  /**
+        /**
    * @brief Retreives the basic image information from SciDB and stores it in a
    *appropriate representation.
    *
@@ -166,9 +169,9 @@ class ShimClient {
    *function, spatial reference information can be missing if not found
    * @return scidb4gdal::StatusCode
    */
-  StatusCode getArrayDesc(const string &inArrayName, SciDBSpatialArray *&out);
+        StatusCode getArrayDesc(const string& inArrayName, SciDBSpatialArray*& out);
 
-  /**
+        /**
   * @brief Retreives single attribute data from shim for a given bounding box
   *
   * This functions performs a HTTP query with an AFL request to prepare a subset
@@ -193,11 +196,11 @@ class ShimClient {
   * @param emptycheck a boolean to state whether or not to check for empty cells
   * @return scidb4gdal::StatusCode
   */
-  StatusCode getData(SciDBSpatialArray &array, uint8_t nband, void *outchunk,
-                     int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max,
-                     bool use_subarray = true, bool emptycheck = true);
+        StatusCode getData(SciDBSpatialArray& array, uint8_t nband, void* outchunk,
+                           int32_t x_min, int32_t y_min, int32_t x_max, int32_t y_max,
+                           bool use_subarray = true, bool emptycheck = true);
 
-  /**
+        /**
    * @brief Fetches the band statistics of the data from the SciDB database
    *
    * Gets simple band statistics using in-database aggregation functions
@@ -207,10 +210,10 @@ class ShimClient {
    * @param out result statistics, i.e. min, max, mean, sd
    * @return scidb4gdal::StatusCode
    */
-  StatusCode getAttributeStats(SciDBSpatialArray &array, uint8_t nband,
-                               SciDBAttributeStats &out);
+        StatusCode getAttributeStats(SciDBSpatialArray& array, uint8_t nband,
+                                     SciDBAttributeStats& out);
 
-  /**
+        /**
    * @brief intializes the cURL easy interface
    *
    * Initializes cURL's easy interface, should be performaed before each web
@@ -218,9 +221,9 @@ class ShimClient {
    *
    * @return void
    */
-  void curlBegin();
+        void curlBegin();
 
-  /**
+        /**
    * @brief Cancels the cURL easy interface and cleans up
    *
    * Cleans up cURL's easy interface, should be performaed after each web
@@ -228,9 +231,9 @@ class ShimClient {
    *
    * @return void
    */
-  void curlEnd();
+        void curlEnd();
 
-  /**
+        /**
    * @brief Executes a HTTP request
    *
    * Wrapper function around curl_easy_perform that retries requests and
@@ -238,18 +241,18 @@ class ShimClient {
    *
    * @return CURLcode
    */
-  CURLcode curlPerform();
+        CURLcode curlPerform();
 
-  /**
+        /**
    * @brief Checks the cURL connection
    *
    * Tests a shim connection by requesting version information
    *
    * @return scidb4gdal::StatusCode
    */
-  StatusCode testConnection();
+        StatusCode testConnection();
 
-  /**
+        /**
    * @brief Creates a new (temporary) SciDB array
    *
    * This function uses the stated SciDBSpatialArray with its original name and
@@ -261,9 +264,9 @@ class ShimClient {
    * @param array metadata representation of a spatial array
    * @return scidb4gdal::StatusCode
    */
-  StatusCode createTempArray(SciDBSpatialArray &array);
+        StatusCode createTempArray(SciDBSpatialArray& array);
 
-  /**
+        /**
   * @brief Makes a temporary array persistent in SciDB
   *
   * This function applies the 'store' command to a temporary array in SciDB,
@@ -275,9 +278,9 @@ class ShimClient {
   * @param tarArr array name of the target array
   * @return scidb4gdal::StatusCode
   */
-  StatusCode persistArray(string srcArr, string tarArr);
+        StatusCode persistArray(string srcArr, string tarArr);
 
-  /**
+        /**
    * @brief Inserts a chunk of data to an existing array
    *
    * The data file will be uploaded to the server using the "upload file"
@@ -306,10 +309,10 @@ class ShimClient {
    *from GDAL!
    * @return scidb4gdal::StatusCode
    */
-  StatusCode insertData(SciDBSpatialArray &array, void *inChunk, int32_t x_min,
-                        int32_t y_min, int32_t x_max, int32_t y_max);
+        StatusCode insertData(SciDBSpatialArray& array, void* inChunk, int32_t x_min,
+                              int32_t y_min, int32_t x_max, int32_t y_max);
 
-  /**
+        /**
    * @brief Inserts an array in SciDB into another one if they are compatible
    *
    * Tries to inset an array in SciDB into another array. It is important that
@@ -324,9 +327,9 @@ class ShimClient {
    *array is inserted into.
    * @return scidb4gdal::StatusCode
    */
-  StatusCode insertInto(SciDBArray &tmpArr, SciDBArray &collArr);
+        StatusCode insertInto(SciDBArray& tmpArr, SciDBArray& collArr);
 
-  /**
+        /**
    * @brief Annotates an array in SciDB with a Spatial Reference
    *
    * Performs a HTTP request to set the spatial reference system of an array in
@@ -336,9 +339,9 @@ class ShimClient {
    *srs to be updated
    * @return scidb4gdal::StatusCode
    */
-  StatusCode updateSRS(SciDBSpatialArray &array);
+        StatusCode updateSRS(SciDBSpatialArray& array);
 
-  /**
+        /**
   * @brief Removes an existing array in SciDB
   *
   * Performs HTTP requests to delete an array in SciDB given the array name.
@@ -346,9 +349,9 @@ class ShimClient {
   * @param inArrayName the name of an existing array
   * @return scidb4gdal::StatusCode
   */
-  StatusCode removeArray(const string &inArrayName);
+        StatusCode removeArray(const string& inArrayName);
 
-  /**
+        /**
   * @brief Checks whether an array exists.
   *
   * This function queries the SHIM client for the existence of an array name by
@@ -359,9 +362,9 @@ class ShimClient {
   * @param out output, true if array already exists in SciDB
   * @return scidb4gdal::StatusCode
   */
-  StatusCode arrayExists(const string &inArrayName, bool &out);
+        StatusCode arrayExists(const string& inArrayName, bool& out);
 
-  /**
+        /**
    * @brief Adds metadata on an array in SciDB
    *
    * This function feeds an SciDB array with some meta data. During the process
@@ -374,10 +377,10 @@ class ShimClient {
    * @param domain The domain under which the metadata is stored.
    * @result scidb4gdal::StatusCode for the operation.
    */
-  StatusCode setArrayMD(string arrayname, map<string, string> kv,
-                        string domain = "");
+        StatusCode setArrayMD(string arrayname, map<string, string> kv,
+                              string domain = "");
 
-  /**
+        /**
    * @brief Fetches metadata of an array from the SciDB database
    *
    * This function retrieves metadata of an SciDB array.
@@ -387,10 +390,10 @@ class ShimClient {
    * @param domain The domain from which the metadata is loaded.
    * @result scidb4gdal::StatusCode for the operation.
    */
-  StatusCode getArrayMD(map<string, string> &kv, string arrayname,
-                        string domain = "");
+        StatusCode getArrayMD(map<string, string>& kv, string arrayname,
+                              string domain = "");
 
-  /**
+        /**
    * @brief Adds metadata on an attribute of an array in SciDB
    *
    * Transfers and stores metadata of an attribute (e.g. NA values) for a SciDB
@@ -402,10 +405,10 @@ class ShimClient {
    * @param domain The domain under which the metadata is stored.
    * @result scidb4gdal::StatusCode for the operation.
    */
-  StatusCode setAttributeMD(string arrayname, string attribute,
-                            map<string, string> kv, string domain = "");
+        StatusCode setAttributeMD(string arrayname, string attribute,
+                                  map<string, string> kv, string domain = "");
 
-  /**
+        /**
    * @brief Fetches the metadata stored for an attribute of an SciDB array.
    *
    * This function retreives metadata for an attribute of an array in SciDB.
@@ -418,10 +421,10 @@ class ShimClient {
    * @param domain The domain under which the metadata is stored.
    * @result scidb4gdal::StatusCode for the operation.
    */
-  StatusCode getAttributeMD(map<string, string> &kv, string arrayname,
-                            string attribute, string domain = "");
+        StatusCode getAttributeMD(map<string, string>& kv, string arrayname,
+                                  string attribute, string domain = "");
 
-  /**
+        /**
    * @brief Setter for create options.
    *
    * This function sets the create parameter obtained from the create options or
@@ -430,9 +433,9 @@ class ShimClient {
    * @param par The create parameters
    * @return Void.
    */
-  void setCreateParameters(CreationParameters &par);
+        void setCreateParameters(CreationParameters& par);
 
-  /**
+        /**
    * @brief Sets the connection parameters on the SHIM client.
    *
    * This function sets the connection parameter obtained from the create or
@@ -442,9 +445,9 @@ class ShimClient {
    * @param par the ConnectionParameters
    * @return Void.
    */
-  void setConnectionParameters(ConnectionParameters &par);
+        void setConnectionParameters(ConnectionParameters& par);
 
-  /**
+        /**
    * @brief Sets the query parameters on the SHIM client.
    *
    * Sets the query parameter obtained from the opening options or the filename
@@ -453,9 +456,9 @@ class ShimClient {
    * @param par The @see QueryParameters
    * @return Void.
    */
-  void setQueryParameters(QueryParameters &par);
+        void setQueryParameters(QueryParameters& par);
 
-  /**
+        /**
    * @brief Attaches the temporal reference to the array in SciDB.
    *
    * The function writes the temporal reference to an array in SciDB. The
@@ -469,9 +472,9 @@ class ShimClient {
    *scidb4gdal::SciDBTemporalArray
    * @return scidb4gdal::StatusCode of the operation.
    */
-  StatusCode updateTRS(SciDBTemporalArray &array);
+        StatusCode updateTRS(SciDBTemporalArray& array);
 
-  /**
+        /**
    * @brief Queries the SHIM client for the type of an array and creates the
    *appropriate SciDB structure for GDAL.
    *
@@ -487,10 +490,10 @@ class ShimClient {
    *process
    * @return scidb4gdal::StatusCode of the operation.
    */
-  StatusCode getType(const string &name, SciDBSpatialArray *&array);
+        StatusCode getType(const string& name, SciDBSpatialArray*& array);
 
- protected:
-  /**
+      protected:
+        /**
   * @brief Fetches all attribute metadata of an array in SciDB
   *
   * Performs HTTP queries to query and retrieve all metadata of the attributes
@@ -502,10 +505,10 @@ class ShimClient {
   * @return scidb4gdal::StausCode
   * @see SciDBAttribute
   */
-  StatusCode getAttributeDesc(const string &inArrayName,
-                              vector<SciDBAttribute> &out);
+        StatusCode getAttributeDesc(const string& inArrayName,
+                                    vector<SciDBAttribute>& out);
 
-  /**
+        /**
   * @brief Fetches all dimension metadata of an array in SciDB
   *
   * Performs HTTP queries to query and retrieve all the metadata for dimensions
@@ -517,10 +520,10 @@ class ShimClient {
   * @return scidb4gdal::StausCode
   * @see SciDBDimension
   */
-  StatusCode getDimensionDesc(const string &inArrayName,
-                              vector<SciDBDimension> &out);
+        StatusCode getDimensionDesc(const string& inArrayName,
+                                    vector<SciDBDimension>& out);
 
-  /**
+        /**
   * @brief Fetches the spatial reference metadata of an array in SciDB
   *
   * Performs HTTP queries to query and retrieve metadata of an array's spatial
@@ -532,9 +535,9 @@ class ShimClient {
   * @return scidb4gdal::StatusCode
   * @see scidb4gdal::SciDBSpatialReference
   */
-  StatusCode getSRSDesc(const string &inArrayName, SciDBSpatialReference &out);
+        StatusCode getSRSDesc(const string& inArrayName, SciDBSpatialReference& out);
 
-  /**
+        /**
   * @brief Fetches the temporal reference metadata of an array in SciDB
   *
   * Performs HTTP queries to query and retrieve metadata of an array's temporal
@@ -546,9 +549,9 @@ class ShimClient {
   * @return scidb4gdal::StausCode
   * @see scidb4gdal::SciDBSTemporalReference
   */
-  StatusCode getTRSDesc(const string &inArrayName, SciDBTemporalReference &out);
+        StatusCode getTRSDesc(const string& inArrayName, SciDBTemporalReference& out);
 
-  /**
+        /**
    * @brief Creates a new shim session and returns its ID
    *
    * Performs a HTTP request to the SHIM session enpoint and creates a new
@@ -556,9 +559,9 @@ class ShimClient {
    *
    * @return integer session ID
    */
-  int newSession();
+        int newSession();
 
-  /**
+        /**
    * @brief Releases an existing shim session
    *
    * Performs a query to the SHIM session endpoint with the current session ID
@@ -567,9 +570,9 @@ class ShimClient {
    * @param sessionID integer session ID
    * @return void.
    */
-  void releaseSession(int sessionID);
+        void releaseSession(int sessionID);
 
-  /**
+        /**
    * @brief Login to the SHIM web client
    *
    * A function used to login to the SHIM web client based on the connection
@@ -577,9 +580,9 @@ class ShimClient {
    *
    * @return void.
    */
-  void login();
+        void login();
 
-  /**
+        /**
    * @brief function to logout from a SHIM client
    *
    * This function is used to logout from the SHIM client by calling the logout
@@ -588,32 +591,32 @@ class ShimClient {
    *
    * @return void
    */
-  void logout();
+        void logout();
 
- private:
-  /** host url */
-  string _host;
-  /** port number */
-  uint16_t _port;
-  /** user name */
-  string _user;
-  /** password */
-  string _passwd;
-  /** ssl use */
-  bool _ssl;
-  /** The cURL class to handle the HTTP calls */
-  CURL *_curl_handle;
-  /** initialize flag */
-  bool _curl_initialized;
-  /** authentication string after login */
-  string _auth;
-  /** pointer to the connection parameters */
-  ConnectionParameters *_conp;
-  /** pointer to the creation parameters */
-  CreationParameters *_cp;
-  /** pointer to the query parameter */
-  QueryParameters *_qp;
-};
+      private:
+        /** host url */
+        string _host;
+        /** port number */
+        uint16_t _port;
+        /** user name */
+        string _user;
+        /** password */
+        string _passwd;
+        /** ssl use */
+        bool _ssl;
+        /** The cURL class to handle the HTTP calls */
+        CURL* _curl_handle;
+        /** initialize flag */
+        bool _curl_initialized;
+        /** authentication string after login */
+        string _auth;
+        /** pointer to the connection parameters */
+        ConnectionParameters* _conp;
+        /** pointer to the creation parameters */
+        CreationParameters* _cp;
+        /** pointer to the query parameter */
+        QueryParameters* _qp;
+    };
 }
 
 #endif

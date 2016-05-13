@@ -6,7 +6,6 @@
 cd gdaldev
 
 ./configure --with-threads \
-            --with-ogr \
             --with-curl \
             --without-geos \
             --without-libtool \
@@ -46,9 +45,7 @@ cd gdaldev
             --without-sde \
             --without-perl \
             --without-php \
-            --without-ruby \
             --without-python \
-            --without-ogpython \
             --without-xml2 \
             --with-hide-internal-symbols
 			

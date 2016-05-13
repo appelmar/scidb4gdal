@@ -31,13 +31,14 @@ SOFTWARE.
 #include "tilecache.h"
 #include "TemporalReference.h"
 
-namespace scidb4gdal {
-using namespace scidb4geo;
+namespace scidb4gdal
+{
+    using namespace scidb4geo;
 
-class SciDBRasterBand;
-class SciDBDataset;
+    class SciDBRasterBand;
+    class SciDBDataset;
 
-/**
+    /**
  * @brief GDALDataset subclass implementing core GDAL functionality
  *
  * The SciDBDataset is a GDAL representation of a SciDB array. The data set
@@ -51,33 +52,34 @@ class SciDBDataset;
  * @author Marius Appel, IfGI Muenster
  * @author Florian Lahn, IfGI Muenster
  */
-class SciDBDataset : public GDALDataset {
-  friend class SciDBRasterBand;
+    class SciDBDataset : public GDALDataset
+    {
+        friend class SciDBRasterBand;
 
- private:
-  /**
+      private:
+        /**
    * Spatial array or a spatio-temporal array to store the meta data about the
    * SciDB representation of the array.
    */
-  SciDBSpatialArray &_array;
-  /**
+        SciDBSpatialArray& _array;
+        /**
    * pointer to Shim client class that is used to interact with the SciDB
    */
-  ShimClient *_client;
-  /**
+        ShimClient* _client;
+        /**
    * the tile cache used for downloading chunked array data and to temporarily
    * storing it before writing to a file
    */
-  TileCache _cache;
+        TileCache _cache;
 
-  /**
+        /**
    * The key-value pairs of the meta data retreived from the source (either a
    * file when creating or from SciDB when querying)
    */
-  char **papszMetadata;
+        char** papszMetadata;
 
- public:
-  /**
+      public:
+        /**
    * @brief The constructor of a SciDBDataset
    *
    * This constructor needs a spatial array representation and a SHIM client
@@ -92,20 +94,20 @@ class SciDBDataset : public GDALDataset {
    * @param client The scidb4gdal::ShimClient that holds the connection
    *information to the SHIM web client.
    */
-  SciDBDataset(SciDBSpatialArray &array, ShimClient *client);
+        SciDBDataset(SciDBSpatialArray& array, ShimClient* client);
 
-  /**
+        /**
    * Destructor for SciDBDatasets
    */
-  ~SciDBDataset();
+        ~SciDBDataset();
 
-  /**
+        /**
    * Function called by GDAL once a SciDB dataset is requested
    * @see GDALDataset::Open
    */
-  static GDALDataset *Open(GDALOpenInfo *poOpenInfo);
+        static GDALDataset* Open(GDALOpenInfo* poOpenInfo);
 
-  /**
+        /**
    * @brief Checks if the data can be opened as a SciDB dataset
    *
    * Decides whether a dataset is a SciDB dataset or not. It mainly depends
@@ -115,16 +117,16 @@ class SciDBDataset : public GDALDataset {
    * @param poOpenInfo GDAL opening options
    * @return int 0 or 1 depending if it can be Identified or not
    */
-  static int Identify(GDALOpenInfo *poOpenInfo);
+        static int Identify(GDALOpenInfo* poOpenInfo);
 
-  /**
+        /**
    * @brief Returns a pointer to the Shim client object
    *
    * @return scidb4gdal::ShimClient*
    */
-  ShimClient *getClient();
+        ShimClient* getClient();
 
-  /**
+        /**
    * @brief Returns affine transformation parameters
    *
    * @see GDALDataset::GetGeoTransform
@@ -132,17 +134,17 @@ class SciDBDataset : public GDALDataset {
    *store the affine transform parameters are stored.
    * @return CPLErr
    */
-  CPLErr GetGeoTransform(double *padfTransform);
+        CPLErr GetGeoTransform(double* padfTransform);
 
-  /**
+        /**
    * @brief Returns WKT spatial reference string
    *
    * @see GDALDataset::GetProjectionRef
    * @return const char*
    */
-  const char *GetProjectionRef();
+        const char* GetProjectionRef();
 
-  /**
+        /**
    * @brief Fetch Metadata for a domain.
    *
    * @see GDALPamDataset::GetMetadata
@@ -150,9 +152,9 @@ class SciDBDataset : public GDALDataset {
    *domain
    * @return char** NULL or a string list.
    */
-  // char ** GetMetadata ( const char * pszDomain = "");
+        // char ** GetMetadata ( const char * pszDomain = "");
 
-  /**
+        /**
    * @brief Set single metadata item.
    *
    * @see GDALPamDataset::GetMetadataItem
@@ -160,29 +162,29 @@ class SciDBDataset : public GDALDataset {
    * @param pszDomain the value to assign to the key.
    * @return const char*
    */
-  // const char * GetMetadataItem (const char * pszName, const char * pszDomain
-  // = "");
+        // const char * GetMetadataItem (const char * pszName, const char * pszDomain
+        // = "");
 
-  /**
+        /**
   * Function for creating a new SciDB array based on an existing GDAL dataset.
   * @see GDALDriver::CreateCopy()
   */
-  static GDALDataset *CreateCopy(const char *pszFilename, GDALDataset *poSrcDS,
-                                 int bStrict, char **papszOptions,
-                                 GDALProgressFunc pfnProgress,
-                                 void *pProgressData);
+        static GDALDataset* CreateCopy(const char* pszFilename, GDALDataset* poSrcDS,
+                                       int bStrict, char** papszOptions,
+                                       GDALProgressFunc pfnProgress,
+                                       void* pProgressData);
 
-  /**
+        /**
    * @brief Delete named dataset.
    *
    * @see GDALDriver::Delete
    * @param pszName name of dataset to delete.
    * @return CPLErr
    */
-  static CPLErr Delete(const char *pszName);
+        static CPLErr Delete(const char* pszName);
 
- protected:
-  /**
+      protected:
+        /**
    * @brief Converts a list of strings (key-value pairs) into a map of strings
    *
    * This function splits the strings of the strlist (KVP) into a map of strings
@@ -193,9 +195,9 @@ class SciDBDataset : public GDALDataset {
    * @param kv the string map object (output)
    * @return void
    */
-  static void gdalMDtoMap(char **strlist, map<string, string> &kv);
+        static void gdalMDtoMap(char** strlist, map<string, string>& kv);
 
-  /**
+        /**
    * @brief Returns a list of strings mit key-value pairs from a map of strings
    *
    * This function transforms a map of strings into a list of KVP strings:
@@ -204,9 +206,9 @@ class SciDBDataset : public GDALDataset {
    * @param kv The map of strings that represent keys and values
    * @return char** The list of string representation for key value pairs.
    */
-  static char **mapToGdalMD(map<string, string> &kv);
+        static char** mapToGdalMD(map<string, string>& kv);
 
-  /**
+        /**
    * @brief Copys the meta data from a source to the SciDB array representation
    *
    * This function will be used to extract the meta data from the source dataset
@@ -218,11 +220,11 @@ class SciDBDataset : public GDALDataset {
    * @param options The scidb4gdal::CreationParameters
    * @return void
    */
-  static void copyMetadataToArray(GDALDataset *poSrcDS,
-                                  SciDBSpatialArray &array,
-                                  CreationParameters *options);
+        static void copyMetadataToArray(GDALDataset* poSrcDS,
+                                        SciDBSpatialArray& array,
+                                        CreationParameters* options);
 
-  /**
+        /**
    * @brief Transmits and stores an image into a temporal SciDB array
    *
    * @param client the ShimClient holding the necessary information to connect
@@ -234,13 +236,13 @@ class SciDBDataset : public GDALDataset {
    * @param pProgressData the progress data
    * @return void
    */
-  static void uploadImageIntoTempArray(ShimClient *client,
-                                       SciDBSpatialArray &array,
-                                       GDALDataset *poSrcDS,
-                                       GDALProgressFunc pfnProgress,
-                                       void *pProgressData);
+        static void uploadImageIntoTempArray(ShimClient* client,
+                                             SciDBSpatialArray& array,
+                                             GDALDataset* poSrcDS,
+                                             GDALProgressFunc pfnProgress,
+                                             void* pProgressData);
 
-  /**
+        /**
    * @brief Checks if an array can be inserted into another array
    *
    * This functions queries the SciDB data base whether or not an array can be
@@ -251,35 +253,36 @@ class SciDBDataset : public GDALDataset {
    * @param tar_array the target array metadata representation
    * @return bool
    */
-  static bool arrayIntegrateable(SciDBSpatialArray &src_array,
-                                 SciDBSpatialArray &tar_array);
-};
+        static bool arrayIntegrateable(SciDBSpatialArray& src_array,
+                                       SciDBSpatialArray& tar_array);
+    };
 
-/**
+    /**
  * GDALRasterBand subclass implementing core GDAL functionality for single bands
  */
-class SciDBRasterBand : public GDALPamRasterBand {
-  friend class SciDBDataset;
+    class SciDBRasterBand : public GDALPamRasterBand
+    {
+        friend class SciDBDataset;
 
-  SciDBSpatialArray *_array;  //!< associated array metadata object
-  char **papszMetadata;
+        SciDBSpatialArray* _array; //!< associated array metadata object
+        char** papszMetadata;
 
- public:
-  /**
+      public:
+        /**
    * @brief Default constructor for SciDB attribute bands
    *
    * @param poDS the parent dataset
    * @param array the metadata representation of the array
    * @param nBand the number of the band in the data set
    */
-  SciDBRasterBand(SciDBDataset *poDS, SciDBSpatialArray *array, int nBand);
+        SciDBRasterBand(SciDBDataset* poDS, SciDBSpatialArray* array, int nBand);
 
-  /**
+        /**
    * @brief Band destructor
    */
-  ~SciDBRasterBand();
+        ~SciDBRasterBand();
 
-  /**
+        /**
    * @brief GDAL function called as array attribute data is requested, loads
    *data from SciDB server
    *
@@ -292,38 +295,38 @@ class SciDBRasterBand : public GDALPamRasterBand {
    * @param pImage the image where the data is written into
    * @return CPLErr
    */
-  virtual CPLErr IReadBlock(int nBlockXOff, int nBlockYOff, void *pImage);
+        virtual CPLErr IReadBlock(int nBlockXOff, int nBlockYOff, void* pImage);
 
-  /*
+        /*
   * GDAL function called as array attribtue data shall be written, uploads data
   * to SciDB and thus might take some time
    */
-  // virtual CPLErr IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage
-  // );
+        // virtual CPLErr IWriteBlock ( int nBlockXOff, int nBlockYOff, void *pImage
+        // );
 
-  /** @copydoc GDALRasterBand::GetStatistics */
-  virtual CPLErr GetStatistics(int bApproxOK, int bForce, double *pdfMin,
-                               double *pdfMax, double *pdfMean,
-                               double *pdfStdDev);
+        /** @copydoc GDALRasterBand::GetStatistics */
+        virtual CPLErr GetStatistics(int bApproxOK, int bForce, double* pdfMin,
+                                     double* pdfMax, double* pdfMean,
+                                     double* pdfStdDev);
 
-  /** @copydoc GDALPamRasterBand::GetNoDataValue */
-  virtual double GetNoDataValue(int *pbSuccess = NULL);
+        /** @copydoc GDALPamRasterBand::GetNoDataValue */
+        virtual double GetNoDataValue(int* pbSuccess = NULL);
 
-  /** @copydoc GDALPamRasterBand::GetMinimum */
-  virtual double GetMinimum(int *pbSuccess = NULL);
+        /** @copydoc GDALPamRasterBand::GetMinimum */
+        virtual double GetMinimum(int* pbSuccess = NULL);
 
-  /** @copydoc GDALPamRasterBand::GetMaximum */
-  virtual double GetMaximum(int *pbSuccess = NULL);
+        /** @copydoc GDALPamRasterBand::GetMaximum */
+        virtual double GetMaximum(int* pbSuccess = NULL);
 
-  /** @copydoc GDALPamRasterBand::GetOffset */
-  virtual double GetOffset(int *pbSuccess = NULL);
+        /** @copydoc GDALPamRasterBand::GetOffset */
+        virtual double GetOffset(int* pbSuccess = NULL);
 
-  /** @copydoc GDALPamRasterBand::GetScale */
-  virtual double GetScale(int *pbSuccess = NULL);
+        /** @copydoc GDALPamRasterBand::GetScale */
+        virtual double GetScale(int* pbSuccess = NULL);
 
-  /** @copydoc GDALPamRasterBand::GetUnitType */
-  virtual const char *GetUnitType();
-};
+        /** @copydoc GDALPamRasterBand::GetUnitType */
+        virtual const char* GetUnitType();
+    };
 }
 
 #endif

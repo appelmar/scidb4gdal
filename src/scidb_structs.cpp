@@ -24,54 +24,61 @@ SOFTWARE.
 
 #include "scidb_structs.h"
 
-namespace scidb4gdal {
-using namespace std;
+namespace scidb4gdal
+{
+    using namespace std;
 
-string SciDBArray::toString() {
-  stringstream s;
-  s << "'" << name << "'"
-    << ":";
-  for (uint32_t i = 0; i < dims.size(); ++i)
-    s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high
-      << "," << dims[i].typeId << ">";
-  for (uint32_t i = 0; i < attrs.size(); ++i)
-    s << "['" << attrs[i].name << "'," << attrs[i].typeId << ","
-      << attrs[i].nullable << "]";
-  s << "\n";
-  return s.str();
-}
+    string SciDBArray::toString()
+    {
+        stringstream s;
+        s << "'" << name << "'"
+          << ":";
+        for (uint32_t i = 0; i < dims.size(); ++i)
+            s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high
+              << "," << dims[i].typeId << ">";
+        for (uint32_t i = 0; i < attrs.size(); ++i)
+            s << "['" << attrs[i].name << "'," << attrs[i].typeId << ","
+              << attrs[i].nullable << "]";
+        s << "\n";
+        return s.str();
+    }
 
-string SciDBArray::getFormatString() {
-  stringstream s;
-  s << "(";
-  for (uint32_t i = 0; i < attrs.size() - 1; ++i) {
-    s << attrs[i].typeId << ",";  // TODO: Add nullable
-  }
-  s << attrs[attrs.size() - 1].typeId;  // TODO: Add nullable
-  s << ")";
-  return s.str();
-}
+    string SciDBArray::getFormatString()
+    {
+        stringstream s;
+        s << "(";
+        for (uint32_t i = 0; i < attrs.size() - 1; ++i) {
+            s << attrs[i].typeId << ","; // TODO: Add nullable
+        }
+        s << attrs[attrs.size() - 1].typeId; // TODO: Add nullable
+        s << ")";
+        return s.str();
+    }
 
-string SciDBArray::getSchemaString() {
-  stringstream s;
+    string SciDBArray::getSchemaString()
+    {
+        stringstream s;
 
-  s << "<";
-  for (uint32_t i = 0; i < attrs.size(); ++i) {
-    s << attrs[i].name << ":" << attrs[i].typeId;
-    if (attrs[i].nullable) s << " null";
-    if (i < (attrs.size() - 1)) s << ",";
-  }
-  s << ">";
+        s << "<";
+        for (uint32_t i = 0; i < attrs.size(); ++i) {
+            s << attrs[i].name << ":" << attrs[i].typeId;
+            if (attrs[i].nullable)
+                s << " null";
+            if (i < (attrs.size() - 1))
+                s << ",";
+        }
+        s << ">";
 
-  s << "[";
-  for (uint32_t i = 0; i < dims.size(); ++i) {
-    s << dims[i].name << "=" << dims[i].start << ":"
-      << (dims[i].start + dims[i].length - 1);
-    s << "," << dims[i].chunksize << ","
-      << "0";  // TODO: Add overlap
-    if (i < (dims.size() - 1)) s << ",";
-  }
-  s << "]";
-  return s.str();
-}
+        s << "[";
+        for (uint32_t i = 0; i < dims.size(); ++i) {
+            s << dims[i].name << "=" << dims[i].start << ":"
+              << (dims[i].start + dims[i].length - 1);
+            s << "," << dims[i].chunksize << ","
+              << "0"; // TODO: Add overlap
+            if (i < (dims.size() - 1))
+                s << ",";
+        }
+        s << "]";
+        return s.str();
+    }
 }
