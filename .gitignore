@@ -34,3 +34,4 @@ gdaldev
 /.project
 /doc/*.png
 /doc/*.xmi
+*.tar.gz
