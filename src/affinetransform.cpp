@@ -32,8 +32,7 @@ SOFTWARE.
 #include <limits>
 #include "utils.h"
 
-namespace scidb4gdal
-{
+namespace scidb4gdal {
 
     using namespace std;
 
@@ -44,13 +43,11 @@ namespace scidb4gdal
     AffineTransform::AffineTransform(double x0, double y0, double a11, double a22)
         : _x0(x0), _y0(y0), _a11(a11), _a22(a22), _a12(0), _a21(0), _inv(NULL) {}
     AffineTransform::AffineTransform(double x0, double y0, double a11, double a22,
-                                     double a12, double a21)
-        : _x0(x0), _y0(y0), _a11(a11), _a22(a22), _a12(a12), _a21(a21), _inv(NULL)
-    {
+                                    double a12, double a21)
+        : _x0(x0), _y0(y0), _a11(a11), _a22(a22), _a12(a12), _a21(a21), _inv(NULL) {
     }
     AffineTransform::AffineTransform(const string& astr)
-        : _x0(0), _y0(0), _a11(1), _a22(1), _a12(0), _a21(0), _inv(NULL)
-    {
+        : _x0(0), _y0(0), _a11(1), _a22(1), _a12(0), _a21(0), _inv(NULL) {
         vector<string> parts;
         boost::split(parts, astr, boost::is_any_of(",; "));
         for (vector<string>::iterator it = parts.begin(); it != parts.end(); ++it) {
@@ -77,15 +74,14 @@ namespace scidb4gdal
                 else {
                     stringstream serr;
                     serr << "Unknown affine transformation parameter '" + kv[0] +
-                            "' will be ignored ";
+                                "' will be ignored ";
                     Utils::warn(serr.str());
                 }
             }
         }
     }
 
-    AffineTransform::~AffineTransform()
-    {
+    AffineTransform::~AffineTransform() {
         if (_inv) {
             _inv->_inv = NULL; // No recursive deletes!!!
             delete _inv;
@@ -93,32 +89,29 @@ namespace scidb4gdal
         }
     }
 
-    string AffineTransform::toString()
-    {
+    string AffineTransform::toString() {
         stringstream sstr;
         sstr << setprecision(numeric_limits<double>::digits10) << "x0"
-             << "=" << _x0 << " "
-             << "y0"
-             << "=" << _y0 << " "
-             << "a11"
-             << "=" << _a11 << " "
-             << "a22"
-             << "=" << _a22 << " "
-             << "a12"
-             << "=" << _a12 << " "
-             << "a21"
-             << "=" << _a21;
+            << "=" << _x0 << " "
+            << "y0"
+            << "=" << _y0 << " "
+            << "a11"
+            << "=" << _a11 << " "
+            << "a22"
+            << "=" << _a22 << " "
+            << "a12"
+            << "=" << _a12 << " "
+            << "a21"
+            << "=" << _a21;
         return sstr.str();
     }
 
-    bool AffineTransform::isIdentity()
-    {
+    bool AffineTransform::isIdentity() {
         return (_a11 == 1 && _a12 == 0 && _a21 == 0 && _a22 == 1 && _x0 == 0 &&
                 _y0 == 0);
     }
 
-    AffineTransform::double2 AffineTransform::f(const double2& v)
-    {
+    AffineTransform::double2 AffineTransform::f(const double2& v) {
         double2 result;
         result.x = _x0 + _a11 * v.x + _a12 * v.y;
         result.y = _y0 + _a21 * v.x + _a22 * v.y;
@@ -126,21 +119,18 @@ namespace scidb4gdal
     }
 
     void AffineTransform::f(const AffineTransform::double2& v_in,
-                            AffineTransform::double2& v_out)
-    {
+                            AffineTransform::double2& v_out) {
         v_out.x = _x0 + _a11 * v_in.x + _a12 * v_in.y;
         v_out.y = _y0 + _a21 * v_in.x + _a22 * v_in.y;
     }
 
-    void AffineTransform::f(AffineTransform::double2& v)
-    {
+    void AffineTransform::f(AffineTransform::double2& v) {
         double x = v.x;
         v.x = _x0 + _a11 * v.x + _a12 * v.y;
         v.y = _y0 + _a21 * x + _a22 * v.y;
     }
 
-    AffineTransform::double2 AffineTransform::fInv(const double2& v)
-    {
+    AffineTransform::double2 AffineTransform::fInv(const double2& v) {
         if (_inv == NULL) {
             double d = det();
             if (fabs(d) < DBL_EPSILON) {
@@ -155,16 +145,15 @@ namespace scidb4gdal
             double inv_y0 = inv_a21 * _x0 - inv_a22 * _y0;
 
             _inv =
-            new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
+                new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
             _inv->_inv = this; // Prevent repreated computations of f, f-1, f, f-1, ...
-                               // This is dangerous in destruction...
+                            // This is dangerous in destruction...
         }
         return _inv->f(v);
     }
 
     void AffineTransform::fInv(const AffineTransform::double2& v_in,
-                               AffineTransform::double2& v_out)
-    {
+                            AffineTransform::double2& v_out) {
         if (_inv == NULL) {
             double d = det();
             if (fabs(d) < DBL_EPSILON) {
@@ -179,15 +168,14 @@ namespace scidb4gdal
             double inv_y0 = inv_a21 * _x0 - inv_a22 * _y0;
 
             _inv =
-            new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
+                new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
             _inv->_inv = this; // Prevent repreated computations of f, f-1, f, f-1, ...
-                               // This is dangerous in destruction...
+                            // This is dangerous in destruction...
         }
         _inv->f(v_in, v_out);
     }
 
-    void AffineTransform::fInv(AffineTransform::double2& v)
-    {
+    void AffineTransform::fInv(AffineTransform::double2& v) {
         if (_inv == NULL) {
             double d = det();
             if (fabs(d) < DBL_EPSILON) {
@@ -202,9 +190,9 @@ namespace scidb4gdal
             double inv_y0 = inv_a21 * _x0 - inv_a22 * _y0;
 
             _inv =
-            new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
+                new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
             _inv->_inv = this; // Prevent repreated computations of f, f-1, f, f-1, ...
-                               // This is dangerous in destruction...
+                            // This is dangerous in destruction...
         }
 
         _inv->f(v);

@@ -6,143 +6,132 @@
 #include <boost/assign.hpp>
 #include <string>
 
-namespace scidb4gdal
-{
+namespace scidb4gdal {
 
-    using namespace std;
+using namespace std;
 
-    template <typename T>
-    bool Resolver<T>::contains(string key)
-    {
-        return mapping.find(key) != mapping.end();
-    }
+template <typename T>
+bool Resolver<T>::contains(string key) {
+    return mapping.find(key) != mapping.end();
+}
 
-    template <typename T>
-    T Resolver<T>::getKey(string s) { return mapping[s]; }
+template <typename T>
+T Resolver<T>::getKey(string s) { return mapping[s]; }
 
-    ParameterParser::ParameterParser(string scidbFile, char** optionKVP,
-                                     SciDBOperation op)
-        : _operation(op)
-    {
-        // set the resolver a.k.a the key value pairs in the connection / property
-        // string or the create / opening options
-        _creationTypeResolver.mapping =
+ParameterParser::ParameterParser(string scidbFile, char** optionKVP,
+                                 SciDBOperation op)
+    : _operation(op) {
+    // set the resolver a.k.a the key value pairs in the connection / property
+    // string or the create / opening options
+    _creationTypeResolver.mapping =
         map_list_of("S", S_ARRAY)("ST", ST_ARRAY)("STS", ST_SERIES);
 
-        _propKeyResolver.mapping = map_list_of("dt", TRS)("timestamp", TIMESTAMP)(
+    _propKeyResolver.mapping = map_list_of("dt", TRS)("timestamp", TIMESTAMP)(
         "t", TIMESTAMP)("type", TYPE)("i", T_INDEX)("bbox", BBOX)("srs", SRS)(
         "CHUNKSIZE_SP", CHUNKSIZE_SPATIAL)("chunksize_sp", CHUNKSIZE_SPATIAL)(
         "CHUNKSIZE_T", CHUNKSIZE_TEMPORAL)("chunksize_t", CHUNKSIZE_TEMPORAL);
 
-        _conKeyResolver.mapping = map_list_of("host", HOST)("port", PORT)(
+    _conKeyResolver.mapping = map_list_of("host", HOST)("port", PORT)(
         "user", USER)("password", PASSWORD)("ssl", SSL)("array", ARRAY)(
         "confirmDelete", CONFIRM_DELETE);
 
-        _scidb_filename = scidbFile;
-        _options = optionKVP;
-        if (!init()) {
-            throw ERR_GLOBAL_PARSE;
-        }
+    _scidb_filename = scidbFile;
+    _options = optionKVP;
+    if (!init()) {
+        throw ERR_GLOBAL_PARSE;
     }
+}
 
-    void ParameterParser::parseConnectionString()
-    {
-        vector<string> connparts;
-        // Split at whitespace, comma, semicolon
-        boost::split(connparts, _connection_string, boost::is_any_of("; "));
-        for (vector<string>::iterator it = connparts.begin(); it != connparts.end();
-             ++it) {
-            vector<string> kv;
-            // No colon because uf URL
-            boost::split(kv, *it, boost::is_any_of("="));
-            if (kv.size() != 2) {
-                continue;
-            } else {
-                if (_conKeyResolver.contains(string(kv[0]))) {
-                    assignConectionParameter(kv[0], kv[1]);
-                } else {
-                    Utils::debug("unused parameter \"" + string(kv[0]) +
-                                 "\" with value \"" + string(kv[1]) + "\"");
-                }
-            }
-        }
-    }
-
-    void ParameterParser::parseOpeningOptions()
-    {
-        int count = CSLCount(_options);
-        for (int i = 0; i < count; i++) {
-            const char* s = CSLGetField(_options, i);
-            char* key;
-            const char* value = CPLParseNameValue(s, &key);
-
-            if (_conKeyResolver.contains(std::string(key))) {
-                assignConectionParameter(std::string(key), value);
-            } else {
-                if (_propKeyResolver.contains(std::string(key))) {
-                    assignQueryParameter(std::string(key), std::string(value));
-                } else {
-                    Utils::debug("unused parameter \"" + string(key) + "\" with value \"" +
-                                 string(value) + "\"");
-                }
-            }
-        }
-    }
-
-    void ParameterParser::parseCreateOptions()
-    {
-        int count = CSLCount(_options);
-        for (int i = 0; i < count; i++) {
-            const char* s = CSLGetField(_options, i);
-            char* key;
-            const char* value = CPLParseNameValue(s, &key);
-
-            if (_conKeyResolver.contains(std::string(key))) {
-                assignConectionParameter(std::string(key), value);
-            } else {
-                if (_propKeyResolver.contains(std::string(key))) {
-                    assignCreateParameter(std::string(key), value);
-                } else {
-                    Utils::debug("unused parameter \"" + string(key) + "\" with value \"" +
-                                 string(value) + "\"");
-                }
-            }
-        }
-    }
-
-    bool ParameterParser::splitPropertyString()
-    {
-        string propToken = "properties=";
-        int start = _scidb_filename.find(propToken);
-        bool found = (start >= 0);
-
-        // if there then split it accordingly and fill the ConnectionPars and the
-        // SelectProperties
-        if (found) {
-            // if we find the 'properties=' in the connection string we treat those
-            // string part as
-            // the database open parameters
-            int end = start + propToken.length();
-            _connection_string = _scidb_filename.substr(0, start - 1);
-            _properties_string =
-            _scidb_filename.substr(end, _scidb_filename.length() - 1);
+void ParameterParser::parseConnectionString() {
+    vector<string> connparts;
+    // Split at whitespace, comma, semicolon
+    boost::split(connparts, _connection_string, boost::is_any_of("; "));
+    for (vector<string>::iterator it = connparts.begin(); it != connparts.end();
+         ++it) {
+        vector<string> kv;
+        // No colon because uf URL
+        boost::split(kv, *it, boost::is_any_of("="));
+        if (kv.size() != 2) {
+            continue;
         } else {
-            _connection_string = _scidb_filename;
+            if (_conKeyResolver.contains(string(kv[0]))) {
+                assignConnectionParameter(kv[0], kv[1]);
+            } else {
+                Utils::debug("unused parameter \"" + string(kv[0]) +
+                             "\" with value \"" + string(kv[1]) + "\"");
+            }
         }
-        return found;
     }
+}
 
-    void ParameterParser::parsePropertiesString()
-    {
-        // mapping between the constant variables and their string representation for
-        // using a switch/case statement later
-        // std::map<string,Properties> propResolver = map_list_of ("t",T_INDEX);
+void ParameterParser::parseOpeningOptions() {
+    int count = CSLCount(_options);
+    for (int i = 0; i < count; i++) {
+        const char* s = CSLGetField(_options, i);
+        char* key;
+        const char* value = CPLParseNameValue(s, &key);
 
-        vector<string> parts;
-        boost::split(
-        parts, _properties_string,
-        boost::is_any_of(
-        ";")); // Split at semicolon and comma for refering to a whole KVP
+        if (_conKeyResolver.contains(std::string(key))) {
+            assignConnectionParameter(std::string(key), value);
+        } else {
+            if (_propKeyResolver.contains(std::string(key))) {
+                assignQueryParameter(std::string(key), std::string(value));
+            } else {
+                Utils::debug("unused parameter \"" + string(key) + "\" with value \"" +
+                             string(value) + "\"");
+            }
+        }
+    }
+}
+
+void ParameterParser::parseCreateOptions() {
+    int count = CSLCount(_options);
+    for (int i = 0; i < count; i++) {
+        const char* s = CSLGetField(_options, i);
+        char* key;
+        const char* value = CPLParseNameValue(s, &key);
+
+        if (_conKeyResolver.contains(std::string(key))) {
+            assignConnectionParameter(std::string(key), value);
+        } else {
+            if (_propKeyResolver.contains(std::string(key))) {
+                assignCreateParameter(std::string(key), value);
+            } else {
+                Utils::debug("unused parameter \"" + string(key) + "\" with value \"" +
+                             string(value) + "\"");
+            }
+        }
+    }
+}
+
+bool ParameterParser::splitPropertyString() {
+    string propToken = "properties=";
+    int start = _scidb_filename.find(propToken);
+    bool found = (start >= 0);
+
+    // if there then split it accordingly and fill the ConnectionPars and the
+    // SelectProperties
+    if (found) {
+        // if we find the 'properties=' in the connection string we treat those
+        // string part as
+        // the database open parameters
+        int end = start + propToken.length();
+        _connection_string = _scidb_filename.substr(0, start - 1);
+        _properties_string =
+            _scidb_filename.substr(end, _scidb_filename.length() - 1);
+    } else {
+        _connection_string = _scidb_filename;
+    }
+    return found;
+}
+
+void ParameterParser::parsePropertiesString() {
+    // mapping between the constant variables and their string representation for
+    // using a switch/case statement later
+    // std::map<string,Properties> propResolver = map_list_of ("t",T_INDEX);
+
+    vector<string> parts;
+    boost::split(parts, _properties_string, boost::is_any_of(";")); // Split at semicolon and comma for refering to a whole KVP
         // example for filename with properties variable    "src_win:0 0 50 50;..."
         for (vector<string>::iterator it = parts.begin(); it != parts.end(); ++it) {
             vector<string> kv, c;
@@ -154,14 +143,13 @@ namespace scidb4gdal
                     assignQueryParameter(kv[0], kv[1]);
                 } else {
                     Utils::debug("unused parameter \"" + string(kv[0]) +
-                                 "\" with value \"" + string(kv[1]) + "\"");
+                                "\" with value \"" + string(kv[1]) + "\"");
                 }
             }
         }
     }
 
-    void ParameterParser::loadParsFromEnv(ConnectionParameters* con)
-    {
+    void ParameterParser::loadParsFromEnv(ConnectionParameters* con) {
         char* x;
 
         x = std::getenv("SCIDB4GDAL_HOST");
@@ -183,21 +171,20 @@ namespace scidb4gdal
             con->port = boost::lexical_cast<int>(x);
     }
 
-    void ParameterParser::parseArrayName()
-    {
+    void ParameterParser::parseArrayName() {
         // 	  string array = pars->arrayname;
         size_t length = _con->arrayname.size();
         size_t t_start = _con->arrayname.find_first_of('[');
         size_t t_end = _con->arrayname.find_last_of(']');
 
-        if (t_start == std::string::npos|| t_end == std::string::npos) {
+        if (t_start == std::string::npos || t_end == std::string::npos) {
             Utils::error("No or invalid temporal information in array name.");
             return;
         }
         // extract temporal string
         if ((length - 1) == t_end) {
             string t_expression =
-            _con->arrayname.substr(t_start + 1, (t_end - t_start) - 1);
+                _con->arrayname.substr(t_start + 1, (t_end - t_start) - 1);
             // remove the temporal part of the array name otherwise it messes up the
             // concrete array name in scidb
             string temp = _con->arrayname.substr(0, t_start);
@@ -207,7 +194,7 @@ namespace scidb4gdal
             boost::split(kv, t_expression, boost::is_any_of(","));
             if (kv.size() < 2) {
                 Utils::error("Temporal query not complete. Please state the dimension "
-                             "name and the temporal index / interval");
+                            "name and the temporal index / interval");
                 return;
             }
             // first part is the dimension identifier
@@ -217,7 +204,7 @@ namespace scidb4gdal
             string t_interval = kv[1];
 
             /* Test with Regex, failed due to gcc version 4.8.4 (4.9 implements regex
- * completely) */
+            * completely) */
             // 	    std::smatch match;
             //
             // 	    std::regex
@@ -244,7 +231,7 @@ namespace scidb4gdal
                         // TODO for now we parse it correctly, but we will just use the
                         // lower_bound... change this later
                         Utils::debug("Currently interval query is not supported. Using the "
-                                     "lower bound instead");
+                                    "lower bound instead");
                         _query->temp_index = _query->lower_bound;
                     } else {
                         // temporal index
@@ -261,20 +248,17 @@ namespace scidb4gdal
         }
     }
 
-    ConnectionParameters& ParameterParser::getConnectionParameters()
-    {
+    ConnectionParameters& ParameterParser::getConnectionParameters() {
         return *_con;
     }
 
     QueryParameters& ParameterParser::getQueryParameters() { return *_query; }
 
-    CreationParameters& ParameterParser::getCreationParameters()
-    {
+    CreationParameters& ParameterParser::getCreationParameters() {
         return *_create;
     }
 
-    void ParameterParser::validate()
-    {
+    void ParameterParser::validate() {
         if (_scidb_filename == "" ||
             _scidb_filename.substr(0, 6).compare("SCIDB:") != 0) {
             _isValid = false;
@@ -283,12 +267,11 @@ namespace scidb4gdal
         }
 
         _scidb_filename = _scidb_filename.substr(
-        6, _scidb_filename.length() - 6); // Remove SCIDB: from connection string
+            6, _scidb_filename.length() - 6); // Remove SCIDB: from connection string
         _isValid = true;
     }
 
-    bool ParameterParser::init()
-    {
+    bool ParameterParser::init() {
         _isValid = false;
         validate();
 
@@ -321,7 +304,7 @@ namespace scidb4gdal
         if (!_con->isValid()) {
             stringstream s;
             s << "Failed to extract connection information. host: " << _con->host
-              << ", array: " << _con->arrayname;
+            << ", array: " << _con->arrayname;
             Utils::error(s.str());
         }
         //       if (!_con->isValid()) {
@@ -331,7 +314,7 @@ namespace scidb4gdal
         if (_operation == SCIDB_OPEN) {
             parseOpeningOptions();
             parseArrayName(); // array name will be modified if a temporal query is
-                              // detected (for the ConnectionPars)
+                            // detected (for the ConnectionPars)
         }
         if (_operation == SCIDB_CREATE) {
             parseCreateOptions();
@@ -341,8 +324,7 @@ namespace scidb4gdal
 
     bool ParameterParser::isValid() { return _isValid; }
 
-    void ParameterParser::assignConectionParameter(string key, string value)
-    {
+    void ParameterParser::assignConnectionParameter(string key, string value) {
         ConnectionStringKey enumKey = _conKeyResolver.getKey(key);
         switch (enumKey) {
             case HOST:
@@ -377,8 +359,7 @@ namespace scidb4gdal
         }
     }
 
-    void ParameterParser::assignCreateParameter(string key, string value)
-    {
+    void ParameterParser::assignCreateParameter(string key, string value) {
         Properties enumKey = _propKeyResolver.getKey(key);
         switch (enumKey) {
             case TRS: {
@@ -438,8 +419,7 @@ namespace scidb4gdal
                 break;
         }
     }
-    void ParameterParser::assignQueryParameter(string key, string value)
-    {
+    void ParameterParser::assignQueryParameter(string key, string value) {
         Properties enumKey = _propKeyResolver.getKey(key);
         switch (enumKey) {
             case T_INDEX:

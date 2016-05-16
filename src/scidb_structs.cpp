@@ -24,27 +24,24 @@ SOFTWARE.
 
 #include "scidb_structs.h"
 
-namespace scidb4gdal
-{
+namespace scidb4gdal {
     using namespace std;
 
-    string SciDBArray::toString()
-    {
+    string SciDBArray::toString() {
         stringstream s;
         s << "'" << name << "'"
-          << ":";
+        << ":";
         for (uint32_t i = 0; i < dims.size(); ++i)
             s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high
-              << "," << dims[i].typeId << ">";
+            << "," << dims[i].typeId << ">";
         for (uint32_t i = 0; i < attrs.size(); ++i)
             s << "['" << attrs[i].name << "'," << attrs[i].typeId << ","
-              << attrs[i].nullable << "]";
+            << attrs[i].nullable << "]";
         s << "\n";
         return s.str();
     }
 
-    string SciDBArray::getFormatString()
-    {
+    string SciDBArray::getFormatString() {
         stringstream s;
         s << "(";
         for (uint32_t i = 0; i < attrs.size() - 1; ++i) {
@@ -55,8 +52,7 @@ namespace scidb4gdal
         return s.str();
     }
 
-    string SciDBArray::getSchemaString()
-    {
+    string SciDBArray::getSchemaString() {
         stringstream s;
 
         s << "<";
@@ -72,9 +68,9 @@ namespace scidb4gdal
         s << "[";
         for (uint32_t i = 0; i < dims.size(); ++i) {
             s << dims[i].name << "=" << dims[i].start << ":"
-              << (dims[i].start + dims[i].length - 1);
+            << (dims[i].start + dims[i].length - 1);
             s << "," << dims[i].chunksize << ","
-              << "0"; // TODO: Add overlap
+            << "0"; // TODO: Add overlap
             if (i < (dims.size() - 1))
                 s << ",";
         }

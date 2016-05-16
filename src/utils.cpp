@@ -29,16 +29,12 @@ SOFTWARE.
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
-namespace scidb4gdal
-{
+namespace scidb4gdal {
     using namespace std;
 
-    namespace Utils
-    {
-        // see
-        // http://stackoverflow.com/questions/997946/how-to-get-current-time-and-date-in-c
-        string getCurDatetime()
-        {
+    namespace Utils {
+        // see http://stackoverflow.com/questions/997946/how-to-get-current-time-and-date-in-c
+        string getCurDatetime() {
             // Current date/time based on current system
             time_t now = time(0);
 
@@ -52,8 +48,7 @@ namespace scidb4gdal
             return out.str();
         }
 
-        void error(const string& msg, bool kill)
-        {
+        void error(const string& msg, bool kill) {
             // std::cout << "(" << getCurDatetime() << ") ERROR: " << msg << std::endl;
             if (kill)
                 CPLError(CE_Fatal, CPLE_AppDefined, msg.c_str(), "");
@@ -62,20 +57,17 @@ namespace scidb4gdal
             // throw msg;
         }
 
-        void warn(const string& msg)
-        {
+        void warn(const string& msg) {
             // std::cout << "(" << getCurDatetime() << ") WARNING: " << msg << std::endl;
             CPLError(CE_Warning, CPLE_AppDefined, msg.c_str(), "");
         }
 
-        void debug(const string& msg)
-        {
+        void debug(const string& msg) {
             // std::cout << "(" << getCurDatetime() << ") DEBUG: " << msg << std::endl;
             CPLDebug("scidb4gdal", msg.c_str(), "");
         }
 
-        GDALDataType scidbTypeIdToGDALType(const string& typeId)
-        {
+        GDALDataType scidbTypeIdToGDALType(const string& typeId) {
             // see src/query/TypeSystem.h of SciDB for definitions
             if (typeId == "int8")
                 return GDT_Byte; // signed vs unsigned might lead to conflicts
@@ -96,8 +88,7 @@ namespace scidb4gdal
             return GDT_Unknown; // No GDAL support for int64, uint64, string
         }
 
-        string gdalTypeToSciDBTypeId(GDALDataType type)
-        {
+        string gdalTypeToSciDBTypeId(GDALDataType type) {
             if (type == GDT_Byte)
                 return "uint8";
             else if (type == GDT_UInt32)
@@ -115,8 +106,7 @@ namespace scidb4gdal
             return 0;
         }
 
-        size_t scidbTypeIdBytes(const string& typeId)
-        {
+        size_t scidbTypeIdBytes(const string& typeId) {
             // int64 and uint64 not supported by GDAL
             if (typeId == "int8")
                 return 1;
@@ -137,8 +127,7 @@ namespace scidb4gdal
             return 0;
         }
 
-        size_t gdalTypeBytes(GDALDataType type)
-        {
+        size_t gdalTypeBytes(GDALDataType type) {
             if (type == GDT_Byte)
                 return 1;
             else if (type == GDT_UInt32)
@@ -156,8 +145,7 @@ namespace scidb4gdal
             return 0;
         }
 
-        double defaultNoDataGDAL(GDALDataType type)
-        {
+        double defaultNoDataGDAL(GDALDataType type) {
             switch (type) {
                 case (GDT_UInt16):
                     return SCIDB4GDAL_DEFAULTNODATA_UINT16;
@@ -179,22 +167,19 @@ namespace scidb4gdal
             return 0;
         }
 
-        double defaultNoDataSciDB(const string& typeId)
-        {
+        double defaultNoDataSciDB(const string& typeId) {
             return defaultNoDataGDAL(scidbTypeIdToGDALType(typeId));
         }
 
-        void sleep(long int ms)
-        {
-#ifdef WIN32
+        void sleep(long int ms) {
+        #ifdef WIN32
             Sleep(ms);
-#else
+        #else
             usleep(ms * 1000);
-#endif
+        #endif
         }
 
-        uint32_t nextPow2(uint32_t x)
-        {
+        uint32_t nextPow2(uint32_t x) {
             if (!(x & (x - 1))) {
                 return (x);
             }
@@ -205,13 +190,12 @@ namespace scidb4gdal
             return x;
         }
 
-        bool validateTimestampString(string& in)
-        {
+        bool validateTimestampString(string& in) {
             /*
-* comment: use REGEX instead! But gcc 4.84 shipped with Ubuntu 14.04 does not
-* support reg expressions...
-* gcc > 4.9 uses it...
-*/
+        * comment: use REGEX instead! But gcc 4.84 shipped with Ubuntu 14.04 does not
+        * support reg expressions...
+        * gcc > 4.9 uses it...
+        */
             bool isValid = true;
             boost::algorithm::trim(in);
             // check date String
@@ -271,8 +255,7 @@ namespace scidb4gdal
             return isValid;
         }
 
-        std::string mdMapToString(std::map<string, string>& kv)
-        {
+        std::string mdMapToString(std::map<string, string>& kv) {
             map<string, string>::iterator it;
             stringstream result;
 

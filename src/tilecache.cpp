@@ -24,27 +24,23 @@ SOFTWARE.
 
 #include "tilecache.h"
 
-namespace scidb4gdal
-{
+namespace scidb4gdal {
 
     TileCache::TileCache()
         : _totalSize(0), _maxSize(SCIDB4GEO_MAXCHUNKCACHE_MB * 1024 * 1024) {}
 
-    TileCache::~TileCache()
-    {
+    TileCache::~TileCache() {
         clear();
         _cache.clear();
         _q.clear();
     }
 
-    bool TileCache::has(uint32_t id)
-    {
+    bool TileCache::has(uint32_t id) {
         map<uint32_t, ArrayTile>::iterator it;
         return _cache.find(id) != _cache.end();
     }
 
-    void TileCache::remove(uint32_t id)
-    {
+    void TileCache::remove(uint32_t id) {
         map<uint32_t, ArrayTile>::iterator it = _cache.find(id);
         if (it != _cache.end()) {
             ArrayTile temp = it->second;
@@ -55,15 +51,13 @@ namespace scidb4gdal
         }
     }
 
-    void TileCache::clear()
-    {
+    void TileCache::clear() {
         while (!_q.empty()) {
             remove(_q.front());
         }
     }
 
-    void TileCache::add(ArrayTile c)
-    {
+    void TileCache::add(ArrayTile c) {
         // Assert that chunk has not been cached already
         if (has(c.id))
             return;
@@ -83,8 +77,7 @@ namespace scidb4gdal
         _totalSize += c.size;
     }
 
-    ArrayTile* TileCache::get(uint32_t id)
-    {
+    ArrayTile* TileCache::get(uint32_t id) {
         if (has(id))
             return &_cache[id];
         return NULL;
