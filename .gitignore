@@ -32,3 +32,5 @@
 /.project
 /doc/*.png
 /doc/*.xmi
+doc/html/*
+doc/html
