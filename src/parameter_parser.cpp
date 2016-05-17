@@ -18,13 +18,11 @@ bool Resolver<T>::contains(string key) {
 template <typename T>
 T Resolver<T>::getKey(string s) { return mapping[s]; }
 
-ParameterParser::ParameterParser(string scidbFile, char** optionKVP,
-                                 SciDBOperation op)
+ParameterParser::ParameterParser(string scidbFile, char** optionKVP, SciDBOperation op)
     : _operation(op) {
     // set the resolver a.k.a the key value pairs in the connection / property
     // string or the create / opening options
-    _creationTypeResolver.mapping =
-        map_list_of("S", S_ARRAY)("ST", ST_ARRAY)("STS", ST_SERIES);
+    _creationTypeResolver.mapping = map_list_of("S", S_ARRAY)("ST", ST_ARRAY)("STS", ST_SERIES);
 
     _propKeyResolver.mapping = map_list_of("dt", TRS)("timestamp", TIMESTAMP)(
         "t", TIMESTAMP)("type", TYPE)("i", T_INDEX)("bbox", BBOX)("srs", SRS)(
@@ -32,7 +30,7 @@ ParameterParser::ParameterParser(string scidbFile, char** optionKVP,
         "CHUNKSIZE_T", CHUNKSIZE_TEMPORAL)("chunksize_t", CHUNKSIZE_TEMPORAL);
 
     _conKeyResolver.mapping = map_list_of("host", HOST)("port", PORT)(
-        "user", USER)("password", PASSWORD)("ssl", SSL)("array", ARRAY)(
+        "user", USER)("password", PASSWORD)("ssl", SSL)("trust", SSLTRUST)("array", ARRAY)(
         "confirmDelete", CONFIRM_DELETE);
 
     _scidb_filename = scidbFile;
@@ -57,8 +55,7 @@ void ParameterParser::parseConnectionString() {
             if (_conKeyResolver.contains(string(kv[0]))) {
                 assignConnectionParameter(kv[0], kv[1]);
             } else {
-                Utils::debug("unused parameter \"" + string(kv[0]) +
-                             "\" with value \"" + string(kv[1]) + "\"");
+                Utils::debug("unused parameter \"" + string(kv[0]) + "\" with value \"" + string(kv[1]) + "\"");
             }
         }
     }
@@ -77,8 +74,7 @@ void ParameterParser::parseOpeningOptions() {
             if (_propKeyResolver.contains(std::string(key))) {
                 assignQueryParameter(std::string(key), std::string(value));
             } else {
-                Utils::debug("unused parameter \"" + string(key) + "\" with value \"" +
-                             string(value) + "\"");
+                Utils::debug("unused parameter \"" + string(key) + "\" with value \"" + string(value) + "\"");
             }
         }
     }
@@ -97,8 +93,7 @@ void ParameterParser::parseCreateOptions() {
             if (_propKeyResolver.contains(std::string(key))) {
                 assignCreateParameter(std::string(key), value);
             } else {
-                Utils::debug("unused parameter \"" + string(key) + "\" with value \"" +
-                             string(value) + "\"");
+                Utils::debug("unused parameter \"" + string(key) + "\" with value \"" + string(value) + "\"");
             }
         }
     }
@@ -117,9 +112,9 @@ bool ParameterParser::splitPropertyString() {
         // the database open parameters
         int end = start + propToken.length();
         _connection_string = _scidb_filename.substr(0, start - 1);
-        _properties_string =
-            _scidb_filename.substr(end, _scidb_filename.length() - 1);
-    } else {
+        _properties_string = _scidb_filename.substr(end, _scidb_filename.length() - 1);
+    } 
+    else {
         _connection_string = _scidb_filename;
     }
     return found;
@@ -142,8 +137,7 @@ void ParameterParser::parsePropertiesString() {
                 if (_propKeyResolver.contains(std::string(kv[0]))) {
                     assignQueryParameter(kv[0], kv[1]);
                 } else {
-                    Utils::debug("unused parameter \"" + string(kv[0]) +
-                                "\" with value \"" + string(kv[1]) + "\"");
+                    Utils::debug("unused parameter \"" + string(kv[0]) + "\" with value \"" + string(kv[1]) + "\"");
                 }
             }
         }
@@ -171,14 +165,14 @@ void ParameterParser::parsePropertiesString() {
             con->port = boost::lexical_cast<int>(x);
     }
 
-    void ParameterParser::parseArrayName() {
+    void ParameterParser::parseSlicedArrayName() {
         // 	  string array = pars->arrayname;
         size_t length = _con->arrayname.size();
         size_t t_start = _con->arrayname.find_first_of('[');
         size_t t_end = _con->arrayname.find_last_of(']');
 
         if (t_start == std::string::npos || t_end == std::string::npos) {
-            Utils::error("No or invalid temporal information in array name.");
+            Utils::debug("No temporal information in array name.");
             return;
         }
         // extract temporal string
@@ -313,7 +307,7 @@ void ParameterParser::parsePropertiesString() {
 
         if (_operation == SCIDB_OPEN) {
             parseOpeningOptions();
-            parseArrayName(); // array name will be modified if a temporal query is
+            parseSlicedArrayName(); // array name will be modified if a temporal query is
                             // detected (for the ConnectionPars)
         }
         if (_operation == SCIDB_CREATE) {
@@ -328,8 +322,10 @@ void ParameterParser::parsePropertiesString() {
         ConnectionStringKey enumKey = _conKeyResolver.getKey(key);
         switch (enumKey) {
             case HOST:
-                _con->host = value;
-                _con->ssl = value.substr(0, 5).compare("https") == 0;
+                _con->host = value;   
+                //  Explicitly set ssl from URL only if http or https is given
+                if (value.substr(0, 8).compare("https://") == 0) _con->ssl = true;
+                else if (value.substr(0, 7).compare("http://") == 0) _con->ssl = false;
                 break;
             case USER:
                 _con->user = value;
@@ -342,6 +338,9 @@ void ParameterParser::parsePropertiesString() {
                 break;
             case SSL:
                 _con->ssl = CSLTestBoolean(value.c_str());
+                break;
+            case SSLTRUST:
+                _con->ssltrust = CSLTestBoolean(value.c_str());
                 break;
             case ARRAY:
                 _con->arrayname = value;

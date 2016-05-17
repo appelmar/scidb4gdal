@@ -38,7 +38,6 @@ namespace scidb4geo
     using namespace std;
 
 
-
     int countNextDigits ( string &s, int start )
     {
         int i = start;

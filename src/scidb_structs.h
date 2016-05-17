@@ -87,6 +87,9 @@ namespace scidb4gdal {
     * The attributes hold the information of the cell value in each band.
     */
     struct SciDBArray {
+        
+        virtual ~SciDBArray() {};
+        
         /** the name of the array under which it is (or will be) stored in SciDB */
         string name;
         /** a list of scidb4gdal::Attribute that contain metadata about the attributes */
@@ -456,11 +459,9 @@ namespace scidb4gdal {
         */
         virtual ~SciDBSpatialArray() {}
 
-        /** The position index of the designated x dimension (West-East) in the
-        * dimension list */
+        /** The position index of the designated x dimension (West-East) in the dimension list */
         int _x_idx;
-        /** the position of the designated y dimension (North-South) in the dimension
-        * list*/
+        /** the position of the designated y dimension (North-South) in the dimension list*/
         int _y_idx;
 
         /**

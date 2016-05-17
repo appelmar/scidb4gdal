@@ -51,46 +51,47 @@ void GDALRegister_SciDB() {
         poDriver->SetDescription("SciDB");
         poDriver->SetMetadataItem(GDAL_DCAP_RASTER, "YES");
         std::stringstream driverlongname;
-        driverlongname << "SciDB array driver("
-                       << "BUILD " << __DATE__ << " " << __TIME__ << ")";
+        driverlongname << "SciDB array driver(" << "BUILD " << __DATE__ << " " << __TIME__ << ")";
         poDriver->SetMetadataItem(GDAL_DMD_LONGNAME, driverlongname.str().c_str());
         poDriver->SetMetadataItem(GDAL_DMD_HELPTOPIC, "frmt_scidb.html");
-        poDriver->SetMetadataItem(GDAL_DMD_CREATIONDATATYPES,
-                                  "Byte UInt16 Int16 Uint32 Int32 Float32 Float64");
+        poDriver->SetMetadataItem(GDAL_DMD_CREATIONDATATYPES,"Byte UInt16 Int16 Uint32 Int32 Float32 Float64");
 
         /* Create and opening options description */
-        std::stringstream co_descr;
-        co_descr << "   <Option name='host' type='string' "
-                    "default='http://localhost' description='hostname or IP "
-                    "address of SciDB coordinator instance'/>";
-        co_descr << "   <Option name='port' type='string' default='8083' "
-                    "description='port number shim listens on'/>";
-        co_descr << "   <Option name='user' type='string' default='scidb' "
-                    "description='username to connect to SciDB'/>";
-        co_descr << "   <Option name='password' type='string' default='scidb' "
-                    "description='padssword to connect to SciDB'/>";
-        co_descr << "   <Option name='ssl'  type='boolean' description='Use SSL "
-                    "connection'/>";
-        co_descr << "   <Option name='CHUNKSIZE_SP' type='int' description='chunk "
-                    "size of spatial dimensions in pixels'/>";
-        co_descr << "   <Option name='CHUNKSIZE_T' type='int' description='chunk "
-                    "size of temporal dimension in pixels'/>";
-        co_descr << "   <Option name='type' type='string-select' description='type "
-                    "of array to be created (S=2d space,  ST=3d spacetime, STS=3d "
-                    "spacetime with unbounded temporal dimension)'>"
-                    "   <Value>S</Value>"
-                    "   <Value>ST</Value>"
-                    "   <Value>STS</Value>"
-                    "   </Option>";
-        co_descr << "   <Option name='bbox' type='string' description='spatial "
-                    "boundaries of the target array'/>";
+        std::stringstream co_descr, general_descr,  oo_descr;
+        general_descr << "    <Option name='host' type='string' default='http://localhost' description='hostname or IP address of SciDB coordinator instance'/>";
+        general_descr << "    <Option name='port' type='string' default='8083' description='port number shim listens on'/>";
+        general_descr << "    <Option name='user' type='string' default='scidb' description='username to connect to SciDB'/>";
+        general_descr << "    <Option name='password' type='string' default='scidb' description='password to connect to SciDB'/>";
+        general_descr << "    <Option name='ssl'  type='boolean' description='Use SSL connection'/>";
+        general_descr << "    <Option name='trust' default='true'  type='boolean' description='ignore certificate checks'/>";           
+        
+        co_descr <<  "<CreationOptionList>" <<  general_descr.str();            
+        oo_descr <<  "<OpenOptionList>" <<  general_descr.str();            
+                    
+        co_descr << "    <Option name='CHUNKSIZE_SP' type='int' description='chunk size of spatial dimensions in pixels'/>";
+        co_descr << "    <Option name='CHUNKSIZE_T' type='int' description='chunk size of temporal dimension in pixels'/>";
+        co_descr << "    <Option name='type' type='string-select' description='type of array to be created (S=2d space,  ST=3d spacetime, STS=3d spacetime with unbounded temporal dimension)'>"
+                    "       <Value>S</Value>"
+                    "       <Value>ST</Value>"
+                    "       <Value>STS</Value>"
+                    "    </Option>";
+        co_descr << "    <Option name='bbox' type='string' description='spatial boundaries of the target array'/>";
+        
+        
         // co_descr <<  "   <Option name='srs' type='string'  description='spatial
         // reference system '/>" // TODO: remove srs parameter from driver
-        co_descr << "   <Option name='t' type='string'  description='datetime as "
-                    "ISO8601 string'/>";
-        co_descr << "   <Option name='dt' type='string' description='temporal "
-                    "resolution as ISO8601 period string'/>";
+        co_descr << "    <Option name='t' type='string'  description='datetime as ISO8601 string'/>";
+        co_descr << "    <Option name='dt' type='string' description='temporal resolution as ISO8601 period string'/>";
+        co_descr << "</CreationOptionList>";
         poDriver->SetMetadataItem(GDAL_DMD_CREATIONOPTIONLIST, co_descr.str().c_str());
+        
+        
+        oo_descr << "    <Option name='timestamp' type='string' description='datetime as ISO8601 string to query a temporal slice of a spacetime array'/>";
+        oo_descr << "    <Option name='t' type='int' description='temporal array index to query a temporal slice of a spacetime array'/>";
+        oo_descr <<  "</OpenOptionList>";
+        poDriver->SetMetadataItem(GDAL_DMD_OPENOPTIONLIST, oo_descr.str().c_str());
+        
+        
 
         poDriver->pfnOpen = scidb4gdal::SciDBDataset::Open;
         poDriver->pfnIdentify = scidb4gdal::SciDBDataset::Identify;
@@ -107,15 +108,13 @@ namespace scidb4gdal {
     *  SciDBRasterBand
     * =============================================
     */
-    SciDBRasterBand::SciDBRasterBand(SciDBDataset* poDS, SciDBSpatialArray* array,
-                                    int nBand) {
+    SciDBRasterBand::SciDBRasterBand(SciDBDataset* poDS, SciDBSpatialArray* array,int nBand) 
+    {
         this->poDS = poDS;
         this->nBand = nBand;
         this->_array = array;
 
-        eDataType = Utils::scidbTypeIdToGDALType(
-            _array->attrs[nBand]
-                .typeId); // Data type is mapped from SciDB's attribute data type
+        eDataType = Utils::scidbTypeIdToGDALType( _array->attrs[nBand].typeId); // Data type is mapped from SciDB's attribute data type
 
         uint32_t nImgYSize(1 + _array->getYDim()->high - _array->getYDim()->low);
         uint32_t nImgXSize(1 + _array->getXDim()->high - _array->getXDim()->low);
@@ -352,8 +351,7 @@ namespace scidb4gdal {
         this->SetDescription(_array.toString().c_str());
 
         SciDBSpatialArray* arr_ptr = &this->_array;
-        SciDBSpatioTemporalArray* st_arr_ptr =
-            dynamic_cast<SciDBSpatioTemporalArray*>(arr_ptr);
+        SciDBSpatioTemporalArray* st_arr_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(arr_ptr);
 
         // check if dynamic cast was successfull. if so then check for the temporal
         // index and then calculate the timestamp according to the resolution
@@ -519,14 +517,13 @@ namespace scidb4gdal {
         // overwrite the dimension chunksizes with the ones stated in the create
         // options or recalculate them
         SciDBSpatialArray* array_ptr = &array;
-        SciDBSpatioTemporalArray* st_ptr =
-            dynamic_cast<SciDBSpatioTemporalArray*>(array_ptr);
+        SciDBSpatioTemporalArray* st_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(array_ptr);
         bool isST = (st_ptr) ? true : false;
 
         // create Dimensions // Derive chunksize from attribute sizes
         if (options->chunksize_spatial > 0 && options->chunksize_temporal > 0) {
             Utils::debug("Using assigned spatial and temporal chunksizes.");
-            // use both chunksizes, because both are stated / probably do nothing
+            // use both chunksizes as given 
         } else if (options->chunksize_spatial > 0 &&
                 options->chunksize_temporal < 0 && isST) {
             stringstream ss;
@@ -546,26 +543,22 @@ namespace scidb4gdal {
             // recalculate the spatial chunksizes
             ss << "Calculating spatial chunksize: s=";
 
-            int divident =
-                (isST) ? (options->chunksize_temporal * pixelsize) : (pixelsize);
-            int s_calc =
-                (int)sqrt((SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024) / divident);
+            int divident = (isST) ? (options->chunksize_temporal * pixelsize) : (pixelsize);
+            int s_calc = (int)sqrt((SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024) / divident);
             options->chunksize_spatial = s_calc;
             ss << s_calc;
             Utils::debug(ss.str());
         } else if (options->chunksize_spatial < 0 &&
                 options->chunksize_temporal < 0) {
             // calculate both or use defaults
-            Utils::debug("Calculating spatial chunksize and taking the default "
-                        "temporal chunksize (t=1).");
+            Utils::debug("Calculating spatial chunksize and taking the default temporal chunksize (t=1).");
             int divident =
                 (isST) ? (SCIDB4GDAL_DEFAULT_TDIM_BLOCKSIZE * pixelsize) : (pixelsize);
 
             uint32_t blocksize =
                 Utils::nextPow2((uint32_t)sqrt(
                     (((double)(SCIDB4GEO_DEFAULT_CHUNKSIZE_MB * 1024 * 1024)) /
-                    ((double)(divident))))) /
-                2;
+                    ((double)(divident))))) / 2;
             stringstream ss;
             ss << "Using chunksize " << blocksize << "x" << blocksize << " --> "
             << (int)(((double)(blocksize * blocksize * pixelsize)) /
@@ -819,20 +812,15 @@ namespace scidb4gdal {
         free(bandInterleavedChunk);
     }
 
-    bool SciDBDataset::arrayIntegrateable(SciDBSpatialArray& src_array,
-                                        SciDBSpatialArray& tar_array) {
+    bool SciDBDataset::arrayIntegrateable(SciDBSpatialArray& src_array, SciDBSpatialArray& tar_array) {
         bool sameSRS = (src_array.auth_srid == tar_array.auth_srid) &&  boost::iequals(src_array.auth_name, tar_array.auth_name);
 
-        if (sameSRS) {
-            Utils::debug("Check whether source and target array have the same spatial reference system... OK");
-        } else
-            Utils::warn("Check whether source and target array have the same spatial reference system... FAILED");
+        if (sameSRS)  Utils::debug("Check whether source and target array have the same spatial reference system... OK");
+        else Utils::warn("Check whether source and target array have the same spatial reference system... FAILED");
 
         // source arrays bounding box
-        AffineTransform::double2 src_ul = AffineTransform::double2(
-            src_array.getXDim()->low, src_array.getYDim()->high);
-        AffineTransform::double2 src_lr = AffineTransform::double2(
-            src_array.getXDim()->high, src_array.getYDim()->low);
+        AffineTransform::double2 src_ul = AffineTransform::double2(src_array.getXDim()->low, src_array.getYDim()->high);
+        AffineTransform::double2 src_lr = AffineTransform::double2(src_array.getXDim()->high, src_array.getYDim()->low);
         src_array.affineTransform.f(src_ul);
         src_array.affineTransform.f(src_lr);
         double src_x_min, src_x_max, src_y_min, src_y_max;
@@ -931,9 +919,9 @@ namespace scidb4gdal {
 
             // 3. create client and set parameters
             client = new ShimClient(con_pars); // connection parameters are set
-
-            client->setCreateParameters(
-                *create_pars); // create parameters regarding time
+            
+            client->setCreateParameters(*create_pars); // create parameters regarding time
+           
 
             // in order to open the array after creation the temporal information needs
             // to be transferred also
@@ -947,17 +935,17 @@ namespace scidb4gdal {
             if (code != SUCCESS) {
                 throw code;
             }
-            Utils::debug(exists ? "Array exists." : "Array can be created.");
+            Utils::debug(exists ? "Referenced array already exists." : "New array will be created.");
             Utils::debug("-- DONE");
 
             if (exists && create_pars->hasBBOX) {
-                // currently we only support the fresh creation of a coverage by stating a
-                // bounding box
-                Utils::error("Currently the operation to overwrite an existing image "
-                            "with a bounding box statement is not allowed.");
+                // currently we only support the fresh creation of a coverage by stating a bounding box
+                Utils::error("Currently the operation to overwrite an existing image with a bounding box statement is not allowed.");
                 throw ERR_CREATE_ARRAYEXISTS;
             }
-
+            
+            
+   
             Utils::debug( "** Create source array representation in GDAL for input image **");
             // 4. Collect metadata from source data and store in SciDBSpatialArray
             // (happens only in GDAL)
@@ -979,8 +967,7 @@ namespace scidb4gdal {
                     if (create_pars->timestamp == "" && create_pars->dt == "") {
                         src_array = new SciDBSpatioTemporalArray();
                     } else {
-                        src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,
-                                                                create_pars->dt);
+                        src_array = new SciDBSpatioTemporalArray(create_pars->timestamp, create_pars->dt);
                     }
                     ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high =
                         INT64_MAX; // set the dimension to maximum = indefinite, will be
@@ -1002,6 +989,31 @@ namespace scidb4gdal {
             Utils::debug("Testing metadata copy: " + src_array->toString());
             Utils::debug("-- DONE");
 
+            
+            
+            
+            if (!client->hasSCIDB4GEO()) 
+            {
+                if (exists) {
+                    Utils::error("Inserting images to an existing array needs SciDB spacetime extension. Please install the extension on the SciDB server.");
+                    throw ERR_GLOBAL_NO_SCIDB4GEO;
+                } 
+                if (create_pars->hasBBOX) {
+                    Utils::error("Creating arrays with a bounding box statement needs SciDB spacetime extension. Please install the extension on the SciDB server."); 
+                    throw ERR_GLOBAL_NO_SCIDB4GEO;
+                }
+                if (create_pars->type ==  ST_ARRAY ||  create_pars->type ==  ST_SERIES) {
+                    Utils::error("Inserting images as spatiotemporal (3d) arrays needs the SciDB spacetime extension. Please install the extension on the SciDB server.");
+                    throw ERR_GLOBAL_NO_SCIDB4GEO;
+                }
+                //  TODO: Are there more cases to be catched here?
+               
+            }
+            
+            
+            
+            
+            
             // prepare the target array
             Utils::debug("** Prepare the target array representation **");
             if (exists) {
@@ -1109,6 +1121,9 @@ namespace scidb4gdal {
                 src_array->name = insertableName;
             }
 
+            
+            
+            
             Utils::debug("** Creating the array structure for the uploaded image in SciDB **");
             if (client->createTempArray(*src_array) != SUCCESS) {
                 throw ERR_CREATE_TEMPARRAY;
@@ -1141,8 +1156,7 @@ namespace scidb4gdal {
                         client->updateTRS(*((SciDBSpatioTemporalArray*)src_array));
                     }
 
-                    Utils::debug(
-                        "Trying to persist array metadata in SciDB system catalog");
+                    Utils::debug("Trying to persist array metadata in SciDB system catalog");
                     // Set Metadata in database
                     {
                         // set general image information
@@ -1286,6 +1300,11 @@ namespace scidb4gdal {
                                 "as connection string in the file name or as environment "
                                 "parameter.");
                     break;
+                case ERR_GLOBAL_NO_SCIDB4GEO:
+                    Utils::error("To perform the requested operation, the SciDB server must run the spacetime extension. Without the extension, it "
+                        "is only possible to upload / download single images to / from a single two-dimensional arrays with the same image boundaries");
+                    break;
+            
                 default:
                     Utils::error("Uncaught error: " + boost::lexical_cast<string>(e));
                     break;
@@ -1338,9 +1357,7 @@ namespace scidb4gdal {
 
         // Do not allow update access
         if (poOpenInfo->eAccess == GA_Update) {
-            CPLError(CE_Failure, CPLE_NotSupported, "scidb4gdal currently does not "
-                                                    "support update access to existing "
-                                                    "arrays.\n");
+            CPLError(CE_Failure, CPLE_NotSupported, "scidb4gdal currently does not support update access to existing arrays.\n");
             return NULL;
         }
 
@@ -1357,12 +1374,7 @@ namespace scidb4gdal {
             query_pars = &pp.getQueryParameters();
             con_pars = &pp.getConnectionParameters();
 
-            stringstream out;
-            out << "Query parameter control:\n\thasTemporalIndex: ";
-            (query_pars->hasTemporalIndex) ? out << "TRUE" : out << "FALSE";
-            out << "\n\ttemp_index: " << query_pars->temp_index
-                << "\n\ttimestamp: " << query_pars->timestamp;
-            Utils::debug(out.str());
+           
 
             // 2. Check validity of connection parameters
             if (!con_pars->isValid()) {
@@ -1373,7 +1385,19 @@ namespace scidb4gdal {
 
             // 3. Create shim client
             ShimClient* client = new ShimClient(con_pars);
+            
+            //  Check whether scidb4geo is installed and stop impossible operations
+            if (!client->hasSCIDB4GEO()) {
+                if (query_pars->timestamp.length() > 0) {  
+                    Utils::error("Downloading temporal slices with given timestamp needs SciDB spacetime extension. Please install the extension on the SciDB server.");
+                    throw ERR_GLOBAL_NO_SCIDB4GEO;
+                }
+            }
+            
+            
+
             client->setQueryParameters(*query_pars);
+            
 
             // create simple array here and cast it later if needed
             SciDBSpatialArray* array;
@@ -1388,8 +1412,7 @@ namespace scidb4gdal {
 
             // try to cast the array. if not possible then it is null and the temporal
             // parameter setting is skipped
-            SciDBSpatioTemporalArray* starray_ptr =
-                dynamic_cast<SciDBSpatioTemporalArray*>(array);
+            SciDBSpatioTemporalArray* starray_ptr = dynamic_cast<SciDBSpatioTemporalArray*>(array);
             if (starray_ptr) {
                 Utils::debug("Type Cast OK. Start setting up temporal information");
                 // check if the temporal index was set or if a timestamp was used
@@ -1398,9 +1421,8 @@ namespace scidb4gdal {
                     char* t_index_key = new char[1];
                     t_index_key[0] = 't';
                     if (CSLFindName(poOpenInfo->papszOpenOptions, t_index_key) >= 0) {
-                        string value =
-                            CSLFetchNameValue(poOpenInfo->papszOpenOptions, t_index_key);
-                        Utils::debug("Casting temp index");
+                        string value = CSLFetchNameValue(poOpenInfo->papszOpenOptions, t_index_key);
+                        Utils::debug("Casting temporal index");
                         query_pars->temp_index = boost::lexical_cast<int>(value);
                         Utils::debug("done");
                     }
@@ -1408,8 +1430,7 @@ namespace scidb4gdal {
                     // convert date to temporal index
                     Utils::debug("Converting date to index");
                     if (query_pars->timestamp.length() == 0) {
-                        Utils::debug("No temporal index and no timestamp provided. Using "
-                                    "first temporal index instead");
+                        Utils::warn("No temporal index and no timestamp provided. Using first temporal index instead");
                         query_pars->temp_index = -1;
                         query_pars->hasTemporalIndex = false;
                     } else {
@@ -1429,7 +1450,7 @@ namespace scidb4gdal {
                     if (query_pars->temp_index < dim->low ||
                         query_pars->temp_index > dim->high) {
                         Utils::error(
-                            "Specified temporal index out of bounce. Temporal Index stated "
+                            "Specified temporal index out of bounds. Temporal index stated "
                             "or calculated: " +
                             boost::lexical_cast<string>(query_pars->temp_index) +
                             ", Lower bound: " + boost::lexical_cast<string>(dim->low) + " (" +
@@ -1438,12 +1459,12 @@ namespace scidb4gdal {
                             starray_ptr->datetimeAtIndex(dim->high).toStringISO() + ")");
                         return NULL;
                     }
-                } /*else {
-    //set the temporal index to 0 (the first one, if no query parameter was
-    stated)
-    query_pars->temp_index = starray_ptr->getTDim()->low;
-    query_pars->hasTemporalIndex = true;
-    }*/
+                } 
+                /*else {
+                    //set the temporal index to 0 (the first one, if no query parameter was stated)
+                    query_pars->temp_index = starray_ptr->getTDim()->low;
+                    query_pars->hasTemporalIndex = true;
+                }*/
             }
 
             // Create the dataset
@@ -1457,7 +1478,11 @@ namespace scidb4gdal {
                     Utils::error("This is not a scidb4gdal connection string");
                     break;
                 case ERR_READ_ARRAYUNKNOWN:
-                    Utils::error("No array name stated.");
+                    Utils::error("Array name missing");
+                    break;
+                case ERR_GLOBAL_NO_SCIDB4GEO:
+                    Utils::error("To perform the requested operation, the SciDB server must run the spacetime extension. Without the extension, it "
+                        "is only possible to upload / download single images to / from a single two-dimensional arrays with the same image boundaries");
                     break;
             }
             return NULL;

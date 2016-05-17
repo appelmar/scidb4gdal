@@ -170,7 +170,7 @@ namespace scidb4gdal
         *
         * @return void
         */
-        void parseArrayName();
+        void parseSlicedArrayName();
 
         /**
         * @brief loads the connection string from environment parameters

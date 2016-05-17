@@ -31,24 +31,21 @@ SOFTWARE.
 #define SCIDB4GDAL_DEFAULT_XDIMNAME "x"
 #define SCIDB4GDAL_DEFAULT_YDIMNAME "y"
 #define SCIDB4GDAL_DEFAULT_ZDIMNAME "z" // not used by gdal
-#define SCIDB4GDAL_DEFAULT_TDIMNAME "t" // not used by gdal
+#define SCIDB4GDAL_DEFAULT_TDIMNAME "t" 
 
 //#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_X 512
 //#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y 512
 
 #define SCIDB4GDAL_DEFAULT_BLOCKSIZE 512
 #define SCIDB4GDAL_DEFAULT_TDIM_BLOCKSIZE 1
-#define SCIDB4GEO_DEFAULT_CHUNKSIZE_MB \
-    32 // This is an upper limit, SciDB recommends smaller chunks ~ 10 MB, but
-       // for ingestion and download, larger chunks turned out to be faster.
+#define SCIDB4GEO_DEFAULT_CHUNKSIZE_MB 32  // This is an upper limit, SciDB recommends smaller chunks ~ 10 MB, but for ingestion and download, larger chunks turned out to be faster.
 
 #define SCIDB4GDAL_DEFAULT_UPLOAD_FILENAME "scidb4gdal_temp.bin"
 #define SCIDB4GDAL_ARRAYSUFFIX_TEMP "_temp"
 #define SCIDB4GDAL_ARRAYSUFFIX_TEMPLOAD "_tempload"
 #define SCIDB4GDAL_ARRAYSUFFIX_COLLECTION_INTEGRATION "_integrate"
 
-//#define SCIDB4GDAL_ARRAY_PREFIX "GDAL_" // Names of created arrays get a
-// prefix, not yet implemented
+//#define SCIDB4GDAL_ARRAY_PREFIX "GDAL_" // Names of created arrays get a prefix, not yet implemented
 
 #define SCIDB4GDAL_MAINMEM_HARD_LIMIT_MB 1024
 

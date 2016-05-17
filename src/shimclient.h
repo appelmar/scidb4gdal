@@ -232,6 +232,15 @@ namespace scidb4gdal {
         */
         StatusCode testConnection();
 
+        
+        /**
+        * @brief Tests whether a SciDB installation runs the scidb4geo plugin or not
+        * @param ret return code to capture connection and query errors
+        * @return true if scidb4geo is running,  false otherwise
+        */
+        bool hasSCIDB4GEO(StatusCode &ret);
+        bool hasSCIDB4GEO();
+        
         /**
         * @brief Creates a new (temporary) SciDB array
         *
@@ -537,6 +546,8 @@ namespace scidb4gdal {
         string _passwd;
         /** ssl use */
         bool _ssl;
+        /** ssl verification */
+        bool _ssltrust;      
         /** The cURL class to handle the HTTP calls */
         CURL* _curl_handle;
         /** initialize flag */
@@ -549,6 +560,8 @@ namespace scidb4gdal {
         CreationParameters* _cp;
         /** pointer to the query parameter */
         QueryParameters* _qp;
+        /** is scidb4geo installed? */
+        bool* _hasSCIDB4GEO;
     };
 }
 

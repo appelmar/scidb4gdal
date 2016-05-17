@@ -36,7 +36,9 @@ namespace scidb4gdal {
         PASSWORD,
         /** the key for using SSL encryption */
         SSL,
-        /** the key to confirm the delete preocess */
+        /** bool value whether SSL certificates should be checked or not */
+        SSLTRUST, 
+        /** the key to confirm the delete process */
         CONFIRM_DELETE
     };
 
@@ -188,6 +190,8 @@ namespace scidb4gdal {
         string passwd;
         /** flag for using SSL encryption */
         bool ssl;
+         /** flag for using SSL verification */
+        bool ssltrust;
         /** error code if the connection parameters are invalid */
         int error_code;
 
@@ -199,7 +203,7 @@ namespace scidb4gdal {
         * Default constructor to create empty connection parameters
         */
         ConnectionParameters()
-            : arrayname(""), host(""), port(0), user(""), passwd(""), deleteArray(false) {}
+            : arrayname(""), host(""), port(0), user(""), passwd(""), ssl(false), ssltrust(true),  deleteArray(false) {}
 
         /**
         * @brief Represents the connection parameter in string form
@@ -210,8 +214,10 @@ namespace scidb4gdal {
         */
         string toString() {
             stringstream s;
-            s << "array=" << arrayname << " host=" << host << " port=" << port
-            << "  user=" << user << " passwd=" << passwd;
+            stringstream pw_enc;
+            // Do NOT print the password
+            for (unsigned int i = 0; i<passwd.length(); ++i) pw_enc << "x";
+            s << "array=" << arrayname << " host=" << host << " port=" << port << " user=" << user << " passwd=" << pw_enc.str() <<  " ssl=" <<  (ssl ? "true" : "false") <<  " trust=" <<  (ssltrust  ?  "true" : "false");
             return s.str();
         };
 

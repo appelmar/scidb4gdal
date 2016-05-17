@@ -189,10 +189,8 @@ namespace scidb4gdal {
             double inv_x0 = -inv_a11 * _x0 + inv_a12 * _y0;
             double inv_y0 = inv_a21 * _x0 - inv_a22 * _y0;
 
-            _inv =
-                new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
-            _inv->_inv = this; // Prevent repreated computations of f, f-1, f, f-1, ...
-                            // This is dangerous in destruction...
+            _inv = new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
+            _inv->_inv = this; // Prevent recursive computations of f, f-1, f, f-1, ... This is dangerous in destruction...
         }
 
         _inv->f(v);
