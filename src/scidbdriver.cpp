@@ -80,6 +80,7 @@ void GDALRegister_SciDB() {
         
         // co_descr <<  "   <Option name='srs' type='string'  description='spatial
         // reference system '/>" // TODO: remove srs parameter from driver
+        co_descr << "    <Option name='srs' type='string'  description='spatial reference system (deprecated)'/>";
         co_descr << "    <Option name='t' type='string'  description='datetime as ISO8601 string'/>";
         co_descr << "    <Option name='dt' type='string' description='temporal resolution as ISO8601 period string'/>";
         co_descr << "</CreationOptionList>";
@@ -866,6 +867,11 @@ namespace scidb4gdal {
             tar_y_min = tar_ul.y;
         }
 
+//         stringstream s1;
+//         s1 << "BBOX source image: " << setprecision(numeric_limits<double>::digits10) << " " << src_x_min << " " << src_y_min << " " << src_x_max << " " << src_y_max;
+//         s1 <<  "- BBOX target image: " << setprecision(numeric_limits<double>::digits10) <<  tar_x_min << " " << tar_y_min << " " << tar_x_max << " " << tar_y_max;
+//         Utils::debug(s1.str());
+        
         bool isTPP = (src_x_min >= tar_x_min) && (src_y_min >= tar_y_min) &&
                     (src_x_max <= tar_x_max) && (src_y_max <= tar_y_max);
 
@@ -961,7 +967,11 @@ namespace scidb4gdal {
                         src_array = new SciDBSpatioTemporalArray(create_pars->timestamp,
                                                                 create_pars->dt);
                     }
-                    Utils::debug("SciDBSpatioTemporalArray created.");
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = 0; 
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->start = 0; 
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->low = 0; 
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->length = 1 ;
+                     Utils::debug("SciDB spacetime array with single temporal slice created.");
                     break;
                 case ST_SERIES:
                     if (create_pars->timestamp == "" && create_pars->dt == "") {
@@ -969,11 +979,11 @@ namespace scidb4gdal {
                     } else {
                         src_array = new SciDBSpatioTemporalArray(create_pars->timestamp, create_pars->dt);
                     }
-                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high =
-                        INT64_MAX; // set the dimension to maximum = indefinite, will be
-                    // adapted when creating the temporal src_array
-                    Utils::debug("SciDBSpatioTemporalArray created with open temporal "
-                                "dimension (spatiotemporal series)");
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = SCIDB_MAX_DIM_INDEX; // set the dimension to maximum = indefinite, will be adapted when creating the temporal src_array
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->start = 0; 
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->low = 0; 
+                    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->length = SCIDB_MAX_DIM_INDEX  - 0 + 1;
+                    Utils::debug("SciDB spacetime array with unbdounded temporal dimension created.");
                     break;
             }
             Utils::debug("-- DONE");
@@ -1084,14 +1094,14 @@ namespace scidb4gdal {
                     }
 
                     // new image coordinates for target array
-                    x->low = img_x_min;
-                    x->high = img_x_max;
-                    x->start = img_x_min;
-                    x->length = img_x_max - img_x_min + 1;
-                    y->low = img_y_min;
-                    y->high = img_y_max;
-                    y->start = img_y_min;
-                    y->length = img_y_max - img_y_min + 1;
+                    x->low = (int64_t)floor(img_x_min);
+                    x->high = (int64_t)ceil(img_x_max);
+                    x->start = x->low;
+                    x->length = (x->high  - x->low) + 1;
+                    y->low = (int64_t)floor(img_y_min);
+                    y->high = (int64_t)ceil(img_y_max);
+                    y->start = y->low;
+                    y->length = (y->high  - y->low) + 1;
 
                     // transfer the stated SRS information from create options to the target array
                     tar_arr->auth_name = create_pars->auth_name;

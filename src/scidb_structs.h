@@ -70,7 +70,7 @@ namespace scidb4gdal {
         int64_t start;
 
         /** The range of the dimension. E.g. start + length = maximal allowed value */
-        int64_t length;
+        uint64_t length;
     };
 
     /**

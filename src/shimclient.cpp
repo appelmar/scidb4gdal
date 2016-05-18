@@ -1247,38 +1247,42 @@ namespace scidb4gdal {
         // j=0:99,10,0];
         stringstream afl;
         afl << "CREATE TEMP ARRAY " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP;
+        
+        afl <<  array.getSchemaString();
+        
+        
         // Append attribute specification
-        afl << " <";
-        for (uint32_t i = 0; i < array.attrs.size(); ++i) {
-            afl << array.attrs[i].name << ": " << array.attrs[i].typeId;
-            if (i != array.attrs.size() - 1) {
-                afl << ",";
-            } else {
-                afl << ">";
-            }
-        }
+//         afl << " <";
+//         for (uint32_t i = 0; i < array.attrs.size(); ++i) {
+//             afl << array.attrs[i].name << ": " << array.attrs[i].typeId;
+//             if (i != array.attrs.size() - 1) {
+//                 afl << ",";
+//             } else {
+//                 afl << ">";
+//             }
+//         }
+// 
+//         // Append dimension spec
+//         afl << " [";
+//         for (uint32_t i = 0; i < array.dims.size(); ++i) {
+//             string dimHigh = "";
+//             if (array.dims[i].high == SCIDB_MAX_DIM_INDEX) {
+//                 dimHigh = "*";
+//             } else {
+//                 dimHigh = boost::lexical_cast<string>(array.dims[i].high);
+//             }
+// 
+//             // TODO: Overlap
+//             afl << array.dims[i].name << "=" << array.dims[i].low << ":" << dimHigh
+//                 << "," << array.dims[i].chunksize << "," << 0;
+//             if (i != array.dims.size() - 1) {
+//                 afl << ", ";
+//             } else {
+//                 afl << "]";
+//             }
+//         }
 
-        // Append dimension spec
-        afl << " [";
-        for (uint32_t i = 0; i < array.dims.size(); ++i) {
-            string dimHigh = "";
-            if (array.dims[i].high == INT64_MAX) {
-                dimHigh = "*";
-            } else {
-                dimHigh = boost::lexical_cast<string>(array.dims[i].high);
-            }
 
-            // TODO: Overlap
-            afl << array.dims[i].name << "=" << array.dims[i].low << ":" << dimHigh
-                << "," << array.dims[i].chunksize << "," << 0;
-            if (i != array.dims.size() - 1) {
-                afl << ", ";
-            } else {
-                afl << "]";
-            }
-        }
-
-        // afl << ";";
         string aflquery = afl.str();
         Utils::debug("Performing AFL Query: " + afl.str());
 
@@ -1379,7 +1383,7 @@ namespace scidb4gdal {
         for (uint32_t i = 0; i < srcArray.dims.size(); i++) {
             string dim_name = srcArray.dims[i].name;
             string dimHigh;
-            if (srcArray.dims[i].high == INT64_MAX) {
+            if (srcArray.dims[i].high == SCIDB_MAX_DIM_INDEX) {
                 dimHigh = "*";
             } else {
                 dimHigh = boost::lexical_cast<string>(srcArray.dims[i].high);
@@ -1444,7 +1448,7 @@ namespace scidb4gdal {
         
     
         stringstream afl;
-        afl << "insert(" << afl_filternonNA << ", " << collArr << ")";
+        afl << "insert(" << afl_filternonNA.str() << ", " << collArr << ")";
         Utils::debug("Performing AFL Query: " + afl.str());
 
         curlBegin();
@@ -1563,6 +1567,7 @@ namespace scidb4gdal {
         array_tile.getYDim()->low = y_min;
         array_tile.getYDim()->high = y_max;
         array_tile.getYDim()->length = y_max - y_min + 1;
+        
 
         afl_input << "input(" << array_tile.getSchemaString() << ",'" << remoteFilename << "', -2, '" << format << "')";
         
