@@ -515,11 +515,33 @@ namespace scidb4gdal {
         * @return void.
         */
         void releaseSession(int sessionID);
+        
+        /**
+        * @brief Requests the server's SciDB / shim version 
+        * 
+        * This function returns the SciDB / shim version running on the server. Consecutive calls will NOT result in 
+        * multiple HTTP request, i.e. the version is cached in _shimversion.
+        * @return string version identifier like v15.12xxxxxxx.
+        */
+        string getVersion();
+        
+        
+        /**
+        * @brief Convert a version string to integer major and minor versions 
+        * 
+        * @param version [in] version string
+        * @param version [out] integer major version
+        * @param version [out] integer minor version
+        * @return void
+        */
+        void stringToVersion(const string& version, int* major, int* minor);
+        
 
         /**
         * @brief Login to the SHIM web client
         *
-        * A function used to login to the SHIM web client based on the connection parameters that were set.
+        * A function used to login to the SHIM web client based on the connection parameters that were set. The login/logout mechanism  
+        * has been removed in SciDB 15.12 and will not do anything except setting _auth to an arbitrary value as a workaround. 
         *
         * @return void.
         */
@@ -534,6 +556,10 @@ namespace scidb4gdal {
         * @return void
         */
         void logout();
+        
+        
+        
+        
 
     private:
         /** host url */
@@ -562,6 +588,8 @@ namespace scidb4gdal {
         QueryParameters* _qp;
         /** is scidb4geo installed? */
         bool* _hasSCIDB4GEO;
+        /** version of Shim */
+        string _shimversion;
     };
 }
 

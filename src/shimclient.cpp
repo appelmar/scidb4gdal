@@ -34,7 +34,7 @@ namespace scidb4gdal {
     using namespace scidb4geo;
 
     ShimClient::ShimClient()
-        : _host("https://localhost"), _port(8083), _user("scidb"), _passwd("scidb"), _ssl(true), _curl_handle(0), _curl_initialized(false), _auth(""),  _hasSCIDB4GEO(NULL) {
+        : _host("https://localhost"), _port(8083), _user("scidb"), _passwd("scidb"), _ssl(true), _curl_handle(0), _curl_initialized(false), _auth(""),  _hasSCIDB4GEO(NULL), _shimversion("") {
         curl_global_init(CURL_GLOBAL_ALL);
         stringstream ss;
 
@@ -56,7 +56,7 @@ namespace scidb4gdal {
 
     ShimClient::ShimClient(string host, uint16_t port, string user, string passwd,
                         bool ssl = false)
-        : _host(host), _port(port), _user(user), _passwd(passwd), _ssl(ssl), _curl_handle(0), _curl_initialized(false), _auth(""),  _hasSCIDB4GEO(NULL) {
+        : _host(host), _port(port), _user(user), _passwd(passwd), _ssl(ssl), _curl_handle(0), _curl_initialized(false), _auth(""),  _hasSCIDB4GEO(NULL), _shimversion("") {
         curl_global_init(CURL_GLOBAL_ALL);
         stringstream ss;
 
@@ -87,7 +87,8 @@ namespace scidb4gdal {
         _curl_handle(0),
         _curl_initialized(false),
         _auth(""), 
-        _hasSCIDB4GEO(NULL) {
+        _hasSCIDB4GEO(NULL),
+        _shimversion(""){
         
         curl_global_init(CURL_GLOBAL_ALL);
 
@@ -228,6 +229,44 @@ namespace scidb4gdal {
     }
 
     
+    
+    string ShimClient::getVersion()
+    {
+        if (!_shimversion.empty()) return _shimversion;
+        
+        Utils::debug("Requesting the server's SciDB / shim version over HTTP...");
+        curlBegin();
+
+        stringstream ss;
+        ss << _host << SHIMENDPOINT_VERSION;
+       
+        curl_easy_setopt(_curl_handle, CURLOPT_URL, ss.str().c_str());
+
+        // Test connection
+        string response;
+        curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION,&responseToStringCallback);
+        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, &response);
+
+        curlPerform();
+        curlEnd();
+        
+        _shimversion = response;
+        
+        Utils::debug("SciDB server runs version " + response);
+
+        return response;
+    }
+    
+    
+    void ShimClient::stringToVersion(const string& version, int* major, int* minor)
+    {
+        *major = boost::lexical_cast<int>(version.substr(1,2));
+        *minor = boost::lexical_cast<int>(version.substr(4,2));
+    }
+
+    
+    
+    
     bool ShimClient::hasSCIDB4GEO()
     {
         StatusCode s = SUCCESS;
@@ -319,6 +358,9 @@ namespace scidb4gdal {
     
     
     int ShimClient::newSession() {
+        
+        
+        
         if (_ssl && _auth.empty())
             login();
 
@@ -374,7 +416,26 @@ namespace scidb4gdal {
     }
 
     void ShimClient::login() {
+        
+        /* Since the login endpoint as been removed with SciDB 15.12 we need
+           to check the version first and set _auth to an arbitrary value. This 
+           value is passed to all following HTTP requests but will not be 
+           interpreted by shim. This workaround remains backward compatibility
+           with older shim versions. */
+        
+        int major,minor;
+        stringToVersion(getVersion(),&major,&minor);
+        
+        if (major > 15 || (major == 15 && minor >= 12)) 
+        {
+            _auth="UNUSED";
+            return;
+        }
+        
+        
         curlBegin();
+        
+        
 
         stringstream ss;
         string response;
@@ -384,8 +445,7 @@ namespace scidb4gdal {
         curl_easy_setopt(_curl_handle, CURLOPT_URL, ss.str().c_str());
         curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
 
-        curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION,
-                        &responseToStringCallback);
+        curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback);
         curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, &response);
         curlPerform();
         curlEnd();
@@ -402,6 +462,23 @@ namespace scidb4gdal {
     }
 
     void ShimClient::logout() {
+        
+        
+         /* Since the logout endpoint as been removed with SciDB 15.12 we need
+           to check the version first and set _auth to an arbitrary value. This 
+           value is passed to all following HTTP requests but will not be 
+           interpreted by shim. This workaround remains backward compatibility
+           with older shim versions. */
+        
+        int major,minor;
+        stringToVersion(getVersion(),&major,&minor);
+        
+        if (major > 15 || (major == 15 && minor >= 12)) 
+        {
+            _auth="UNUSED";
+            return;
+        }
+        
         curlBegin();
 
         stringstream ss;
@@ -490,8 +567,8 @@ namespace scidb4gdal {
         ss.str("");
         vector<string> rows;
         boost::split(rows, response, boost::is_any_of("\n"));
-        // ignore first row
-        for (vector<string>::iterator it = ++(rows.begin()); it != rows.end(); ++it) {
+        
+        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
             vector<string> cols;
             boost::split(cols, *it, boost::is_any_of(","));
             if (cols.size() != 3) {
@@ -598,7 +675,7 @@ namespace scidb4gdal {
         vector<string> rows;
         boost::split(rows, response, boost::is_any_of("\n"));
         // ignore first row
-        for (vector<string>::iterator it = ++(rows.begin()); it != rows.end(); ++it) {
+        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
             vector<string> cols;
             boost::split(cols, *it, boost::is_any_of(","));
             if (cols.size() != 7) {
@@ -731,12 +808,17 @@ namespace scidb4gdal {
         vector<string> rows;
         boost::split(rows, response, boost::is_any_of("\n"));
 
-        if (rows.size() < 2 || rows.size() > 3) { // Header + 1 data row
+        if (rows.size() < 1 || rows.size() > 4) { // Header + 1 data row
             Utils::warn("Cannot extract SRS information from response: " + response);
             return ERR_SRS_NOSPATIALREFFOUND;
         }
 
-        string row = rows[1];
+        string row;
+        for (uint32_t i=0; i < rows.size() && rows[i].empty(); ++i)  row = rows[i];
+        if (row.empty()) {
+            Utils::error("Cannot extract temporal reference of array'" + inArrayName + "'.");
+            return ERR_GLOBAL_PARSE;
+        }
         vector<string> cols;
         int cur_start = -1;
         for (uint32_t i = 0; i < row.length();
@@ -841,8 +923,13 @@ namespace scidb4gdal {
         vector<string> rows;
         boost::split(rows, response, boost::is_any_of("\n"));
 
-        if (rows.size() > 2) {
-            string row = rows[1]; // TODO ensure that rows has more than 1 row (more
+        string row;
+        for (uint32_t i=0; i < rows.size() && rows[i].empty(); ++i)  row = rows[i];
+        if (row.empty()) {
+            Utils::error("Cannot extract temporal reference of array'" + inArrayName + "'.");
+            return ERR_GLOBAL_PARSE;
+        }
+            //string row = rows[0]; // TODO ensure that rows has more than 1 row (more
             // than header)
             vector<string> cols;
             int cur_start = -1;
@@ -865,7 +952,7 @@ namespace scidb4gdal {
                 out.setTPoint(p);
                 out.setTInterval(i);
             }
-        }
+        
         releaseSession(sessionID);
 
         return SUCCESS;
@@ -950,7 +1037,7 @@ namespace scidb4gdal {
             curlBegin();
             stringstream ss;
             stringstream afl;
-            afl << "filter(eo_arrays(), name='" <<  name <<  "')";
+            afl << "project(filter(eo_arrays(), name='" <<  name <<  "'),setting)";
             Utils::debug("Performing AFL Query: " + afl.str());
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
             << "id=" << sessionID << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0) << "&save=" << "csv";
@@ -993,41 +1080,41 @@ namespace scidb4gdal {
                 curlEnd();
                 return ERR_GLOBAL_UNKNOWN;
             };
+            
             curlEnd();
         }
 
+        
         // Parse CSV into string vector
         vector<string> rows;
         boost::split(rows, response, boost::is_any_of("\n"));
 
-        if (rows.size() > 2) {
+        bool success = false;
+        if (rows.size() > 1) {
             // Find items between single quotes 'XXX', only works if all SciDB
             // attributes of query result are strings
-            for (vector<string>::iterator it = ++(rows.begin()); it != rows.end();
-                ++it) {
-                vector<string> cols;
-                boost::split(cols, *it, boost::is_any_of(","));
-
-                string n = cols[0].substr(1, cols[0].length() - 2);
-                if (n == name) {
-                    string type = cols[1].substr(1, cols[1].length() - 2);
-                    if (type == "s") {
-                        array = new SciDBSpatialArray();
-                        break;
-                    } else if (type == "st") {
-                        array = new SciDBSpatioTemporalArray();
-                        break;
-                    } else {
-                        Utils::debug("Can't evaluate " + type);
-                        return ERR_GLOBAL_UNKNOWN;
-                    }
-                } else {
-                    continue;
-                }
+            for (vector<string>::iterator it = rows.begin(); it != rows.end();++it) {
+                if (it->empty()) continue;
+                if (it->compare("'s'") == 0) {
+                    array = new SciDBSpatialArray();
+                    success = true;
+                    break;  
+                } 
+                else if (it->compare("'st'") == 0) {
+                    array = new SciDBSpatioTemporalArray();
+                    success = true;
+                    break;   
+                } 
+                else continue;    
             }
         }
+        if (!success) {
+            Utils::error("Cannot derive setting for array '" + name + "'. Invalid response of project(filter(eo_arrays(...))).");
+            releaseSession(sessionID);
+            return ERR_GLOBAL_UNKNOWN;
+        }
 
-        releaseSession(sessionID);
+        
         return SUCCESS;
     }
 
@@ -1926,7 +2013,7 @@ namespace scidb4gdal {
         vector<string> rows;
         boost::split(rows, response, boost::is_any_of("\n"));
         // ignore first row
-        for (vector<string>::iterator it = ++(rows.begin()); it != rows.end(); ++it) {
+        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
             vector<string> cols;
             boost::split(cols, *it, boost::is_any_of(","));
             if (cols.size() != 2) {
@@ -2068,8 +2155,8 @@ namespace scidb4gdal {
 
         vector<string> rows;
         boost::split(rows, response, boost::is_any_of("\n"));
-        // ignore first row
-        for (vector<string>::iterator it = ++(rows.begin()); it != rows.end(); ++it) {
+        
+        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
             vector<string> cols;
             boost::split(cols, *it, boost::is_any_of(","));
             if (cols.size() != 2) {
