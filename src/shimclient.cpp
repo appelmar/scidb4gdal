@@ -260,8 +260,31 @@ namespace scidb4gdal {
     
     void ShimClient::stringToVersion(const string& version, int* major, int* minor)
     {
-        *major = boost::lexical_cast<int>(version.substr(1,2));
-        *minor = boost::lexical_cast<int>(version.substr(4,2));
+        vector<string> parts;
+        boost::split(parts, version, boost::is_any_of(".-"));
+        if (parts.size() < 2) {
+            stringstream ss; 
+            ss << "Cannot extract SciDB / shim version from string '" << version << "'";
+            Utils::error(ss.str());
+            major = 0;
+            minor = 0;
+            return;
+        }
+        *major = boost::lexical_cast<int>(parts[0].substr(1,parts[0].length()-1)); // Remove "v" prefix
+        *minor = boost::lexical_cast<int>(parts[1]);
+      
+    }
+    
+    
+    bool ShimClient::isVersionGreaterThan(int maj, int min) {
+        int major,minor;
+        stringToVersion(getVersion(),&major,&minor);
+        
+        if (major > maj || (major == maj && minor > min)) 
+        {
+            return true;
+        }   
+        return false;
     }
 
     
@@ -423,11 +446,7 @@ namespace scidb4gdal {
            interpreted by shim. This workaround remains backward compatibility
            with older shim versions. */
         
-        int major,minor;
-        stringToVersion(getVersion(),&major,&minor);
-        
-        if (major > 15 || (major == 15 && minor >= 12)) 
-        {
+        if (isVersionGreaterThan(15,7)) {
             _auth="UNUSED";
             return;
         }
@@ -542,8 +561,7 @@ namespace scidb4gdal {
             curlBegin();
             ss.str("");
             // READ BYTES  ///////////////////////////
-            ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-            << "id=" << sessionID << "&n=0";
+            ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -563,41 +581,42 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-        // Parse CSV
+      
         ss.str("");
-        vector<string> rows;
-        boost::split(rows, response, boost::is_any_of("\n"));
         
-        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
-            vector<string> cols;
-            boost::split(cols, *it, boost::is_any_of(","));
-            if (cols.size() != 3) {
-                continue; // TODO: Error handling, expected 3 cols
-            }
-            if (cols[0].length() < 2 || cols[1].length() < 2 || cols[2].length() < 2)
-                continue;
-
-            SciDBAttribute attr;
-
-            // Remove quotes
-            attr.name = cols[0].substr(1, cols[0].length() - 2);
-            // Remove quotes
-            attr.typeId = cols[1].substr(1, cols[1].length() - 2);
-            attr.nullable = (cols[2].compare("TRUE") * cols[2].compare("true") == 0);
-
-            // Assert attr has datatype that is supported by GDAL
-            if (Utils::scidbTypeIdToGDALType(attr.typeId) == GDT_Unknown) {
-                ss.str("");
-                ss << "SciDB GDAL driver does not support data type " << attr.typeId
-                << " of attribute " << attr.name;
-                Utils::error(ss.str());
-                return ERR_READ_UNKNOWN;
-            }
-
-            out.push_back(attr);
+        
+        CSVstring* csv;
+        if (!isVersionGreaterThan(15,7)) {
+         csv = new CSVstring( response,true); // with header  
         }
-
+        else csv = new CSVstring( response,false); // with header  
+        
+        
+        for (int i=0; i<csv->nrow(); ++i) 
+        {
+             SciDBAttribute attr;
+             attr.name = csv->get<string>(i,0).substr(1, csv->get<string>(i,0).length() - 2); // remove ''
+             attr.typeId = csv->get<string>(i,1).substr(1, csv->get<string>(i,1).length() - 2); // remove ''
+             attr.nullable = (csv->get<string>(i,2).compare("TRUE") * csv->get<string>(i,2).compare("true") == 0);
+             
+              // Assert attr has datatype that is supported by GDAL
+                if (Utils::scidbTypeIdToGDALType(attr.typeId) == GDT_Unknown) {
+                    ss.str("");
+                    ss << "SciDB GDAL driver does not support data type " << attr.typeId << ". Array attribute '" << attr.name << "' will be ignored." ;
+                    Utils::warn(ss.str());
+                    continue;
+                }
+                out.push_back(attr);
+        }
+        
+        delete csv;
+        
         releaseSession(sessionID);
+        
+        if (out.size() == 0) {
+            Utils::error("Array '" + inArrayName + "' has no valid GDAL compatible attributes.");
+            return ERR_GLOBAL_UNKNOWN;
+        }
 
         return SUCCESS;
     }
@@ -670,38 +689,35 @@ namespace scidb4gdal {
         }
 
         // Parse CSV
-        stringstream ss;
+       
 
-        vector<string> rows;
-        boost::split(rows, response, boost::is_any_of("\n"));
-        // ignore first row
-        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
-            vector<string> cols;
-            boost::split(cols, *it, boost::is_any_of(","));
-            if (cols.size() != 7) {
-                continue; // TODO: Error handling, expected 4 cols
-            }
-            if (cols[0].length() < 2 || cols[1].length() < 1 || cols[2].length() < 1 ||
-                cols[3].length() < 1 || cols[4].length() < 1 || cols[5].length() < 1 ||
-                cols[6].length() < 1) {
-                continue;
-            }
-
+        
+        
+        
+        CSVstring* csv;
+        if (!isVersionGreaterThan(15,7)) {
+         csv = new CSVstring( response,true); // with header  
+        }
+        else csv = new CSVstring( response,false); // with header  
+        
+        
+        for (int i=0; i<csv->nrow(); ++i) 
+        {   
             SciDBDimension dim;
-            dim.name = cols[0].substr(1, cols[0].length() - 2);
-            dim.low = boost::lexical_cast<int64_t>(cols[1].c_str());
-            dim.high = boost::lexical_cast<int64_t>(cols[2].c_str());
+            dim.name = csv->get<string>(i,0).substr(1, csv->get<string>(i,0).length() - 2);
+            dim.low = boost::lexical_cast<int64_t>(csv->get<string>(i,1).c_str());
+            dim.high = boost::lexical_cast<int64_t>(csv->get<string>(i,2).c_str());
             // Remove quotes
-            dim.typeId = cols[3].substr(1, cols[3].length() - 2);
-            dim.chunksize = boost::lexical_cast<uint32_t>(cols[4].c_str());
-            dim.start = boost::lexical_cast<int64_t>(cols[5].c_str());
-            dim.length = boost::lexical_cast<int64_t>(cols[6].c_str());
+            dim.typeId = csv->get<string>(i,3).substr(1, csv->get<string>(i,3).length() - 2);
+            dim.chunksize = boost::lexical_cast<uint32_t>(csv->get<string>(i,4).c_str());
+            dim.start = boost::lexical_cast<int64_t>(csv->get<string>(i,5).c_str());
+            dim.length = boost::lexical_cast<int64_t>(csv->get<string>(i,6).c_str());
 
             // yet unspecified e.g. for newly created arrays
             if (dim.high == SCIDB_MAX_DIM_INDEX || dim.low == SCIDB_MAX_DIM_INDEX ||
                 dim.high == -SCIDB_MAX_DIM_INDEX || dim.low == -SCIDB_MAX_DIM_INDEX) {
-                dim.low = boost::lexical_cast<int64_t>(cols[5].c_str());
-                dim.high = dim.low + boost::lexical_cast<int64_t>(cols[6].c_str()) - 1;
+                dim.low = boost::lexical_cast<int64_t>(csv->get<string>(i,5).c_str());
+                dim.high = dim.low + boost::lexical_cast<int64_t>(csv->get<string>(i,6).c_str()) - 1;
             }
 
             // Assert  dim.typeId is integer
@@ -709,23 +725,26 @@ namespace scidb4gdal {
                 dim.typeId == "int16" || dim.typeId == "int8" ||
                 dim.typeId == "uint32" || dim.typeId == "uint64" ||
                 dim.typeId == "uint16" || dim.typeId == "uint8")) {
-                ss.str("");
-                ss << "SciDB GDAL driver works with integer dimensions only. Got "
-                    "dimension " << dim.name << ":" << dim.typeId;
+                stringstream ss;
+                ss << "SciDB GDAL driver works with integer dimensions only. Got dimension " << dim.name << ":" << dim.typeId;
                 Utils::error(ss.str());
                 return ERR_READ_UNKNOWN;
             }
 
             out.push_back(dim);
+               
         }
-
+        
+        
+        
+        delete csv;
+        
         releaseSession(sessionID);
 
         return SUCCESS;
     }
 
-    StatusCode ShimClient::getSRSDesc(const string& inArrayName,
-                                    SciDBSpatialReference& out) {
+    StatusCode ShimClient::getSRSDesc(const string& inArrayName, SciDBSpatialReference& out) {
                                         
         if (!hasSCIDB4GEO()) { //  Default spatial reference
             out.affineTransform = *(new AffineTransform());
@@ -746,8 +765,7 @@ namespace scidb4gdal {
             stringstream ss;
             stringstream afl;
             // project(dimensions(chicago2),name,low,high,type)
-            afl << "project(st_getsrs(" << inArrayName
-                << "),name,xdim,ydim,srtext,proj4text,A,auth_name,auth_srid)";
+            afl << "project(apply(st_getsrs(" << inArrayName << "),auth_srid_str,string(auth_srid)),name,xdim,ydim,srtext,proj4text,A,auth_name,auth_srid_str)"; // Everything should be a string to smiplify CSV col separation
             Utils::debug("Performing AFL Query: " + afl.str());
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
             << "id=" << sessionID << "&query=" << afl.str() << "&save="
@@ -791,8 +809,7 @@ namespace scidb4gdal {
             curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
 
             response = "";
-            curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION,
-                            &responseToStringCallback);
+            curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION, &responseToStringCallback);
             curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, &response);
             if (curlPerform() != CURLE_OK) {
                 curlEnd();
@@ -805,53 +822,42 @@ namespace scidb4gdal {
 
         // Parse CSV
 
-        vector<string> rows;
-        boost::split(rows, response, boost::is_any_of("\n"));
-
-        if (rows.size() < 1 || rows.size() > 4) { // Header + 1 data row
-            Utils::warn("Cannot extract SRS information from response: " + response);
-            return ERR_SRS_NOSPATIALREFFOUND;
+        CSVstring* csv;
+        if (!isVersionGreaterThan(15,7)) {
+         csv = new CSVstring( response,"','","\n", true); // with header  
         }
-
-        string row;
-        for (uint32_t i=0; i < rows.size() && rows[i].empty(); ++i)  row = rows[i];
-        if (row.empty()) {
-            Utils::error("Cannot extract temporal reference of array'" + inArrayName + "'.");
+        else csv =  new CSVstring( response,"','","\n", false); // without header  
+        
+        
+        
+        if (csv->nrow() != 1 || csv->ncol() != 8) 
+        {
+            delete csv;
+            Utils::error("Cannot extract spatial reference of array '" + inArrayName + "'.");
             return ERR_GLOBAL_PARSE;
         }
-        vector<string> cols;
-        int cur_start = -1;
-        for (uint32_t i = 0; i < row.length();
-            ++i) { // Find items between single quotes 'XXX', only works if all SciDB
-            // attributes of query result are strings
-            if (row[i] == '\'') {
-                if (cur_start < 0)
-                    cur_start = i;
-                else {
-                    cols.push_back(row.substr(cur_start + 1, i - cur_start - 1));
-                    cur_start = -1;
-                }
-            }
+        
+        
+        
+        try {
+            
+            out.xdim = csv->get<string>(0,1);
+            out.ydim = csv->get<string>(0,2);
+            out.srtext = csv->get<string>(0,3);
+            out.proj4text = csv->get<string>(0,4);
+            out.affineTransform = *(new AffineTransform(csv->get<string>(0,5)));
+            out.auth_name = csv->get<string>(0,6);
+            out.auth_srid = boost::lexical_cast<uint32_t>(csv->get<string>(0,7).substr(0,csv->get<string>(0,7).length()-1)); // last colum has ' ending
         }
-        // TODO epsg code is an integer and has no quotes (') handle it separately
-        // find last comma and create substring
-        cols.push_back(row.substr(row.find_last_of(',') + 1, row.length() - 1));
-
-        if (cols.size() != 8) {
-            Utils::warn("Cannot extract SRS information from response: " + response);
-            return ERR_SRS_NOSPATIALREFFOUND;
-            //             out.affineTransform = * ( new AffineTransform() );
-            //             out.ydim  =  out.xdim  = out.proj4text  = out.srtext = "";
-        } else {
-            out.xdim = cols[1];
-            out.ydim = cols[2];
-            out.srtext = cols[3];
-            out.proj4text = cols[4];
-            // Should be released
-            out.affineTransform = *(new AffineTransform(cols[5]));
-            out.auth_name = cols[6];
-            out.auth_srid = boost::lexical_cast<uint32_t>(cols[7]);
+        catch (const boost::bad_lexical_cast &) 
+        {
+            delete csv;
+            Utils::warn("Cannot extract spatial reference of array '" + inArrayName + "'.");
+            return ERR_GLOBAL_PARSE;  
         }
+ 
+        
+        delete csv;
 
         releaseSession(sessionID);
 
@@ -918,45 +924,38 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-        // Parse CSV
-
-        vector<string> rows;
-        boost::split(rows, response, boost::is_any_of("\n"));
-
-        string row;
-        for (uint32_t i=0; i < rows.size() && rows[i].empty(); ++i)  row = rows[i];
-        if (row.empty()) {
-            Utils::error("Cannot extract temporal reference of array'" + inArrayName + "'.");
+        
+        
+        CSVstring* csv;
+        if (!isVersionGreaterThan(15,7)) {
+         csv = new CSVstring( response,true); // with header  
+        }
+        else csv = new CSVstring( response,false); // with header  
+        
+        
+        if (csv->nrow() != 1 || csv->ncol() != 3) 
+        {
+            delete csv;
+            Utils::warn("Cannot extract temporal reference of array '" + inArrayName + "'.");
             return ERR_GLOBAL_PARSE;
         }
-            //string row = rows[0]; // TODO ensure that rows has more than 1 row (more
-            // than header)
-            vector<string> cols;
-            int cur_start = -1;
-            for (uint32_t i = 0; i < row.length();
-                ++i) { // Find items between single quotes 'XXX', only works if all
-                // SciDB attributes of query result are strings
-                if (row[i] == '\'') {
-                    if (cur_start < 0)
-                        cur_start = i;
-                    else {
-                        cols.push_back(row.substr(cur_start + 1, i - cur_start - 1));
-                        cur_start = -1;
-                    }
-                }
-            }
-            {
-                out.tdim = cols[0];
-                TPoint* p = new TPoint(cols[1]);
-                TInterval* i = new TInterval(cols[2]);
-                out.setTPoint(p);
-                out.setTInterval(i);
-            }
         
+        
+        
+        out.tdim = csv->get<string>(0,0).substr(0,csv->get<string>(0,0).length()-2); // remove ''
+        TPoint* p = new TPoint(csv->get<string>(0,1).substr(0,csv->get<string>(0,1).length()-2)); // remove '';
+        TInterval* i = new TInterval(csv->get<string>(0,2).substr(0,csv->get<string>(0,0).length()-2)); // remove '';
+        out.setTPoint(p);
+        out.setTInterval(i);
+            
+        delete csv;
         releaseSession(sessionID);
 
-        return SUCCESS;
+        return SUCCESS;  
     }
+    
+    
+    
 
     StatusCode ShimClient::getArrayDesc(const string& inArrayName,
                                         SciDBSpatialArray*& out) {
@@ -1037,7 +1036,7 @@ namespace scidb4gdal {
             curlBegin();
             stringstream ss;
             stringstream afl;
-            afl << "project(filter(eo_arrays(), name='" <<  name <<  "'),setting)";
+            afl << "project(filter(eo_arrays(), name='" <<  name <<  "'),name,setting)";
             Utils::debug("Performing AFL Query: " + afl.str());
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
             << "id=" << sessionID << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0) << "&save=" << "csv";
@@ -1085,36 +1084,39 @@ namespace scidb4gdal {
         }
 
         
-        // Parse CSV into string vector
-        vector<string> rows;
-        boost::split(rows, response, boost::is_any_of("\n"));
-
-        bool success = false;
-        if (rows.size() > 1) {
-            // Find items between single quotes 'XXX', only works if all SciDB
-            // attributes of query result are strings
-            for (vector<string>::iterator it = rows.begin(); it != rows.end();++it) {
-                if (it->empty()) continue;
-                if (it->compare("'s'") == 0) {
-                    array = new SciDBSpatialArray();
-                    success = true;
-                    break;  
-                } 
-                else if (it->compare("'st'") == 0) {
-                    array = new SciDBSpatioTemporalArray();
-                    success = true;
-                    break;   
-                } 
-                else continue;    
-            }
+        
+        CSVstring* csv;
+        if (!isVersionGreaterThan(15,7)) {
+         csv = new CSVstring( response,true); // with header  
         }
-        if (!success) {
+        else csv = new CSVstring( response,false); // without header  
+        
+        
+        Utils::debug("SETTING RESPONSE:" + response);
+        
+        
+        if (csv->nrow() != 1 || csv->ncol() < 1) 
+        {
+            delete csv;
+            Utils::warn("Cannot extract setting of array '" + name + "'.");
+            return ERR_GLOBAL_PARSE;
+        }
+        
+    
+        if ( csv->get<string>(0,1).compare("'s'") == 0) {
+            array = new SciDBSpatialArray();    
+        } 
+        else if ( csv->get<string>(0,1).compare("'st'") == 0) {
+            array = new SciDBSpatioTemporalArray();
+        } 
+        else 
+        {
             Utils::error("Cannot derive setting for array '" + name + "'. Invalid response of project(filter(eo_arrays(...))).");
             releaseSession(sessionID);
+            delete csv;
             return ERR_GLOBAL_UNKNOWN;
         }
-
-        
+        delete csv;
         return SUCCESS;
     }
 
@@ -1146,8 +1148,7 @@ namespace scidb4gdal {
         curlBegin();
         // EXECUTE QUERY  ////////////////////////////
         ss.str();
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-        << "id=" << sessionID;
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"  << "id=" << sessionID;
 
         stringstream tslice;
         if (SciDBSpatioTemporalArray* starray =
@@ -2007,28 +2008,28 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-        // Parse CSV
-        ss.str("");
-
-        vector<string> rows;
-        boost::split(rows, response, boost::is_any_of("\n"));
-        // ignore first row
-        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
-            vector<string> cols;
-            boost::split(cols, *it, boost::is_any_of(","));
-            if (cols.size() != 2) {
-                continue; // TODO: Error handling, expected 2 cols
-            }
-            if (cols[0].length() < 1 || cols[1].length() < 1) {
-                continue;
-            }
-
-            string key = cols[0].substr(1, cols[0].length() - 2);
-            string val = cols[1].substr(1, cols[1].length() - 2);
-
-            kv.insert(std::pair<string, string>(key, val));
+    
+        CSVstring* csv;
+        if (!isVersionGreaterThan(15,7)) {
+         csv = new CSVstring( response,true); // with header  
         }
-
+        else csv = new CSVstring( response,false); // with header  
+        
+        if ( csv->ncol() != 2) 
+        {
+            delete csv;
+            Utils::warn("Cannot extract metadata of array '" + arrayname + "'.");
+            return ERR_GLOBAL_PARSE;
+        }
+        
+        for (int i=0; i<csv->nrow(); ++i)
+        {
+            string key = csv->get<string>(i,0).substr(1, csv->get<string>(i,0).length() - 2);
+            string val = csv->get<string>(i,1).substr(1, csv->get<string>(i,1).length() - 2);
+            kv.insert(std::pair<string, string>(key, val));        
+        }
+        
+        delete csv;
         releaseSession(sessionID);
 
         return SUCCESS;
@@ -2150,28 +2151,29 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-        // Parse CSV
-        ss.str("");
-
-        vector<string> rows;
-        boost::split(rows, response, boost::is_any_of("\n"));
         
-        for (vector<string>::iterator it = rows.begin(); it != rows.end(); ++it) {
-            vector<string> cols;
-            boost::split(cols, *it, boost::is_any_of(","));
-            if (cols.size() != 2) {
-                continue; // TODO: Error handling, expected 2 cols
-            }
-            if (cols[0].length() < 1 || cols[1].length() < 1) {
-                continue;
-            }
-
-            SciDBDimension dim;
-            string key = cols[0].substr(1, cols[0].length() - 2);
-            string val = cols[1].substr(1, cols[1].length() - 2);
-
-            kv.insert(std::pair<string, string>(key, val));
+        CSVstring* csv;
+        if (!isVersionGreaterThan(15,7)) {
+         csv = new CSVstring( response,true); // with header  
         }
+        else csv = new CSVstring( response,false); // with header  
+        
+        if ( csv->ncol() != 2) 
+        {
+            delete csv;
+            Utils::warn("Cannot extract metadata of array '" + arrayname + "'.");
+            return ERR_GLOBAL_PARSE;
+        }
+        
+        for (int i=0; i<csv->nrow(); ++i)
+        {
+            string key = csv->get<string>(i,0).substr(1, csv->get<string>(i,0).length() - 2);
+            string val = csv->get<string>(i,1).substr(1, csv->get<string>(i,1).length() - 2);
+            kv.insert(std::pair<string, string>(key, val));        
+        }
+        
+        delete csv;
+
 
         releaseSession(sessionID);
 
@@ -2223,4 +2225,148 @@ namespace scidb4gdal {
 
         return SUCCESS;
     }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    /****************************************************************************************** */
+    
+    
+    CSVstring::CSVstring(const string& s) : 
+         _s(s),
+        _colsep(","),
+        _rowsep("\n"),
+        _header(false),
+        _cells(NULL),
+        _head(NULL),
+        _ncol(-1),
+        _nrow(-1) { }
+
+    
+    
+    CSVstring::CSVstring(const string& s, bool header) : 
+        _s(s),
+        _colsep(","),
+        _rowsep("\n"),
+        _header(header),
+        _cells(NULL),
+        _head(NULL),
+        _ncol(-1),
+        _nrow(-1) { } 
+
+    
+    CSVstring::CSVstring(const string& s, const string& colsep, const string& rowsep, bool header) :
+        _s(s),
+        _colsep(colsep),
+        _rowsep(rowsep),
+        _header(header),
+        _cells(NULL),
+        _head(NULL),
+        _ncol(-1),
+        _nrow(-1) { }
+
+        
+    CSVstring::~CSVstring()
+    {
+        if (_cells != NULL) 
+        {
+            delete _cells;
+            _cells = NULL;
+        }
+        if (_head != NULL) 
+        {
+            delete _head;
+            _head = NULL;
+        }
+    }
+    
+    template<typename T> T CSVstring::get(int row, int col)
+    {
+        if (_cells == NULL) process();
+        
+        if (row >= _cells->size() || row < 0) {
+            Utils::error("Invalid CSV row requested!");
+        }
+        if (col >= (*_cells)[row].size() || col < 0) {
+            Utils::error("Invalid CSV col requested!");
+        }
+        return boost::lexical_cast<T>((*_cells)[row][col]);
+        
+    }
+    
+    int CSVstring::ncol()
+    {
+        if (_cells == NULL) process();
+        return _ncol;
+    }
+
+
+    int CSVstring::nrow()
+    {
+        if (_cells == NULL) process();
+        return _nrow;
+    }
+    
+    void CSVstring::process()
+    {
+        if (_cells != NULL) {
+            delete _cells;
+            _cells = NULL;
+        }
+         _nrow = 0;
+         _ncol = 0;
+        _cells = new vector<vector<string> >;
+
+        
+        vector<string> rows = Utils::split(_s, _rowsep);
+       
+        
+        size_t i=0;
+        if (_header) {
+            while (rows[i].empty() && i<rows.size()) ++i;
+            vector <string> cols = Utils::split(rows[i],_colsep);
+            _head = new vector<string>(cols);
+            ++i;
+        }
+        
+
+        while( i<rows.size()) 
+        {
+            if (rows[i].empty()) { 
+                ++i;
+                continue;
+            }
+            
+            vector <string> cols = Utils::split(rows[i],_colsep);
+            if (_ncol <= 0) _ncol = cols.size();
+            if (_ncol != cols.size())
+            {
+                stringstream ss;
+                ss << "Unexpected number of colums in CSV string at line  " << i+1 << ": expected " << _ncol << " but had " << cols.size(); 
+                Utils::warn(ss.str());
+            }
+            
+            ++_nrow;
+            _cells->push_back(cols);
+            ++i;
+        }
+    }
+
+    
+    
+    
+    
+    
+    
+    
 }

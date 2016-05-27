@@ -286,6 +286,17 @@ namespace scidb4gdal {
     * @return std::string The merged string of all key-value entries
     */
     std::string mdMapToString(std::map<string, string>& kv);
+    
+    /**
+    * @brief Splits a string to a string vector based on a pattern string
+    *
+    * @param s string to be splitted
+    * @param sep separator or pattern used for splitting
+    * @return string parts between the found separator 
+    */
+    std::vector<std::string> split(const std::string& s, const std::string& sep);
+    
+        
     }
 }
 

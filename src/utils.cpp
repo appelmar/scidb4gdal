@@ -191,11 +191,7 @@ namespace scidb4gdal {
         }
 
         bool validateTimestampString(string& in) {
-            /*
-        * comment: use REGEX instead! But gcc 4.84 shipped with Ubuntu 14.04 does not
-        * support reg expressions...
-        * gcc > 4.9 uses it...
-        */
+
             bool isValid = true;
             boost::algorithm::trim(in);
             // check date String
@@ -264,5 +260,24 @@ namespace scidb4gdal {
             }
             return result.str();
         }
+        
+        
+        vector< string > split(const string& s, const string& sep)
+        {
+            vector <string > out;
+            
+            size_t n=sep.length();
+            size_t a = 0;
+            size_t b = 0;
+           
+            while (b != s.length()) {
+                b = s.find(sep,a);
+                if (b == string::npos) b=s.length();
+                out.push_back(s.substr(a,b-a));
+                a = b + n;             
+            }
+            return out;
+        }
+
     }
 }

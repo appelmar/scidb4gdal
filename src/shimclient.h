@@ -40,6 +40,7 @@ SOFTWARE.
 #include "affinetransform.h"
 #include "utils.h"
 
+
 #define SHIMENDPOINT_NEW_SESSION "/new_session"
 #define SHIMENDPOINT_EXECUTEQUERY "/execute_query"
 #define SHIMENDPOINT_READ_LINES "/read_lines "
@@ -520,8 +521,8 @@ namespace scidb4gdal {
         * @brief Requests the server's SciDB / shim version 
         * 
         * This function returns the SciDB / shim version running on the server. Consecutive calls will NOT result in 
-        * multiple HTTP request, i.e. the version is cached in _shimversion.
-        * @return string version identifier like v15.12xxxxxxx.
+        * multiple HTTP requests, i.e. the version string is cached in _shimversion.
+        * @return string version identifier like v15.12xxxxxxx as returned from shim.
         */
         string getVersion();
         
@@ -530,12 +531,20 @@ namespace scidb4gdal {
         * @brief Convert a version string to integer major and minor versions 
         * 
         * @param version [in] version string
-        * @param version [out] integer major version
-        * @param version [out] integer minor version
+        * @param major [out] integer major version
+        * @param minor [out] integer minor version
         * @return void
         */
         void stringToVersion(const string& version, int* major, int* minor);
         
+        /**
+        * @brief Compares the server's version with a given version 
+        * 
+        * @param maj integer major version
+        * @param min integer minor version
+        * @return true if the server's version is greater than the given version 
+        */
+        bool isVersionGreaterThan(int maj, int min);
 
         /**
         * @brief Login to the SHIM web client
@@ -590,6 +599,83 @@ namespace scidb4gdal {
         bool* _hasSCIDB4GEO;
         /** version of Shim */
         string _shimversion;
+    };
+    
+    
+    
+    /**
+     * @brief A very simple class to interpret CSV strings as tables
+     */
+    class CSVstring 
+    {
+        
+    public:
+        
+        /**
+         * Default constructor, assuming no header, commas as column separators, and newlines as row separators
+         * @param s string with CSV formatted data
+        */
+        CSVstring (const string & s);
+        
+        /**
+         * Constructor assuming commas as column separators and newlines as row separators
+         * @param s string with CSV formatted data
+         * @param header true if the first row is a header with column names
+        */
+        CSVstring (const string &s, bool header); 
+        
+        /**
+         * Constructor for custom CSV formats
+         * @param s string with CSV formatted data
+         * @param colsep string that separates columns
+         * @param rowsep string that separates rows
+         * @param header true if the first row is a header with column names
+        */
+        CSVstring (const string &s, const string &colsep, const string &rowsep, bool header); 
+        
+        /**
+         * Default desctructor
+        */
+        ~CSVstring();
+        
+        /**
+         * Returns a cell value as a given type.
+         * @param row zero-based row index ignoring empty and header rows
+         * @param col zero-based column index
+         * @return the converted value of the cell, using string is safest 
+         */
+        template<typename T> T get(int row, int col);
+        
+        /**
+         * Returns the number of rows. Header and empty rows are ignored.
+         * @return number of rows as integer
+         */
+        int nrow();
+        
+        /**
+         * Returns the number of columns. If rows have different number of columns, the maximum number of columns is returned.
+         * @return number of columns as integer
+         */
+        int ncol();
+        
+        
+    private:
+        
+        
+        void process();
+        
+        const string _s;
+     
+        const string _colsep;
+        const string _rowsep;
+        const bool   _header;
+        
+        vector<vector<string> >* _cells;
+        vector<string>* _head;
+        
+        int _ncol;
+        int _nrow;
+        
     };
 }
 
