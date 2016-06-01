@@ -369,7 +369,7 @@ namespace scidb4gdal {
         _hasSCIDB4GEO = c;  
    
         if (*c) {
-           Utils::debug("Spacetime extension found.");
+           Utils::debug("Spacetime extension found. Good.");
         }
         else {
             Utils::debug("Spacetime extension not found.");
@@ -942,9 +942,9 @@ namespace scidb4gdal {
         
         
         
-        out.tdim = csv->get<string>(0,0).substr(0,csv->get<string>(0,0).length()-2); // remove ''
-        TPoint* p = new TPoint(csv->get<string>(0,1).substr(0,csv->get<string>(0,1).length()-2)); // remove '';
-        TInterval* i = new TInterval(csv->get<string>(0,2).substr(0,csv->get<string>(0,0).length()-2)); // remove '';
+        out.tdim = csv->get<string>(0,0).substr(1,csv->get<string>(0,0).length()-2); // remove ''
+        TPoint* p = new TPoint(csv->get<string>(0,1).substr(1,csv->get<string>(0,1).length()-2)); // remove '';
+        TInterval* i = new TInterval(csv->get<string>(0,2).substr(1,csv->get<string>(0,2).length()-2)); // remove '';
         out.setTPoint(p);
         out.setTInterval(i);
             
@@ -1090,9 +1090,6 @@ namespace scidb4gdal {
          csv = new CSVstring( response,true); // with header  
         }
         else csv = new CSVstring( response,false); // without header  
-        
-        
-        Utils::debug("SETTING RESPONSE:" + response);
         
         
         if (csv->nrow() != 1 || csv->ncol() < 1) 
@@ -2015,10 +2012,18 @@ namespace scidb4gdal {
         }
         else csv = new CSVstring( response,false); // with header  
         
+        if (csv->nrow() == 0) {
+            Utils::debug("Array '" + arrayname + "' has no additional metadata, skipping.");
+            delete csv;
+            releaseSession(sessionID);
+            return SUCCESS;
+        }
+        
         if ( csv->ncol() != 2) 
         {
             delete csv;
-            Utils::warn("Cannot extract metadata of array '" + arrayname + "'.");
+            Utils::error("Cannot extract metadata of array '" + arrayname + "'.");
+            releaseSession(sessionID);
             return ERR_GLOBAL_PARSE;
         }
         
@@ -2157,11 +2162,17 @@ namespace scidb4gdal {
          csv = new CSVstring( response,true); // with header  
         }
         else csv = new CSVstring( response,false); // with header  
-        
+        if (csv->nrow() == 0) {
+            Utils::debug("Array attribute '" + attribute + "' has no additional metadata, skipping.");
+            delete csv;
+            releaseSession(sessionID);
+            return SUCCESS;
+        }
         if ( csv->ncol() != 2) 
         {
             delete csv;
             Utils::warn("Cannot extract metadata of array '" + arrayname + "'.");
+            releaseSession(sessionID);
             return ERR_GLOBAL_PARSE;
         }
         
