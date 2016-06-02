@@ -3,32 +3,27 @@
 A GDAL driver for SciDB arrays
 
 ## Description
-This [GDAL](http://www.gdal.org) driver implements read and write access to SciDB arrays. SciDB is an open-source data management and analytics system developed by [Paradigm4](www.paradigm4.com). SciDB instances need to run the extension for geographic reference  [scidb4geo plugin](https://github.com/mappl/scidb4geo). 
+This [GDAL](http://www.gdal.org) driver implements read and write access to SciDB arrays. SciDB is an open-source data management and analytics system developed by [Paradigm4](http://www.paradigm4.com). 
 
-To interface SciDB with most earth-observation products the driver supports representing multi-tiled and multi-temporal imagery as a single multidimensional array. Single images can be added to existing array as tiles or temporal slices where array indexes are automatically computed. 
+To interface SciDB with most earth-observation products the driver supports representing multi-tiled and multi-temporal imagery as single multidimensional arrays. Single images can be added to an existing array as tile or temporal slice where array indexes are automatically computed. For advanced functionality like this, SciDB instances need to run the extension for geographic reference  [scidb4geo](https://github.com/mappl/scidb4geo). 
 
-An reproducible example with MODIS and SRTM data can be found in a recent blog-post [Scalable Earth Observation analytics with R and SciDB](http://r-spatial.org/r/2016/05/11/scalable-earth-observation-analytics.html).
+
+A reproducible example where this GDAL driver is used from R to ingest and download MODIS and SRTM data can be found in a recent blog-post [Scalable Earth Observation analytics with R and SciDB](http://r-spatial.org/r/2016/05/11/scalable-earth-observation-analytics.html).
 
 
 
 ## News
+- (2016-06-02)
+    - Support for SciDB 15.12
+    - Improved performance of array upload
+    - Automatic build now uses GDAL 2.1.0
 - (2016-04-22)
-    - Python tool for batch uploading images into a spatio-temporal series
+    - Python tool for batch uploading images into a single spacetime array added
 - (2016-02-26)
-    - Chunksizes can be manually configured
+    - Chunk sizes can be provided as create option
 - (2016-02-05)
     - Major update to automatically add imagery to existing spacetime arrays 
-- (2015-09-01)
-    - Driver now compiles under Windows
-- (2015-08-27)
-	- Support for empty SciDB cells (will be filled with NoData value) added
-	- Fixed dimension mismatch between GDAL and SciDB
-	- General GDAL metadata (e.g. color interpretation, no data, offset, and scaling values for bands) can be stored in SciDB's system catalog
-- (2015-06-23)
-	- Automated builds added, build/prepare_platform.sh might also help you to automatically build GDAL from source including this scidb driver
-- (2015-04-02)
-    - Support for HTTPS connections to Shim
-    - Improved performance for both read and write access
+
 
 ## Getting Started
 Similar to other database drivers for GDAL, we define a connection string to reference SciDB arrays. The connection string must contain an array name and may have further arguments like connection details of the database. With release of GDAL version 2.0, we added opening and create options to specify database connection details. Examples below demonstrate how a SciDB array can be referenced using gdalinfo.
@@ -41,7 +36,7 @@ Connection details may alternatively be set as environment variables `SCIDB4GDAL
 
 
 ### Simple array download
-The following examples demonstrate how to download a simple two-dimensional arrays using  [gdal_translate](http://www.gdal.org/gdal_translate.html). 
+The following examples demonstrate how to download a simple two-dimensional arrays using  [gdal_translate](http://www.gdal.org/gdal_translate.html). We assume that database connection details are set es anvironment variables.
 
 1. Download the whole array
 `gdal_translate "SCIDB:array=hello_scidb" "hello_scidb.tif"`
@@ -61,14 +56,13 @@ The following examples demonstrate how to upload single images to simple two-dim
 
 ## Dependencies
 - The driver requires [Shim](https://github.com/Paradigm4/shim) to run on SciDB databases you want to connect to. 
-- [Spacetime extension] (https://github.com/mappl/scidb4geo) for SciDB
 - [cURL](http://curl.haxx.se/) to communicate with SciDB's HTTP web service shim
 - Some [Boost](http://www.boost.org) header-only libraries (no external libraries required for linking) for string functions
 
 
 ## Build Instructions
 
-The following instructions show you how to compile GDAL with added SciDB driver on Unix environments.
+The following instructions show you how to compile GDAL with added SciDB driver on Unix environments. These steps are automated in a script in `build/prepare_platform.sh`.
 
 1. Download GDAL source
 2. Clone this repository `git clone https://github.com/mappl/scidb4gdal` 
