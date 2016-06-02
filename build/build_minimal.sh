@@ -6,13 +6,9 @@
 cd gdaldev
 
 ./configure --with-threads \
-            --with-ogr \
             --with-curl \
             --without-geos \
             --without-libtool \
-            --with-libz=internal \
-            --with-libtiff=internal \
-            --with-geotiff=internal \
             --without-gif \
             --without-pg \
             --without-grass \
@@ -20,9 +16,6 @@ cd gdaldev
             --without-cfitsio \
             --without-pcraster \
             --without-netcdf \
-            --without-png \
-            --without-jpeg \
-            --without-gif \
             --without-ogdi \
             --without-fme \
             --without-hdf4 \
@@ -46,9 +39,7 @@ cd gdaldev
             --without-sde \
             --without-perl \
             --without-php \
-            --without-ruby \
             --without-python \
-            --without-ogpython \
             --without-xml2 \
             --with-hide-internal-symbols
 			

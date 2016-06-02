@@ -38,7 +38,6 @@ namespace scidb4geo
     using namespace std;
 
 
-
     int countNextDigits ( string &s, int start )
     {
         int i = start;
@@ -69,7 +68,7 @@ namespace scidb4geo
     
     TPoint::TPoint()
     {
-	init();
+        init();
     }
 
     TPoint::TPoint ( string str )
@@ -263,9 +262,9 @@ namespace scidb4geo
     string TPoint::toStringISO()
     {
         //return to_iso_extended_string(_pt);
-	
+    
         stringstream s;
-	if (this->_resolution >= YEAR) s << setw ( 4 ) << std::setfill ( '0' ) << _pt.date().year();
+        if (this->_resolution >= YEAR) s << setw ( 4 ) << std::setfill ( '0' ) << _pt.date().year();
         if (this->_resolution >= MONTH) s << "-" << setw ( 2 ) << std::setfill ( '0' ) << _pt.date().month().as_number();
         if (this->_resolution >= DAY) s << "-" << setw ( 2 ) << std::setfill ( '0' ) << _pt.date().day().as_number();
         if (this->_resolution >= HOUR) s << "T" << setw ( 2 ) << std::setfill ( '0' ) << _pt.time_of_day().hours();
@@ -310,18 +309,6 @@ namespace scidb4geo
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
     void TInterval::init()
     {
         _yd = 0;
@@ -333,7 +320,7 @@ namespace scidb4geo
      
     TInterval::TInterval()
     {
-	init();
+        init();
     }
 
 
@@ -619,21 +606,21 @@ namespace scidb4geo
             dif._td = t._pt - _t0->_pt;
         }
 
-	
+    
         double result;
-	
-	//TODO check if difference == 0 conditions are necessary
+    
+        //TODO check if difference == 0 conditions are necessary
         double ym;
-//         if ( ( _dt->_yd * 12 + _dt->_md ) == 0 ) ym = NAN;
-	if ( ( _dt->_yd * 12 + _dt->_md ) == 0 ) ym = 0;
+        // if ( ( _dt->_yd * 12 + _dt->_md ) == 0 ) ym = NAN;
+        if ( ( _dt->_yd * 12 + _dt->_md ) == 0 ) ym = 0;
         else ym = ( dif._yd * 12 + dif._md ) / ( _dt->_yd * 12 + _dt->_md );
         double d;
-//         if ( _dt->_dd.days() == 0 ) d = NAN;
-	if ( _dt->_dd.days() == 0 ) d = 0;
+        //  if ( _dt->_dd.days() == 0 ) d = NAN;
+        if ( _dt->_dd.days() == 0 ) d = 0;
         else d = dif._dd.days() / _dt->_dd.days();
         double tt;
-//         if ( _dt->_td.total_seconds() == 0 ) tt = NAN;
-	if ( _dt->_td.total_seconds() == 0) tt = 0;
+        //  if ( _dt->_td.total_seconds() == 0 ) tt = NAN;
+        if ( _dt->_td.total_seconds() == 0) tt = 0;
         else tt = dif._td.total_seconds() / _dt->_td.total_seconds(); // TODO: Fractional seconds?
 
         if ( _r < DAY ) result =  ym;
@@ -643,18 +630,5 @@ namespace scidb4geo
         return ( int ) result;
 
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 }
