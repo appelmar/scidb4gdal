@@ -1062,6 +1062,9 @@ namespace scidb4gdal {
                             tar_arr = new SciDBSpatioTemporalArray(
                                 *(SciDBSpatioTemporalArray*)src_array);
                             ((SciDBSpatioTemporalArray*)src_array)->getTDim()->high = 0;
+			    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->length = 1;
+			    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->start = 0; 
+			    ((SciDBSpatioTemporalArray*)src_array)->getTDim()->low = 0; 
                             break;
                     }
                     // create "bigger" array
