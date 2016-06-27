@@ -597,7 +597,7 @@ namespace scidb4gdal {
              SciDBAttribute attr;
              attr.name = csv->get<string>(i,0).substr(1, csv->get<string>(i,0).length() - 2); // remove ''
              attr.typeId = csv->get<string>(i,1).substr(1, csv->get<string>(i,1).length() - 2); // remove ''
-             attr.nullable = (csv->get<string>(i,2).compare("TRUE") * csv->get<string>(i,2).compare("true") == 0);
+             attr.nullable = ((csv->get<string>(i,2).compare("TRUE") * csv->get<string>(i,2).compare("true")) == 0);
              
               // Assert attr has datatype that is supported by GDAL
                 if (Utils::scidbTypeIdToGDALType(attr.typeId) == GDT_Unknown) {
@@ -986,6 +986,9 @@ namespace scidb4gdal {
             return res;
         }
 
+        
+        Utils::debug("SciDB array schema: " + out->getSchemaString()); 
+        
         /*
         * Make calls for metadata. First try to get the spatial reference system,
         * then try to get the temporal rs
@@ -1137,6 +1140,21 @@ namespace scidb4gdal {
 
         stringstream ss;
         string response;
+        
+        
+        
+        MD md = array.attrs[nband].md[""];
+        string naval;
+        if (md.find(SCIDB4GDAL_DEFAULTMDFIELD_NODATA) == md.end())
+        {
+            stringstream dtos;
+            dtos <<  Utils::defaultNoDataSciDB(array.attrs[nband].typeId);
+            naval = dtos.str();
+        }
+        else naval =  md[SCIDB4GDAL_DEFAULTMDFIELD_NODATA];
+
+  
+        
 
         int sessionID = newSession();
 
@@ -1180,12 +1198,13 @@ namespace scidb4gdal {
                     afl << "project(subarray(" << arr << "," << y_min << "," << x_min << ","
                         << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":"
-                        << array.attrs[nband].typeId << "> [" << array.getYDim()->name
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
+                        << "> [" << array.getYDim()->name
                         << "=" << 0 << ":" << y_max - y_min << ","
                         << array.getYDim()->chunksize << "," << 0 << ","
                         << array.getXDim()->name << "=" << 0 << ":" << x_max - x_min << ","
                         << array.getXDim()->chunksize << "," << 0 << "],"
-                        << Utils::defaultNoDataSciDB(array.attrs[nband].typeId) << ")))";
+                        << naval << ")))";
                 } else {
                     afl << "(project(subarray(" << arr << "," << y_min << "," << x_min
                         << "," << y_max << "," << x_max << ")," << array.attrs[nband].name
@@ -1198,13 +1217,14 @@ namespace scidb4gdal {
                     afl << "project(between(" << arr << "," << y_min << "," << x_min << ","
                         << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":"
-                        << array.attrs[nband].typeId << "> [" << array.getYDim()->name
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
+                        << "> [" << array.getYDim()->name
                         << "=" << array.getYDim()->start << ":"
                         << array.getYDim()->start + array.getYDim()->length - 1 << ","
                         << array.getYDim()->chunksize << "," << 0 << ","
                         << array.getXDim()->name << "=" << array.getXDim()->start << ":"
                         << array.getXDim()->start + array.getXDim()->length - 1 << ","
-                        << array.getXDim()->chunksize << "," << 0 << "]," << 0 << "),"
+                        << array.getXDim()->chunksize << "," << 0 << "]," << naval << "),"
                         << y_min << "," << x_min << "," << y_max << "," << x_max << ")))";
                 }
 
@@ -1222,12 +1242,13 @@ namespace scidb4gdal {
                     afl << "project(subarray(" << arr << "," << x_min << "," << y_min << ","
                         << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":"
-                        << array.attrs[nband].typeId << "> [" << array.getXDim()->name
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")                
+                        << "> [" << array.getXDim()->name
                         << "=" << 0 << ":" << x_max - x_min << ","
                         << array.getXDim()->chunksize << "," << 0 << ","
                         << array.getYDim()->name << "=" << 0 << ":" << y_max - y_min << ","
                         << array.getYDim()->chunksize << "," << 0 << "],"
-                        << Utils::defaultNoDataSciDB(array.attrs[nband].typeId) << ")))";
+                        << naval << ")))";
                 } else {
                     afl << "transpose(project(subarray(" << arr << "," << x_min << ","
                         << y_min << "," << x_max << "," << y_max << "),"
@@ -1239,13 +1260,14 @@ namespace scidb4gdal {
                     afl << "project(between(" << arr << "," << x_min << "," << y_min << ","
                         << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":"
-                        << array.attrs[nband].typeId << "> [" << array.getXDim()->name
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
+                        << "> [" << array.getXDim()->name
                         << "=" << array.getXDim()->start << ":"
                         << array.getXDim()->start + array.getXDim()->length - 1 << ","
                         << array.getXDim()->chunksize << "," << 0 << ","
                         << array.getYDim()->name << "=" << array.getYDim()->start << ":"
                         << array.getYDim()->start + array.getYDim()->length - 1 << ","
-                        << array.getYDim()->chunksize << "," << 0 << "]," << 0 << "),"
+                        << array.getYDim()->chunksize << "," << 0 << "]," << naval << "),"
                         << x_min << "," << y_min << "," << x_max << "," << y_max << ")))";
                 } else {
                     afl << "transpose(project(between(" << arr << "," << x_min << ","
@@ -1255,13 +1277,23 @@ namespace scidb4gdal {
             }
         }
 
+        //  If attribute is nullable, apply substitute to fill null cells with default null value
+        if (array.attrs[nband].nullable) {
+            string afl_temp = afl.str();
+            afl.str("");
+            afl << "substitute(" <<  afl_temp <<  ", build(<val:" << array.attrs[nband].typeId <<  ">[i=0:0, 1, 0], " << naval  <<  "))";
+
+        }
+        
+        
+        
         Utils::debug("Performing AFL Query: " + afl.str());
 
-        //  //if (array.attrs[nband].nullable) ss << " null";  TODO: Null value
-        //  handling
+
         ss << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0)
-        << "&save="
-        << "(" << array.attrs[nband].typeId << ")";
+           << "&save=" << "(" << array.attrs[nband].typeId;
+        //if (array.attrs[nband].nullable) ss  << " " <<  "null";
+        ss << ")";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1491,7 +1523,9 @@ namespace scidb4gdal {
         string eo_over = "eo_over(" + tmpArr + "," + collArr + ")";
         string join = "join(" + tmpArr + ", " + eo_over + ")";
         string cast = "cast(" + join + ", " + castSchema.str() + ")";
-        string redimension = "redimension(" + cast + "," + collArr + ")";
+        
+        /* 2016-06-27: Added strict=false to ignore cell collisions  */
+        string redimension = "redimension(" + cast + "," + collArr + ", false)";
 
         
         

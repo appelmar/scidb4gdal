@@ -189,11 +189,11 @@ namespace scidb4gdal {
 
             if ((nBlockXOff + 1) * this->nBlockXSize > poGDS->nRasterXSize) {
                 // This is a bit of a hack...
-                size_t dataSize =
-                    (1 + xmax - xmin) * (1 + ymax - ymin) *
-                    Utils::scidbTypeIdBytes(
-                        _array->attrs[nBand - 1]
-                            .typeId); // This is smaller than the block size!
+//                 size_t dataSize = _array->attrs[nBand - 1].nullable ?  
+//                     (1 + xmax - xmin) * (1 + ymax - ymin) *   (Utils::scidbTypeIdBytes( _array->attrs[nBand - 1] .typeId + 1)) :
+//                     (1 + xmax - xmin) * (1 + ymax - ymin) *   Utils::scidbTypeIdBytes( _array->attrs[nBand - 1] .typeId); // This is smaller than the block size!
+                size_t dataSize = (1 + xmax - xmin) * (1 + ymax - ymin) *   Utils::scidbTypeIdBytes( _array->attrs[nBand - 1] .typeId); // This is smaller than the block size!
+   
                 void* buf = malloc(dataSize);
 
                 // Write to temporary buffer first
@@ -229,6 +229,7 @@ namespace scidb4gdal {
 
         poGDS->_cache.add(tile); // Add to cache
 
+        
         // Copy from tile.data to pImage
         memcpy(pImage, tile.data, tile.size);
 
@@ -236,7 +237,7 @@ namespace scidb4gdal {
     }
 
     double SciDBRasterBand::GetNoDataValue(int* pbSuccess) {
-        string key = "NODATA";
+        string key = SCIDB4GDAL_DEFAULTMDFIELD_NODATA;
         double result;
         MD md = _array->attrs[nBand - 1].md[""];
         if (md.find(key) == md.end()) {
@@ -261,7 +262,7 @@ namespace scidb4gdal {
     }
 
     double SciDBRasterBand::GetMaximum(int* pbSuccess) {
-        string key = "MAX";
+        string key = SCIDB4GDAL_DEFAULTMDFIELD_MAX;
         MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
         if (md.find(key) == md.end()) {
             if (pbSuccess != NULL)
@@ -274,7 +275,7 @@ namespace scidb4gdal {
     }
 
     double SciDBRasterBand::GetMinimum(int* pbSuccess) {
-        string key = "MIN";
+        string key = SCIDB4GDAL_DEFAULTMDFIELD_MIN;
         MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
         if (md.find(key) == md.end()) {
             if (pbSuccess != NULL)
@@ -287,7 +288,7 @@ namespace scidb4gdal {
     }
 
     double SciDBRasterBand::GetOffset(int* pbSuccess) {
-        string key = "OFFSET";
+        string key = SCIDB4GDAL_DEFAULTMDFIELD_OFFSET;
         MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
         if (md.find(key) == md.end()) {
             if (pbSuccess != NULL)
@@ -300,7 +301,7 @@ namespace scidb4gdal {
     }
 
     double SciDBRasterBand::GetScale(int* pbSuccess) {
-        string key = "SCALE";
+        string key = SCIDB4GDAL_DEFAULTMDFIELD_SCALE;
         MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
         if (md.find(key) == md.end()) {
             if (pbSuccess != NULL)
@@ -313,7 +314,7 @@ namespace scidb4gdal {
     }
 
     const char* SciDBRasterBand::GetUnitType() {
-        string key = "UNIT";
+        string key = SCIDB4GDAL_DEFAULTMDFIELD_UNIT;
         MD md = _array->attrs[nBand - 1].md[""]; // TODO: Add domain
         if (md.find(key) == md.end()) {
             return "";
@@ -382,11 +383,6 @@ namespace scidb4gdal {
                 }
             }
         }
-
-        // Set Metadata
-
-        // TODO: Overviews?
-        // poDS->oOvManager.Initialize ( poDS, poOpenInfo->pszFilename );
     }
 
     void SciDBDataset::gdalMDtoMap(char** strlist, map<string, string>& kv) {

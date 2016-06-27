@@ -28,17 +28,18 @@ namespace scidb4gdal {
     using namespace std;
 
     string SciDBArray::toString() {
-        stringstream s;
-        s << "'" << name << "'"
-        << ":";
-        for (uint32_t i = 0; i < dims.size(); ++i)
-            s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high
-            << "," << dims[i].typeId << ">";
-        for (uint32_t i = 0; i < attrs.size(); ++i)
-            s << "['" << attrs[i].name << "'," << attrs[i].typeId << ","
-            << attrs[i].nullable << "]";
-        s << "\n";
-        return s.str();
+        return getSchemaString();
+//         stringstream s;
+//         s << "'" << name << "'"
+//         << ":";
+//         for (uint32_t i = 0; i < dims.size(); ++i)
+//             s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high
+//             << "," << dims[i].typeId << ">";
+//         for (uint32_t i = 0; i < attrs.size(); ++i)
+//             s << "['" << attrs[i].name << "'," << attrs[i].typeId << ","
+//             << attrs[i].nullable << "]";
+//         s << "\n";
+//         return s.str();
     }
 
     string SciDBArray::getFormatString() {
@@ -58,7 +59,8 @@ namespace scidb4gdal {
         s << "<";
         for (uint32_t i = 0; i < attrs.size(); ++i) {
             s << attrs[i].name << ":" << attrs[i].typeId;
-            if (attrs[i].nullable)  s << " null";
+            if (attrs[i].nullable)  s << " NULL";
+            else s << " NOT NULL"; 
             if (i < (attrs.size() - 1)) s << ",";
         }
         s << ">";
