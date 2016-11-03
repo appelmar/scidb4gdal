@@ -10,7 +10,7 @@ There are several prerequisites that have to be met before you can upload the da
 
 ### Software
 
-For the script you need the SciDB-driver extension for GDAL and also on the server site, you need a SciDB database (>= version 14.12) with the SCIDB4GEO extension. For GDAL, please make sure that the PATH variables are set, meaning that you can call for example `gdalinfo` without further path suffix. Here, we provide some links on how to [install GDAL from source](https://trac.osgeo.org/gdal/wiki/BuildHints) and how to [install the SciDB driver](https://github.com/mappl/scidb4gdal/blob/master/README.md).
+For the script you need the SciDB-driver extension for GDAL and also on the server site, you need a SciDB database (>= version 14.12) with the SCIDB4GEO extension. For GDAL, please make sure that the PATH variables are set, meaning that you can call for example `gdalinfo` without further path suffix. Here, we provide some links on how to [install GDAL from source](https://trac.osgeo.org/gdal/wiki/BuildHints) and how to [install the SciDB driver](https://github.com/appelmar/scidb4gdal/blob/master/README.md).
 This script also needs Python v2.7 or newer.
 
 ### Data

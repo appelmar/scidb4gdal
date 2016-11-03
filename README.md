@@ -1,11 +1,11 @@
-[![Build Status](https://travis-ci.org/mappl/scidb4gdal.svg?branch=master)](https://travis-ci.org/mappl/scidb4gdal)
+[![Build Status](https://travis-ci.org/appelmar/scidb4gdal.svg?branch=master)](https://travis-ci.org/appelmar/scidb4gdal)
 # scidb4gdal
 A GDAL driver for SciDB arrays
 
 ## Description
 This [GDAL](http://www.gdal.org) driver implements read and write access to SciDB arrays. SciDB is an open-source data management and analytics system developed by [Paradigm4](http://www.paradigm4.com). 
 
-To interface SciDB with most earth-observation products the driver supports representing multi-tiled and multi-temporal imagery as single multidimensional arrays. Single images can be added to an existing array as tile or temporal slice where array indexes are automatically computed. For advanced functionality like this, SciDB instances need to run the extension for geographic reference  [scidb4geo](https://github.com/mappl/scidb4geo). 
+To interface SciDB with most earth-observation products the driver supports representing multi-tiled and multi-temporal imagery as single multidimensional arrays. Single images can be added to an existing array as tile or temporal slice where array indexes are automatically computed. For advanced functionality like this, SciDB instances need to run the extension for geographic reference  [scidb4geo](https://github.com/appelmar/scidb4geo). 
 
 
 A reproducible example where this GDAL driver is used from R to ingest and download MODIS and SRTM data can be found in a recent blog-post [Scalable Earth Observation analytics with R and SciDB](http://r-spatial.org/r/2016/05/11/scalable-earth-observation-analytics.html).
@@ -65,7 +65,7 @@ The following examples demonstrate how to upload single images to simple two-dim
 The following instructions show you how to compile GDAL with added SciDB driver on Unix environments. These steps are automated in a script in `build/prepare_platform.sh`.
 
 1. Download GDAL source
-2. Clone this repository `git clone https://github.com/mappl/scidb4gdal` 
+2. Clone this repository `git clone https://github.com/appelmar/scidb4gdal` 
 3. Copy the source to `GDAL_SRC_DIR/frmts/scidb` by `cp scidb4gdal/src GDAL_SRC_DIR/frmts/scidb`
 4. Add driver to GDAL source tree (see http://www.gdal.org/gdal_drivertut.html#gdal_drivertut_addingdriver):
     1. Add `GDALRegister_SciDB()`to `GDAL_SRC_DIR/gcore/gdal_frmts.h`
