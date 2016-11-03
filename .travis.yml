@@ -11,7 +11,7 @@ addons:
 
 env:
   global:
-    - GH_REF: github.com/mappl/scidb4gdal.git
+    - GH_REF: github.com/appelmar/scidb4gdal.git
     - secure: AnvlNUX5TvjSdMXxFuxNEWBOy2nObMAw4fp84GF93snXX5SkN4QsQ0Q3UHE0ot8ivmoYIDW1WnO9aoLl9bfyttaUk2MmuyYoTrzJpfhYNyAoC6Ba++4g9rs8g+k5fjO74vFeqzmjwo4BVAWve3OCgzj1yU8KhQ5qBfQR6c+EKokaAmUvJjMCdLLITRo3MORPbWmn57fZic77l4SeZW67nJAMKyRwRiT523lj8U8076qQe6xuPqdMAmDalYRlvvGVfOp+6kv7CpdS+Das92xE2yFyGYa59g6xfqadtuitf2ERx/8JjDCLFSbPUT/y2MKj+QthzRBnrP1xt19feOpaaeAD4e7f5rUMBGLL1oE7f61Tlo0n8AszIUtT4YVgf19cBf4BbRaqF8WB1qVih7l8YAxqlKmtNC3LHRHd1WP6KvSeVPEULj48m+7VJUQKr/n+IXKNFiSF68KY2Qpq8BBBbTD0aOZ55bmZFS0sYd7MIuMLdgBJsyWIEcvFRf9k+yeTLdcOmf3cgJvtj/+bFdalpar3yWMDb8Mqi6EJibxiI//kpcw2Lc+AJXKNYKbj1X+pvRehq0kx8zfx8wvJBDUUOeshE/vSpv67UOi/QVnXkqiWg8mtfH3vshoTpNYZ+kSr2PsnUKxlSZftpVCuWlb56Y19no9zUy58ZJxnlzg5iYA=
 
 
