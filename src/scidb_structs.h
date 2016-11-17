@@ -201,7 +201,7 @@ namespace scidb4gdal {
         * temporal dimension to the scidb4gdals default temporal dimension name
         *(scidb4gdal::SCIDB4GDAL_DEFAULT_TDIMNAME)
         */
-        SciDBTemporalReference() : TReference::TReference() {
+        SciDBTemporalReference() : TReference() {
             tdim = SCIDB4GDAL_DEFAULT_TDIMNAME;
         }
 
@@ -216,7 +216,7 @@ namespace scidb4gdal {
         * @param dttext interval statement conform to ISO 8601 time periods, e.g. "P1D" (one day interval) or "P14D" (14 days)
         */
         SciDBTemporalReference(string t0text, string dttext)
-            : TReference::TReference(t0text, dttext) {
+            : TReference(t0text, dttext) {
             tdim = SCIDB4GDAL_DEFAULT_TDIMNAME;
         }
 

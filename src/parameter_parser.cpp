@@ -20,19 +20,46 @@ T Resolver<T>::getKey(string s) { return mapping[s]; }
 
 ParameterParser::ParameterParser(string scidbFile, char** optionKVP, SciDBOperation op)
     : _operation(op) {
+    // 2016-11-17: VC++ 2013 complains about ambigous = operator with map_list_of()
     // set the resolver a.k.a the key value pairs in the connection / property
     // string or the create / opening options
-    _creationTypeResolver.mapping = map_list_of("S", S_ARRAY)("ST", ST_ARRAY)("STS", ST_SERIES);
+    //_creationTypeResolver.mapping = map_list_of("S", S_ARRAY)("ST", ST_ARRAY)("STS", ST_SERIES);
+    _creationTypeResolver.mapping.insert ( std::pair<string,CreationType>("S",S_ARRAY) );
+    _creationTypeResolver.mapping.insert ( std::pair<string,CreationType>("ST",ST_ARRAY) );
+    _creationTypeResolver.mapping.insert ( std::pair<string,CreationType>("STS",ST_SERIES) );
+    
+    // 2016-11-17: VC++ 2013 complains about ambigous = operator with map_list_of()
+    //_propKeyResolver.mapping = map_list_of("dt", TRS)("timestamp", TIMESTAMP)(
+    //    "t", TIMESTAMP)("type", TYPE)("i", T_INDEX)("bbox", BBOX)("srs", SRS)(
+    //    "CHUNKSIZE_SP", CHUNKSIZE_SPATIAL)("chunksize_sp", CHUNKSIZE_SPATIAL)(
+    //    "CHUNKSIZE_T", CHUNKSIZE_TEMPORAL)("chunksize_t", CHUNKSIZE_TEMPORAL);
+    
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("dt",TRS) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("timestamp",TIMESTAMP) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("t",TIMESTAMP) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("type",TYPE) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("i",T_INDEX) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("bbox",BBOX) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("srs",SRS) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("CHUNKSIZE_SP",CHUNKSIZE_SPATIAL) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("chunksize_sp",CHUNKSIZE_SPATIAL) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("CHUNKSIZE_T",CHUNKSIZE_TEMPORAL) );
+    _propKeyResolver.mapping.insert ( std::pair<string,Properties>("chunksize_t",CHUNKSIZE_TEMPORAL) );
 
-    _propKeyResolver.mapping = map_list_of("dt", TRS)("timestamp", TIMESTAMP)(
-        "t", TIMESTAMP)("type", TYPE)("i", T_INDEX)("bbox", BBOX)("srs", SRS)(
-        "CHUNKSIZE_SP", CHUNKSIZE_SPATIAL)("chunksize_sp", CHUNKSIZE_SPATIAL)(
-        "CHUNKSIZE_T", CHUNKSIZE_TEMPORAL)("chunksize_t", CHUNKSIZE_TEMPORAL);
+    // 2016-11-17: VC++ 2013 complains about ambigous = operator with map_list_of()
+    //_conKeyResolver.mapping = map_list_of("host", HOST)("port", PORT)(
+    //    "user", USER)("password", PASSWORD)("ssl", SSL)("trust", SSLTRUST)("array", ARRAY)(
+    //    "confirmDelete", CONFIRM_DELETE);
 
-    _conKeyResolver.mapping = map_list_of("host", HOST)("port", PORT)(
-        "user", USER)("password", PASSWORD)("ssl", SSL)("trust", SSLTRUST)("array", ARRAY)(
-        "confirmDelete", CONFIRM_DELETE);
-
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("host",HOST) );
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("port",PORT) );
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("user",USER) );
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("password",PASSWORD) );
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("ssl",SSL) );
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("trust",SSLTRUST) );
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("array",ARRAY) );
+    _conKeyResolver.mapping.insert( std::pair<string,ConnectionStringKey>("confirmDelete",CONFIRM_DELETE) );
+      
     _scidb_filename = scidbFile;
     _options = optionKVP;
     if (!init()) {
