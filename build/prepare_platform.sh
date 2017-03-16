@@ -21,7 +21,7 @@ sed -i "70i #endif" gdaldev/frmts/gdalallregister.cpp
 sed -i "566i GDAL_FORMATS += scidb" gdaldev/GDALmake.opt.in
 
 # 4. copy scidb driver sources to gdal sources
-cp -R src gdaldev/frmts/scidb
+cp -R --link src gdaldev/frmts/scidb
 
 
 # cd gdaldev && ./configure && make && make install
