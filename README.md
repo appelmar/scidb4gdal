@@ -13,16 +13,14 @@ A reproducible example where this GDAL driver is used from R to ingest and downl
 
 
 ## News
+- (2017-03-16)
+    - Support for SciDB 16.9
 - (2016-06-02)
     - Support for SciDB 15.12
     - Improved performance of array upload
     - Automatic build now uses GDAL 2.1.0
-- (2016-04-22)
-    - Python tool for batch uploading images into a single spacetime array added
 - (2016-02-26)
     - Chunk sizes can be provided as create option
-- (2016-02-05)
-    - Major update to automatically add imagery to existing spacetime arrays 
 
 
 ## Getting Started
@@ -32,11 +30,11 @@ Similar to other database drivers for GDAL, we define a connection string to ref
 
 - opening option based: `gdalinfo -oo "host=<host>" -oo "port=<port>" -oo "user=<user>" -oo "password=<password> -oo "ssl=true" "SCIDB:array=<arrayname>"`
 
-Connection details may alternatively be set as environment variables `SCIDB4GDAL_HOST`, `SCIDB4GDAL_PORT`, `SCIDB4GDAL_USER`, `SCIDB4GDAL_PASSWD`.
+Connection details may alternatively be set as environment variables `SCIDB4GDAL_HOST`, `SCIDB4GDAL_PORT`, `SCIDB4GDAL_USER`, `SCIDB4GDAL_PASSWD`, or as a text file in `$HOME/.scidbpass`.
 
 
 ### Simple array download
-The following examples demonstrate how to download a simple two-dimensional arrays using  [gdal_translate](http://www.gdal.org/gdal_translate.html). We assume that database connection details are set es anvironment variables.
+The following examples demonstrate how to download a simple two-dimensional arrays using  [gdal_translate](http://www.gdal.org/gdal_translate.html). We assume that database connection details are set es environment variables.
 
 1. Download the whole array
 `gdal_translate "SCIDB:array=hello_scidb" "hello_scidb.tif"`
@@ -77,7 +75,7 @@ The following instructions show you how to compile GDAL with added SciDB driver 
 If you get some missing include file errors, you need to install Boost manually. Either use your distribution's package manager e.g. `sudo apt-get install libboost-dev` or simply copy Boost header files to a standard include directory like `/usr/include`.
 
 
-### Build on Windows
+### Build on Windows (not tested)
 
 The following instructions demonstrate how to compile GDAL with added SciDB driver on Windows using Visual Studio 2013.  
 Detailed information for tweaking windows builds can be found at http://trac.osgeo.org/gdal/wiki/BuildingOnWindows.
