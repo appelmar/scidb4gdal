@@ -9,9 +9,9 @@ sudo apt-get update -qq
 sudo apt-get install -y --no-install-recommends -y libboost-dev  libcurl4-openssl-dev
 
 # 2. download GDAL source code
-wget -N http://download.osgeo.org/gdal/2.1.0/gdal-2.1.0.tar.gz
-tar -xf gdal-2.1.0.tar.gz
-mv gdal-2.1.0 gdaldev
+wget -N http://download.osgeo.org/gdal/2.1.3/gdal-2.1.3.tar.gz
+tar -xf gdal-2.1.3.tar.gz
+mv gdal-2.1.3 gdaldev
 
 # 3. add scidb driver to GDAL source; given line numbers are very likely to change with GDAL versions!
 sed -i "37i void CPL_DLL GDALRegister_SciDB(void);" gdaldev/gcore/gdal_frmts.h
@@ -20,8 +20,5 @@ sed -i "69i GDALRegister_SciDB();" gdaldev/frmts/gdalallregister.cpp
 sed -i "70i #endif" gdaldev/frmts/gdalallregister.cpp
 sed -i "566i GDAL_FORMATS += scidb" gdaldev/GDALmake.opt.in
 
-# 4. copy scidb driver sources to gdal sources
-cp -R --link src gdaldev/frmts/scidb
-
-
-# cd gdaldev && ./configure && make && make install
+# 4. copy scidb driver sources to gdal source tree as symlinks
+cp -R -s $PWD/src gdaldev/frmts/scidb
