@@ -1430,7 +1430,7 @@ namespace scidb4gdal {
 
         // attributes
         for (uint32_t i = 0; i < srcArray.attrs.size(); i++) {
-            string nullable = (srcArray.attrs[i].nullable) ? " NULL" : "";
+            string nullable = (srcArray.attrs[i].nullable) ? " NULL" : " NOT NULL";
             castSchema << srcArray.attrs[i].name << ":" << srcArray.attrs[i].typeId
                     << "" << nullable << ",";
         }
