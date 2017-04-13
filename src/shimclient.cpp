@@ -23,19 +23,19 @@ SOFTWARE.
 -----------------------------------------------------------------------------*/
 
 #include "shimclient.h"
-#include <boost/lexical_cast.hpp>
-#include <boost/algorithm/string.hpp>
-#include <cctype> // Microsoft Visual C++ compatibility
 #include <algorithm>
-#include "TemporalReference.h"
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+#include <cctype>  // Microsoft Visual C++ compatibility
 #include <iomanip>
 #include <limits>
+#include "TemporalReference.h"
 
 namespace scidb4gdal {
     using namespace scidb4geo;
 
     ShimClient::ShimClient()
-    : _host("https://localhost"), _port(8083), _user("scidb"), _passwd("scidb"), _ssl(true), _curl_handle(0), _curl_initialized(false), _auth(""), _hasSCIDB4GEO(NULL), _shimversion("") {
+        : _host("https://localhost"), _port(8083), _user("scidb"), _passwd("scidb"), _ssl(true), _curl_handle(0), _curl_initialized(false), _auth(""), _hasSCIDB4GEO(NULL), _shimversion("") {
         curl_global_init(CURL_GLOBAL_ALL);
         stringstream ss;
 
@@ -57,7 +57,7 @@ namespace scidb4gdal {
 
     ShimClient::ShimClient(string host, uint16_t port, string user, string passwd,
                            bool ssl = false)
-    : _host(host), _port(port), _user(user), _passwd(passwd), _ssl(ssl), _curl_handle(0), _curl_initialized(false), _auth(""), _hasSCIDB4GEO(NULL), _shimversion("") {
+        : _host(host), _port(port), _user(user), _passwd(passwd), _ssl(ssl), _curl_handle(0), _curl_initialized(false), _auth(""), _hasSCIDB4GEO(NULL), _shimversion("") {
         curl_global_init(CURL_GLOBAL_ALL);
         stringstream ss;
 
@@ -78,19 +78,17 @@ namespace scidb4gdal {
         host = ss.str();
     }
 
-    ShimClient::ShimClient(ConnectionParameters* con) :
-    _host(con->host),
-    _port(con->port),
-    _user(con->user),
-    _passwd(con->passwd),
-    _ssl(con->ssl),
-    _ssltrust(con->ssltrust),
-    _curl_handle(0),
-    _curl_initialized(false),
-    _auth(""),
-    _hasSCIDB4GEO(NULL),
-    _shimversion("") {
-
+    ShimClient::ShimClient(ConnectionParameters* con) : _host(con->host),
+                                                        _port(con->port),
+                                                        _user(con->user),
+                                                        _passwd(con->passwd),
+                                                        _ssl(con->ssl),
+                                                        _ssltrust(con->ssltrust),
+                                                        _curl_handle(0),
+                                                        _curl_initialized(false),
+                                                        _auth(""),
+                                                        _hasSCIDB4GEO(NULL),
+                                                        _shimversion("") {
         curl_global_init(CURL_GLOBAL_ALL);
 
         stringstream ss;
@@ -124,7 +122,7 @@ namespace scidb4gdal {
      */
     static size_t responseToStringCallback(void* ptr, size_t size, size_t count,
                                            void* stream) {
-        ((string*) stream)->append((char*) ptr, 0, size * count);
+        ((string*)stream)->append((char*)ptr, 0, size * count);
         return size * count;
     }
 
@@ -139,7 +137,7 @@ namespace scidb4gdal {
     static size_t responseBinaryCallback(void* ptr, size_t size, size_t count,
                                          void* stream) {
         size_t realsize = size * count;
-        struct SingleAttributeChunk* mem = (struct SingleAttributeChunk*) stream;
+        struct SingleAttributeChunk* mem = (struct SingleAttributeChunk*)stream;
         memcpy(&(mem->memory[mem->size]), ptr, realsize);
         mem->size += realsize;
         return realsize;
@@ -193,13 +191,13 @@ namespace scidb4gdal {
         for (int i = 1; i < CURL_RETRIES && res == CURLE_COULDNT_CONNECT; ++i) {
             stringstream s;
             s << "Connection error, retrying ... "
-                    << "(#" << i << ")";
+              << "(#" << i << ")";
             Utils::warn(s.str());
             Utils::sleep(i * 100);
             res = curl_easy_perform(_curl_handle);
         }
         if (res != CURLE_OK) {
-            Utils::error((string) ("curl_easy_perform() failed: ") +
+            Utils::error((string)("curl_easy_perform() failed: ") +
                          curl_easy_strerror(res));
         }
         return res;
@@ -245,6 +243,19 @@ namespace scidb4gdal {
         curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, &response);
 
         curlPerform();
+
+        long response_code;
+        curl_easy_getinfo(_curl_handle, CURLINFO_RESPONSE_CODE, &response_code);
+        if (response_code != 200) {
+            curlEnd();
+            if (response_code == 401 || response_code == 403) {
+                Utils::error("Version request failed, this is most likely caused by network or authentication issues.");
+                throw ERR_GLOBAL_AUTHFAILED;
+            } else {
+                Utils::error("Version request failed, this is most likely caused by network or authentication issues.");
+                throw ERR_GLOBAL_CANNOTCONNECT;
+            }
+        }
         curlEnd();
 
         _shimversion = response;
@@ -266,11 +277,10 @@ namespace scidb4gdal {
             return;
         }
         // remove alphabetic characters, e.g. "v" prefix
-        parts[0].erase(std::remove_if(parts[0].begin(), parts[0].end(), (int(*)(int))std::isalpha), parts[0].end());
-        parts[1].erase(std::remove_if(parts[1].begin(), parts[1].end(), (int(*)(int))std::isalpha), parts[1].end());
+        parts[0].erase(std::remove_if(parts[0].begin(), parts[0].end(), (int (*)(int))std::isalpha), parts[0].end());
+        parts[1].erase(std::remove_if(parts[1].begin(), parts[1].end(), (int (*)(int))std::isalpha), parts[1].end());
         *major = boost::lexical_cast<int>(parts[0]);
         *minor = boost::lexical_cast<int>(parts[1]);
-
     }
 
     bool ShimClient::isVersionGreaterThan(int maj, int min) {
@@ -291,7 +301,7 @@ namespace scidb4gdal {
         return x;
     }
 
-    bool ShimClient::hasSCIDB4GEO(StatusCode &ret) {
+    bool ShimClient::hasSCIDB4GEO(StatusCode& ret) {
         ret = SUCCESS;
         if (_hasSCIDB4GEO != NULL) return *_hasSCIDB4GEO;
 
@@ -306,7 +316,9 @@ namespace scidb4gdal {
         Utils::debug("Performing AFL Query: " + afl.str());
 
         ss.str();
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0) << "&save=" << "(uint64)";
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
+           << "id=" << sessionID << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0) << "&save="
+           << "(uint64)";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -327,7 +339,8 @@ namespace scidb4gdal {
         curlBegin();
         // READ BYTES  ////////////////////////////
         ss.str("");
-        ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+        ss << _host << SHIMENDPOINT_READ_BYTES << "?"
+           << "id=" << sessionID << "&n=0";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -336,11 +349,11 @@ namespace scidb4gdal {
 
         struct SingleAttributeChunk data;
         // Expect just one integer
-        data.memory = (char*) malloc(sizeof (uint64_t) * 1);
+        data.memory = (char*)malloc(sizeof(uint64_t) * 1);
         data.size = 0;
 
         curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION, responseBinaryCallback);
-        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*) &data);
+        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*)&data);
         if (curlPerform() != CURLE_OK) {
             ret = ERR_GLOBAL_UNKNOWN;
             curlEnd();
@@ -349,7 +362,7 @@ namespace scidb4gdal {
         }
         curlEnd();
 
-        uint64_t count = ((uint64_t*) data.memory)[0];
+        uint64_t count = ((uint64_t*)data.memory)[0];
 
         free(data.memory);
         releaseSession(sessionID);
@@ -367,9 +380,6 @@ namespace scidb4gdal {
     }
 
     int ShimClient::newSession() {
-
-
-
         if (_ssl && _auth.empty())
             login();
 
@@ -401,7 +411,7 @@ namespace scidb4gdal {
         if (sessionID > 0)
             return sessionID;
 
-        Utils::error((string) ("Invalid session ID"));
+        Utils::error((string)("Invalid session ID"));
         return -1;
     }
 
@@ -410,7 +420,7 @@ namespace scidb4gdal {
         stringstream ss;
         ss << _host << SHIMENDPOINT_RELEASE_SESSION;
         ss << "?"
-                << "id=" << sessionID;
+           << "id=" << sessionID;
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -425,7 +435,6 @@ namespace scidb4gdal {
     }
 
     void ShimClient::login() {
-
         /* Since the login endpoint as been removed with SciDB 15.12 we need
            to check the version first and set _auth to an arbitrary value. This
            value is passed to all following HTTP requests but will not be
@@ -437,16 +446,13 @@ namespace scidb4gdal {
             return;
         }
 
-
         curlBegin();
-
-
 
         stringstream ss;
         string response;
 
         ss << _host << SHIMENDPOINT_LOGIN << "?username=" << _user
-                << "&password=" << _passwd;
+           << "&password=" << _passwd;
         curl_easy_setopt(_curl_handle, CURLOPT_URL, ss.str().c_str());
         curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
 
@@ -459,16 +465,15 @@ namespace scidb4gdal {
         if (response.length() > 0) {
             _auth = response;
             stringstream auth_enc;
-            for (int i = 0; i < _auth.length(); ++i) auth_enc << "x";
+            for (size_t i = 0; i < _auth.length(); ++i) auth_enc << "x";
             Utils::debug((string) "Login to SciDB successsful, using auth key: " + auth_enc.str());
         } else {
-            Utils::error((string) ("Login to SciDB failed"), true);
+            Utils::error((string)("Login to SciDB failed"), true);
+            throw ERR_GLOBAL_CANNOTCONNECT;
         }
     }
 
     void ShimClient::logout() {
-
-
         /* Since the logout endpoint as been removed with SciDB 15.12 we need
           to check the version first and set _auth to an arbitrary value. This
           value is passed to all following HTTP requests but will not be
@@ -516,8 +521,8 @@ namespace scidb4gdal {
             Utils::debug("Performing AFL Query: " + afl.str());
             ss << _host << SHIMENDPOINT_EXECUTEQUERY;
             ss << "?"
-                    << "id=" << sessionID << "&query=" << afl.str() << "&save="
-                    << "csv";
+               << "id=" << sessionID << "&query=" << afl.str() << "&save="
+               << "csv";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -546,7 +551,8 @@ namespace scidb4gdal {
             curlBegin();
             ss.str("");
             // READ BYTES  ///////////////////////////
-            ss << _host << SHIMENDPOINT_READ_BYTES << "?" << "id=" << sessionID << "&n=0";
+            ss << _host << SHIMENDPOINT_READ_BYTES << "?"
+               << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -566,20 +572,18 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-
         ss.str("");
-
 
         CSVstring* csv;
         if (!isVersionGreaterThan(15, 7)) {
-            csv = new CSVstring(response, true); // with header
-        } else csv = new CSVstring(response, false); // with header
-
+            csv = new CSVstring(response, true);  // with header
+        } else
+            csv = new CSVstring(response, false);  // with header
 
         for (int i = 0; i < csv->nrow(); ++i) {
             SciDBAttribute attr;
-            attr.name = csv->get<string>(i, 0).substr(1, csv->get<string>(i, 0).length() - 2); // remove ''
-            attr.typeId = csv->get<string>(i, 1).substr(1, csv->get<string>(i, 1).length() - 2); // remove ''
+            attr.name = csv->get<string>(i, 0).substr(1, csv->get<string>(i, 0).length() - 2);    // remove ''
+            attr.typeId = csv->get<string>(i, 1).substr(1, csv->get<string>(i, 1).length() - 2);  // remove ''
             attr.nullable = ((csv->get<string>(i, 2).compare("TRUE") * csv->get<string>(i, 2).compare("true")) == 0);
 
             // Assert attr has datatype that is supported by GDAL
@@ -624,8 +628,8 @@ namespace scidb4gdal {
             Utils::debug("Performing AFL Query: " + afl.str());
 
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID << "&query=" << afl.str() << "&save="
-                    << "csv";
+               << "id=" << sessionID << "&query=" << afl.str() << "&save="
+               << "csv";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -653,7 +657,7 @@ namespace scidb4gdal {
             stringstream ss;
             response = "";
             ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                    << "id=" << sessionID << "&n=0";
+               << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -673,15 +677,11 @@ namespace scidb4gdal {
 
         // Parse CSV
 
-
-
-
-
         CSVstring* csv;
         if (!isVersionGreaterThan(15, 7)) {
-            csv = new CSVstring(response, true); // with header
-        } else csv = new CSVstring(response, false); // with header
-
+            csv = new CSVstring(response, true);  // with header
+        } else
+            csv = new CSVstring(response, false);  // with header
 
         for (int i = 0; i < csv->nrow(); ++i) {
             SciDBDimension dim;
@@ -713,10 +713,7 @@ namespace scidb4gdal {
             }
 
             out.push_back(dim);
-
         }
-
-
 
         delete csv;
 
@@ -726,8 +723,7 @@ namespace scidb4gdal {
     }
 
     StatusCode ShimClient::getSRSDesc(const string& inArrayName, SciDBSpatialReference& out) {
-
-        if (!hasSCIDB4GEO()) { //  Default spatial reference
+        if (!hasSCIDB4GEO()) {  //  Default spatial reference
             out.affineTransform = *(new AffineTransform());
             out.auth_name = "UNDEFINED";
             out.auth_srid = 0;
@@ -746,11 +742,11 @@ namespace scidb4gdal {
             stringstream ss;
             stringstream afl;
             // project(dimensions(chicago2),name,low,high,type)
-            afl << "project(apply(st_getsrs(" << inArrayName << "),auth_srid_str,string(auth_srid)),name,xdim,ydim,srtext,proj4text,A,auth_name,auth_srid_str)"; // Everything should be a string to smiplify CSV col separation
+            afl << "project(apply(st_getsrs(" << inArrayName << "),auth_srid_str,string(auth_srid)),name,xdim,ydim,srtext,proj4text,A,auth_name,auth_srid_str)";  // Everything should be a string to smiplify CSV col separation
             Utils::debug("Performing AFL Query: " + afl.str());
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID << "&query=" << afl.str() << "&save="
-                    << "csv";
+               << "id=" << sessionID << "&query=" << afl.str() << "&save="
+               << "csv";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -781,7 +777,7 @@ namespace scidb4gdal {
             // READ BYTES  ////////////////////////////
             ss.str("");
             ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                    << "id=" << sessionID << "&n=0";
+               << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -805,10 +801,9 @@ namespace scidb4gdal {
 
         CSVstring* csv;
         if (!isVersionGreaterThan(15, 7)) {
-            csv = new CSVstring(response, "','", "\n", true); // with header
-        } else csv = new CSVstring(response, "','", "\n", false); // without header
-
-
+            csv = new CSVstring(response, "','", "\n", true);  // with header
+        } else
+            csv = new CSVstring(response, "','", "\n", false);  // without header
 
         if (csv->nrow() != 1 || csv->ncol() != 8) {
             delete csv;
@@ -816,23 +811,19 @@ namespace scidb4gdal {
             return ERR_GLOBAL_PARSE;
         }
 
-
-
         try {
-
             out.xdim = csv->get<string>(0, 1);
             out.ydim = csv->get<string>(0, 2);
             out.srtext = csv->get<string>(0, 3);
             out.proj4text = csv->get<string>(0, 4);
             out.affineTransform = *(new AffineTransform(csv->get<string>(0, 5)));
             out.auth_name = csv->get<string>(0, 6);
-            out.auth_srid = boost::lexical_cast<uint32_t>(csv->get<string>(0, 7).substr(0, csv->get<string>(0, 7).length() - 1)); // last colum has ' ending
-        } catch (const boost::bad_lexical_cast &) {
+            out.auth_srid = boost::lexical_cast<uint32_t>(csv->get<string>(0, 7).substr(0, csv->get<string>(0, 7).length() - 1));  // last colum has ' ending
+        } catch (const boost::bad_lexical_cast&) {
             delete csv;
             Utils::warn("Cannot extract spatial reference of array '" + inArrayName + "'.");
             return ERR_GLOBAL_PARSE;
         }
-
 
         delete csv;
 
@@ -854,8 +845,8 @@ namespace scidb4gdal {
             afl << "project(st_gettrs(" << inArrayName << "),tdim,t0,dt)";
             Utils::debug("Performing AFL Query: " + afl.str());
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID << "&query=" << afl.str() << "&save="
-                    << "csv";
+               << "id=" << sessionID << "&query=" << afl.str() << "&save="
+               << "csv";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -880,7 +871,7 @@ namespace scidb4gdal {
             // READ BYTES  ////////////////////////////
             ss.str("");
             ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                    << "id=" << sessionID << "&n=0";
+               << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -901,13 +892,11 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-
-
         CSVstring* csv;
         if (!isVersionGreaterThan(15, 7)) {
-            csv = new CSVstring(response, true); // with header
-        } else csv = new CSVstring(response, false); // with header
-
+            csv = new CSVstring(response, true);  // with header
+        } else
+            csv = new CSVstring(response, false);  // with header
 
         if (csv->nrow() != 1 || csv->ncol() != 3) {
             delete csv;
@@ -915,11 +904,9 @@ namespace scidb4gdal {
             return ERR_GLOBAL_PARSE;
         }
 
-
-
-        out.tdim = csv->get<string>(0, 0).substr(1, csv->get<string>(0, 0).length() - 2); // remove ''
-        TPoint* p = new TPoint(csv->get<string>(0, 1).substr(1, csv->get<string>(0, 1).length() - 2)); // remove '';
-        TInterval* i = new TInterval(csv->get<string>(0, 2).substr(1, csv->get<string>(0, 2).length() - 2)); // remove '';
+        out.tdim = csv->get<string>(0, 0).substr(1, csv->get<string>(0, 0).length() - 2);                     // remove ''
+        TPoint* p = new TPoint(csv->get<string>(0, 1).substr(1, csv->get<string>(0, 1).length() - 2));        // remove '';
+        TInterval* i = new TInterval(csv->get<string>(0, 2).substr(1, csv->get<string>(0, 2).length() - 2));  // remove '';
         out.setTPoint(p);
         out.setTInterval(i);
 
@@ -958,7 +945,6 @@ namespace scidb4gdal {
             return res;
         }
 
-
         Utils::debug("SciDB array schema: " + out->getSchemaString());
 
         /*
@@ -968,7 +954,7 @@ namespace scidb4gdal {
         getSRSDesc(inArrayName, *out);
 
         SciDBSpatioTemporalArray* starr_ptr =
-                dynamic_cast<SciDBSpatioTemporalArray*> (out);
+            dynamic_cast<SciDBSpatioTemporalArray*>(out);
         if (starr_ptr) {
             getTRSDesc(inArrayName, *starr_ptr);
         }
@@ -976,7 +962,7 @@ namespace scidb4gdal {
         // set the metadata
         MD m;
         getArrayMD(m, inArrayName, "");
-        out->md.insert(pair<string, MD>("", m)); // TODO: Add domain
+        out->md.insert(pair<string, MD>("", m));  // TODO: Add domain
 
         for (size_t i = 0; i < out->attrs.size(); ++i) {
             MD ma;
@@ -990,8 +976,6 @@ namespace scidb4gdal {
     }
 
     StatusCode ShimClient::getType(const string& name, SciDBSpatialArray*& array) {
-
-
         StatusCode s;
         bool check = hasSCIDB4GEO(s);
         if (s != SUCCESS) {
@@ -1014,7 +998,8 @@ namespace scidb4gdal {
             afl << "project(filter(eo_arrays(), name='" << name << "'),name,setting)";
             Utils::debug("Performing AFL Query: " + afl.str());
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0) << "&save=" << "csv";
+               << "id=" << sessionID << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0) << "&save="
+               << "csv";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -1025,8 +1010,9 @@ namespace scidb4gdal {
             curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, &response);
             if (curlPerform() != CURLE_OK) {
                 curlEnd();
-                Utils::warn("Cannot query for spatial or temporal annotated query. "
-                            "SCIDB4GEO module activated in SCIDB?");
+                Utils::warn(
+                    "Cannot query for spatial or temporal annotated query. "
+                    "SCIDB4GEO module activated in SCIDB?");
                 return ERR_GLOBAL_NO_SCIDB4GEO;
             };
             curlEnd();
@@ -1038,7 +1024,7 @@ namespace scidb4gdal {
             // READ BYTES  ////////////////////////////
             ss.str("");
             ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                    << "id=" << sessionID << "&n=0";
+               << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -1058,20 +1044,17 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-
-
         CSVstring* csv;
         if (!isVersionGreaterThan(15, 7)) {
-            csv = new CSVstring(response, true); // with header
-        } else csv = new CSVstring(response, false); // without header
-
+            csv = new CSVstring(response, true);  // with header
+        } else
+            csv = new CSVstring(response, false);  // without header
 
         if (csv->nrow() != 1 || csv->ncol() < 1) {
             delete csv;
             Utils::warn("Cannot extract setting of array '" + name + "'.");
             return ERR_GLOBAL_PARSE;
         }
-
 
         if (csv->get<string>(0, 1).compare("'s'") == 0) {
             array = new SciDBSpatialArray();
@@ -1108,18 +1091,14 @@ namespace scidb4gdal {
         stringstream ss;
         string response;
 
-
-
         MD md = array.attrs[nband].md[""];
         string naval;
         if (md.find(SCIDB4GDAL_DEFAULTMDFIELD_NODATA) == md.end()) {
             stringstream dtos;
             dtos << Utils::defaultNoDataSciDB(array.attrs[nband].typeId);
             naval = dtos.str();
-        } else naval = md[SCIDB4GDAL_DEFAULTMDFIELD_NODATA];
-
-
-
+        } else
+            naval = md[SCIDB4GDAL_DEFAULTMDFIELD_NODATA];
 
         int sessionID = newSession();
 
@@ -1128,11 +1107,12 @@ namespace scidb4gdal {
         curlBegin();
         // EXECUTE QUERY  ////////////////////////////
         ss.str();
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID;
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
+           << "id=" << sessionID;
 
         stringstream tslice;
-        if (SciDBSpatioTemporalArray * starray =
-            dynamic_cast<SciDBSpatioTemporalArray*> (&array)) {
+        if (SciDBSpatioTemporalArray* starray =
+                dynamic_cast<SciDBSpatioTemporalArray*>(&array)) {
             // if we have a temporal index, we need to slice the data set
             if (_qp) {
                 t_index = _qp->temp_index;
@@ -1146,7 +1126,7 @@ namespace scidb4gdal {
             }
 
             tslice << "slice(" << array.name << "," + starray->tdim + "," << t_index
-                    << ")";
+                   << ")";
         } else {
             // Utils::debug("Cast failed. Skipping the slicing.");
             tslice << array.name;
@@ -1155,45 +1135,45 @@ namespace scidb4gdal {
         string arr = tslice.str();
 
         stringstream afl;
-        if (x_idx > y_idx) { // TODO: need to check performance of differend ordering
+        if (x_idx > y_idx) {  // TODO: need to check performance of differend ordering
 
             if (use_subarray) {
                 if (emptycheck) {
                     afl << "(merge(";
                     afl << "project(subarray(" << arr << "," << y_min << "," << x_min << ","
-                            << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
+                        << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":"
-                            << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
-                            << "> [" << array.getYDim()->name
-                            << "=" << 0 << ":" << y_max - y_min << ","
-                            << array.getYDim()->chunksize << "," << 0 << ","
-                            << array.getXDim()->name << "=" << 0 << ":" << x_max - x_min << ","
-                            << array.getXDim()->chunksize << "," << 0 << "],"
-                            << naval << ")))";
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
+                        << "> [" << array.getYDim()->name
+                        << "=" << 0 << ":" << y_max - y_min << ","
+                        << array.getYDim()->chunksize << "," << 0 << ","
+                        << array.getXDim()->name << "=" << 0 << ":" << x_max - x_min << ","
+                        << array.getXDim()->chunksize << "," << 0 << "],"
+                        << naval << ")))";
                 } else {
                     afl << "(project(subarray(" << arr << "," << y_min << "," << x_min
-                            << "," << y_max << "," << x_max << ")," << array.attrs[nband].name
-                            << "))";
+                        << "," << y_max << "," << x_max << ")," << array.attrs[nband].name
+                        << "))";
                 }
-            } else { // Between
+            } else {  // Between
                 // TODO: Test which way is the fastest
                 if (emptycheck) {
                     afl << "(merge(";
                     afl << "project(between(" << arr << "," << y_min << "," << x_min << ","
-                            << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
+                        << y_max << "," << x_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":"
-                            << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
-                            << "> [" << array.getYDim()->name
-                            << "=" << array.getYDim()->start << ":"
-                            << array.getYDim()->start + array.getYDim()->length - 1 << ","
-                            << array.getYDim()->chunksize << "," << 0 << ","
-                            << array.getXDim()->name << "=" << array.getXDim()->start << ":"
-                            << array.getXDim()->start + array.getXDim()->length - 1 << ","
-                            << array.getXDim()->chunksize << "," << 0 << "]," << naval << "),"
-                            << y_min << "," << x_min << "," << y_max << "," << x_max << ")))";
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
+                        << "> [" << array.getYDim()->name
+                        << "=" << array.getYDim()->start << ":"
+                        << array.getYDim()->start + array.getYDim()->length - 1 << ","
+                        << array.getYDim()->chunksize << "," << 0 << ","
+                        << array.getXDim()->name << "=" << array.getXDim()->start << ":"
+                        << array.getXDim()->start + array.getXDim()->length - 1 << ","
+                        << array.getXDim()->chunksize << "," << 0 << "]," << naval << "),"
+                        << y_min << "," << x_min << "," << y_max << "," << x_max << ")))";
                 } else {
                     afl << "(project(between(" << arr << "," << y_min << "," << x_min << ","
-                            << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
+                        << y_max << "," << x_max << ")," << array.attrs[nband].name << "))";
                 }
             }
         } else {
@@ -1201,39 +1181,39 @@ namespace scidb4gdal {
                 if (emptycheck) {
                     afl << "transpose(merge(";
                     afl << "project(subarray(" << arr << "," << x_min << "," << y_min << ","
-                            << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
+                        << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",build(<" << array.attrs[nband].name << ":"
-                            << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
-                            << "> [" << array.getXDim()->name
-                            << "=" << 0 << ":" << x_max - x_min << ","
-                            << array.getXDim()->chunksize << "," << 0 << ","
-                            << array.getYDim()->name << "=" << 0 << ":" << y_max - y_min << ","
-                            << array.getYDim()->chunksize << "," << 0 << "],"
-                            << naval << ")))";
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
+                        << "> [" << array.getXDim()->name
+                        << "=" << 0 << ":" << x_max - x_min << ","
+                        << array.getXDim()->chunksize << "," << 0 << ","
+                        << array.getYDim()->name << "=" << 0 << ":" << y_max - y_min << ","
+                        << array.getYDim()->chunksize << "," << 0 << "],"
+                        << naval << ")))";
                 } else {
                     afl << "transpose(project(subarray(" << arr << "," << x_min << ","
-                            << y_min << "," << x_max << "," << y_max << "),"
-                            << array.attrs[nband].name << "))";
+                        << y_min << "," << x_max << "," << y_max << "),"
+                        << array.attrs[nband].name << "))";
                 }
             } else {
                 if (emptycheck) {
                     afl << "transpose(merge(";
                     afl << "project(between(" << arr << "," << x_min << "," << y_min << ","
-                            << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
+                        << x_max << "," << y_max << ")," << array.attrs[nband].name << ")";
                     afl << ",between(build(<" << array.attrs[nband].name << ":"
-                            << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
-                            << "> [" << array.getXDim()->name
-                            << "=" << array.getXDim()->start << ":"
-                            << array.getXDim()->start + array.getXDim()->length - 1 << ","
-                            << array.getXDim()->chunksize << "," << 0 << ","
-                            << array.getYDim()->name << "=" << array.getYDim()->start << ":"
-                            << array.getYDim()->start + array.getYDim()->length - 1 << ","
-                            << array.getYDim()->chunksize << "," << 0 << "]," << naval << "),"
-                            << x_min << "," << y_min << "," << x_max << "," << y_max << ")))";
+                        << array.attrs[nband].typeId << ((array.attrs[nband].nullable) ? " NULL" : " NOT NULL")
+                        << "> [" << array.getXDim()->name
+                        << "=" << array.getXDim()->start << ":"
+                        << array.getXDim()->start + array.getXDim()->length - 1 << ","
+                        << array.getXDim()->chunksize << "," << 0 << ","
+                        << array.getYDim()->name << "=" << array.getYDim()->start << ":"
+                        << array.getYDim()->start + array.getYDim()->length - 1 << ","
+                        << array.getYDim()->chunksize << "," << 0 << "]," << naval << "),"
+                        << x_min << "," << y_min << "," << x_max << "," << y_max << ")))";
                 } else {
                     afl << "transpose(project(between(" << arr << "," << x_min << ","
-                            << y_min << "," << x_max << "," << y_max << "),"
-                            << array.attrs[nband].name << "))";
+                        << y_min << "," << x_max << "," << y_max << "),"
+                        << array.attrs[nband].name << "))";
                 }
             }
         }
@@ -1243,16 +1223,13 @@ namespace scidb4gdal {
             string afl_temp = afl.str();
             afl.str("");
             afl << "substitute(" << afl_temp << ", build(<val:" << array.attrs[nband].typeId << ">[i=0:0, 1, 0], " << naval << "))";
-
         }
-
-
 
         Utils::debug("Performing AFL Query: " + afl.str());
 
-
         ss << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0)
-                << "&save=" << "(" << array.attrs[nband].typeId;
+           << "&save="
+           << "(" << array.attrs[nband].typeId;
         //if (array.attrs[nband].nullable) ss  << " " <<  "null";
         ss << ")";
         // Add auth parameter if using ssl
@@ -1272,7 +1249,7 @@ namespace scidb4gdal {
         // READ BYTES  ////////////////////////////
         ss.str("");
         ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                << "id=" << sessionID << "&n=0";
+           << "id=" << sessionID << "&n=0";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1281,17 +1258,17 @@ namespace scidb4gdal {
 
         response = "";
         struct SingleAttributeChunk data;
-        data.memory = (char*) outchunk;
+        data.memory = (char*)outchunk;
         data.size = 0;
 
         curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION, responseBinaryCallback);
-        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*) &data);
+        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*)&data);
         curlPerform();
         curlEnd();
 
         releaseSession(sessionID);
 
-        outchunk = (void*) data.memory;
+        outchunk = (void*)data.memory;
 
         return SUCCESS;
     }
@@ -1328,7 +1305,6 @@ namespace scidb4gdal {
 
         afl << array.getSchemaString();
 
-
         // Append attribute specification
         //         afl << " <";
         //         for (uint32_t i = 0; i < array.attrs.size(); ++i) {
@@ -1360,7 +1336,6 @@ namespace scidb4gdal {
         //             }
         //         }
 
-
         string aflquery = afl.str();
         Utils::debug("Performing AFL Query: " + afl.str());
 
@@ -1370,8 +1345,8 @@ namespace scidb4gdal {
         // EXECUTE QUERY  ////////////////////////////
         ss.str("");
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID
-                << "&query=" << curl_easy_escape(_curl_handle, aflquery.c_str(), 0);
+           << "id=" << sessionID
+           << "&query=" << curl_easy_escape(_curl_handle, aflquery.c_str(), 0);
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1402,10 +1377,10 @@ namespace scidb4gdal {
         // EXECUTE QUERY  ////////////////////////////
         stringstream ss;
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID
-                << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
+           << "id=" << sessionID
+           << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
         if (_ssl && !_auth.empty())
-            ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            ss << "&auth=" << _auth;  // Add auth parameter if using ssl
         curl_easy_setopt(_curl_handle, CURLOPT_URL, ss.str().c_str());
         curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
         if (curlPerform() != CURLE_OK) {
@@ -1422,8 +1397,8 @@ namespace scidb4gdal {
     StatusCode ShimClient::insertInto(SciDBArray& srcArray, SciDBArray& destArray) {
         // create new array
         int sessionID = newSession();
-        string collArr = destArray.name; // array name in which we want to store the data
-        string tmpArr = srcArray.name; // array name with the source data
+        string collArr = destArray.name;  // array name in which we want to store the data
+        string tmpArr = srcArray.name;    // array name with the source data
 
         stringstream castSchema;
         castSchema << "<";
@@ -1432,27 +1407,28 @@ namespace scidb4gdal {
         for (uint32_t i = 0; i < srcArray.attrs.size(); i++) {
             string nullable = (srcArray.attrs[i].nullable) ? " NULL" : " NOT NULL";
             castSchema << srcArray.attrs[i].name << ":" << srcArray.attrs[i].typeId
-                    << "" << nullable << ",";
+                       << "" << nullable << ",";
         }
 
         // special handling for the over attributes (over_x, over_y, over_t) -> rename
         // them based on the stored names for dimensions in
         // the destination array
-        if (SciDBSpatioTemporalArray * starray =
-            dynamic_cast<SciDBSpatioTemporalArray*> (&destArray)) {
+        if (SciDBSpatioTemporalArray* starray =
+                dynamic_cast<SciDBSpatioTemporalArray*>(&destArray)) {
             // target attibute names from (over_x, over_y, over_t)
             castSchema << starray->getXDim()->name << ":int64 NULL, "
-                    << starray->getYDim()->name << ":int64 NULL, "
-                    << starray->getTDim()->name << ":int64 NULL>[";
-        } else if (SciDBSpatialArray * sarray =
-                   dynamic_cast<SciDBSpatialArray*> (&destArray)) {
+                       << starray->getYDim()->name << ":int64 NULL, "
+                       << starray->getTDim()->name << ":int64 NULL>[";
+        } else if (SciDBSpatialArray* sarray =
+                       dynamic_cast<SciDBSpatialArray*>(&destArray)) {
             // eo_over creates attributes over_x,over_y AND over_t every time
             // target attibute names from (over_x, over_y, over_t)
             castSchema << sarray->getXDim()->name << ":int64 NULL, "
-                    << sarray->getYDim()->name << ":int64 NULL, t:int64 NULL>[";
+                       << sarray->getYDim()->name << ":int64 NULL, t:int64 NULL>[";
         } else {
-            Utils::debug("Cannot cast array to spatial or spatiotemporal. Using "
-                         "standard axis definitions.");
+            Utils::debug(
+                "Cannot cast array to spatial or spatiotemporal. Using "
+                "standard axis definitions.");
             castSchema << "x:int64 NULL, y:int64 NULL, t:int64 NULL>[";
         }
 
@@ -1468,7 +1444,7 @@ namespace scidb4gdal {
             }
             // TODO change statement for overlap
             castSchema << "src_" << dim_name << "=" << srcArray.dims[i].low << ":"
-                    << dimHigh << "," << srcArray.dims[i].chunksize << ",0";
+                       << dimHigh << "," << srcArray.dims[i].chunksize << ",0";
 
             if (i < srcArray.dims.size() - 1) {
                 castSchema << ", ";
@@ -1478,17 +1454,12 @@ namespace scidb4gdal {
         castSchema << "]";
         // the dimensions of the src array will be discarded later
 
-
-
-
         string eo_over = "eo_over(" + tmpArr + "," + collArr + ")";
         string join = "join(" + tmpArr + ", " + eo_over + ")";
         string cast = "cast(" + join + ", " + castSchema.str() + ")";
 
         /* 2016-06-27: Added strict=false to ignore cell collisions  */
         string redimension = "redimension(" + cast + "," + collArr + ", false)";
-
-
 
         /* 2016-05-17: Moved filtering of NA values from insertData() to here  */
 
@@ -1499,7 +1470,7 @@ namespace scidb4gdal {
         // check if NODATA value exists...
         unsigned int noNA = 0;
         for (uint32_t i = 0; i < srcArray.attrs.size(); ++i) {
-            string naVal = srcArray.attrs[i].md[""]["NODATA"]; // if not exists then an empty string will be returned in this case
+            string naVal = srcArray.attrs[i].md[""]["NODATA"];  // if not exists then an empty string will be returned in this case
             if (naVal.empty()) {
                 ++noNA;
                 continue;
@@ -1511,21 +1482,19 @@ namespace scidb4gdal {
             } else if (Utils::scidbTypeIdIsFloatingPoint(srcArray.attrs[i].typeId)) {
                 double v = boost::lexical_cast<double>(naVal);
                 afl_predicateNA << srcArray.attrs[i].name << " = " << std::setprecision(numeric_limits<double>::digits10) << v;
-            } else continue;
+            } else
+                continue;
 
             afl_predicateNA << " OR ";
-
         }
         afl_predicateNA << " FALSE ";
-        if (noNA < srcArray.attrs.size()) { // at least one nodata value was set
+        if (noNA < srcArray.attrs.size()) {  // at least one nodata value was set
             afl_filternonNA << "filter(" << redimension << ", NOT (" << afl_predicateNA.str() << "))";
 
         } else {
             afl_filternonNA << redimension;
         }
         /* 2016-05-17: END */
-
-
 
         stringstream afl;
         afl << "insert(" << afl_filternonNA.str() << ", " << collArr << ")";
@@ -1535,10 +1504,10 @@ namespace scidb4gdal {
         // EXECUTE QUERY  ////////////////////////////
         stringstream ss;
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID
-                << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
+           << "id=" << sessionID
+           << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
         if (_ssl && !_auth.empty())
-            ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            ss << "&auth=" << _auth;  // Add auth parameter if using ssl
         curl_easy_setopt(_curl_handle, CURLOPT_URL, ss.str().c_str());
         curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
         if (curlPerform() != CURLE_OK) {
@@ -1596,7 +1565,7 @@ namespace scidb4gdal {
         ss << _host << ":" << _port << SHIMENDPOINT_UPLOAD_FILE;
 #endif
         ss << "?"
-                << "id=" << sessionID;
+           << "id=" << sessionID;
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1648,9 +1617,7 @@ namespace scidb4gdal {
         array_tile.getYDim()->high = y_max;
         array_tile.getYDim()->length = y_max - y_min + 1;
 
-
         afl_input << "input(" << array_tile.getSchemaString() << ",'" << remoteFilename << "', -2, '" << format << "')";
-
 
         stringstream afl_redimension;
         if ((x_min == array.getXDim()->start) && (y_min == array.getYDim()->start) &&
@@ -1662,7 +1629,6 @@ namespace scidb4gdal {
             afl_redimension << "redimension(" << afl_input.str() << "," << array.getSchemaString() << ")";
         }
 
-
         stringstream afl;
         afl << "insert(" << afl_redimension.str() << ", " << array.name << SCIDB4GDAL_ARRAYSUFFIX_TEMP << ")";
         Utils::debug("Performing AFL Query: " + afl.str());
@@ -1670,8 +1636,8 @@ namespace scidb4gdal {
         curlBegin();
         ss.str("");
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID
-                << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
+           << "id=" << sessionID
+           << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1711,8 +1677,8 @@ namespace scidb4gdal {
 
         ss.str();
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID << "&query=" << afl.str() << "&save="
-                << "(double,double,double,double)";
+           << "id=" << sessionID << "&query=" << afl.str() << "&save="
+           << "(double,double,double,double)";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1727,7 +1693,7 @@ namespace scidb4gdal {
         // READ BYTES  ////////////////////////////
         ss.str("");
         ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                << "id=" << sessionID << "&n=0";
+           << "id=" << sessionID << "&n=0";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1735,18 +1701,18 @@ namespace scidb4gdal {
         curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
 
         struct SingleAttributeChunk data;
-        data.memory = (char*) malloc(sizeof (double) * 4);
+        data.memory = (char*)malloc(sizeof(double) * 4);
         data.size = 0;
 
         curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION, responseBinaryCallback);
-        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*) &data);
+        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*)&data);
         curlPerform();
         curlEnd();
 
-        out.min = ((double*) data.memory)[0];
-        out.max = ((double*) data.memory)[1];
-        out.mean = ((double*) data.memory)[2];
-        out.stdev = ((double*) data.memory)[3];
+        out.min = ((double*)data.memory)[0];
+        out.max = ((double*)data.memory)[1];
+        out.mean = ((double*)data.memory)[2];
+        out.stdev = ((double*)data.memory)[3];
 
         free(data.memory);
 
@@ -1763,12 +1729,14 @@ namespace scidb4gdal {
         // There might be less complex queries but this one always succeeds and does
         // not give HTTP 500 SciDB errors
         afl << "aggregate(filter(list('arrays'),name='" << inArrayName
-                << "'),count(name))";
+            << "'),count(name))";
         Utils::debug("Performing AFL Query: " + afl.str());
 
         // 	createSHIMExecuteString(ss, sessionID, afl);
         ss.str();
-        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?" << "id=" << sessionID << "&query=" << afl.str() << "&save=" << "(int64)";
+        ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
+           << "id=" << sessionID << "&query=" << afl.str() << "&save="
+           << "(int64)";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1783,7 +1751,7 @@ namespace scidb4gdal {
         // READ BYTES  ////////////////////////////
         ss.str("");
         ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                << "id=" << sessionID << "&n=0";
+           << "id=" << sessionID << "&n=0";
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1792,15 +1760,15 @@ namespace scidb4gdal {
 
         struct SingleAttributeChunk data;
         // Expect just one integer
-        data.memory = (char*) malloc(sizeof (int64_t) * 1);
+        data.memory = (char*)malloc(sizeof(int64_t) * 1);
         data.size = 0;
 
         curl_easy_setopt(_curl_handle, CURLOPT_WRITEFUNCTION, responseBinaryCallback);
-        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*) &data);
+        curl_easy_setopt(_curl_handle, CURLOPT_WRITEDATA, (void*)&data);
         curlPerform();
         curlEnd();
 
-        uint64_t count = ((int64_t*) data.memory)[0];
+        uint64_t count = ((int64_t*)data.memory)[0];
 
         if (count > 0)
             out = true;
@@ -1815,7 +1783,6 @@ namespace scidb4gdal {
     }
 
     StatusCode ShimClient::updateSRS(SciDBSpatialArray& array) {
-
         if (!hasSCIDB4GEO()) {
             Utils::warn("SciDB server does not run spacetime extension. Update of spatial reference system skipped.");
             return SUCCESS;
@@ -1833,14 +1800,14 @@ namespace scidb4gdal {
             // EXECUTE QUERY  ////////////////////////////
             stringstream afl;
             afl << "st_setsrs(" << array.name << ",'" << array.getXDim()->name << "','"
-                    << array.getYDim()->name << "','" << array.auth_name << "',"
-                    << array.auth_srid << ",'" << array.affineTransform.toString() << "')";
+                << array.getYDim()->name << "','" << array.auth_name << "',"
+                << array.auth_srid << ",'" << array.affineTransform.toString() << "')";
             Utils::debug("Performing AFL Query: " + afl.str());
 
             stringstream ss;
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID
-                    << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
+               << "id=" << sessionID
+               << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -1868,9 +1835,9 @@ namespace scidb4gdal {
         Utils::debug("Performing AFL Query: " + afl.str());
 
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID << "&query=" << afl.str();
+           << "id=" << sessionID << "&query=" << afl.str();
         if (_ssl && !_auth.empty())
-            ss << "&auth=" << _auth; // Add auth parameter if using ssl
+            ss << "&auth=" << _auth;  // Add auth parameter if using ssl
 
         curl_easy_setopt(_curl_handle, CURLOPT_URL, ss.str().c_str());
         curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
@@ -1887,7 +1854,6 @@ namespace scidb4gdal {
     StatusCode ShimClient::setArrayMD(string arrayname,
                                       std::map<std::string, std::string> kv,
                                       string domain) {
-
         if (!hasSCIDB4GEO()) {
             Utils::warn("SciDB server does not run spacetime extension. Update of array metadata skipped.");
             return SUCCESS;
@@ -1911,11 +1877,11 @@ namespace scidb4gdal {
         curlBegin();
         stringstream ss, afl;
         afl << "eo_setmd(" << arrayname << ",'" << key_array_str.str() << "','"
-                << val_array_str.str() << "')";
+            << val_array_str.str() << "')";
         Utils::debug("Performing AFL Query: " + afl.str());
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID
-                << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
+           << "id=" << sessionID
+           << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -1946,15 +1912,15 @@ namespace scidb4gdal {
             stringstream afl;
             afl.str("");
             afl << "project(filter(eo_getmd(" << arrayname
-                    << "),attribute='' and domain='" << domain << "'), key, value)";
+                << "),attribute='' and domain='" << domain << "'), key, value)";
 
             Utils::debug("Performing AFL Query: " + afl.str());
 
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID
-                    << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0)
-                    << "&save="
-                    << "csv";
+               << "id=" << sessionID
+               << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0)
+               << "&save="
+               << "csv";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -1981,7 +1947,7 @@ namespace scidb4gdal {
             ss.str("");
             // READ BYTES  ///////////////////////////
             ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                    << "id=" << sessionID << "&n=0";
+               << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -2000,11 +1966,11 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-
         CSVstring* csv;
         if (!isVersionGreaterThan(15, 7)) {
-            csv = new CSVstring(response, true); // with header
-        } else csv = new CSVstring(response, false); // with header
+            csv = new CSVstring(response, true);  // with header
+        } else
+            csv = new CSVstring(response, false);  // with header
 
         if (csv->nrow() == 0) {
             Utils::debug("Array '" + arrayname + "' has no additional metadata, skipping.");
@@ -2034,7 +2000,6 @@ namespace scidb4gdal {
 
     StatusCode ShimClient::setAttributeMD(string arrayname, string attribute,
                                           map<string, string> kv, string domain) {
-
         if (!hasSCIDB4GEO()) {
             Utils::warn("SciDB server does not run spacetime extension. Update of attribute metadata skipped.");
             return SUCCESS;
@@ -2058,11 +2023,11 @@ namespace scidb4gdal {
         curlBegin();
         stringstream ss, afl;
         afl << "eo_setmd(" << arrayname << ",'" << attribute << "','"
-                << key_array_str.str() << "','" << val_array_str.str() << "')";
+            << key_array_str.str() << "','" << val_array_str.str() << "')";
         Utils::debug("Performing AFL Query: " + afl.str());
         ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                << "id=" << sessionID
-                << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
+           << "id=" << sessionID
+           << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
         // Add auth parameter if using ssl
         if (_ssl && !_auth.empty())
             ss << "&auth=" << _auth;
@@ -2093,15 +2058,15 @@ namespace scidb4gdal {
             curlBegin();
             stringstream afl;
             afl << "project(filter(eo_getmd(" << arrayname << "),attribute='"
-                    << attribute << "' and domain='" << domain << "'), key, value)";
+                << attribute << "' and domain='" << domain << "'), key, value)";
 
             Utils::debug("Performing AFL Query: " + afl.str());
 
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID
-                    << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0)
-                    << "&save="
-                    << "csv";
+               << "id=" << sessionID
+               << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0)
+               << "&save="
+               << "csv";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -2129,7 +2094,7 @@ namespace scidb4gdal {
             ss.str("");
             // READ BYTES  ///////////////////////////
             ss << _host << SHIMENDPOINT_READ_BYTES << "?"
-                    << "id=" << sessionID << "&n=0";
+               << "id=" << sessionID << "&n=0";
             // Add auth parameter if using ssl
             if (_ssl && !_auth.empty())
                 ss << "&auth=" << _auth;
@@ -2148,11 +2113,11 @@ namespace scidb4gdal {
             curlEnd();
         }
 
-
         CSVstring* csv;
         if (!isVersionGreaterThan(15, 7)) {
-            csv = new CSVstring(response, true); // with header
-        } else csv = new CSVstring(response, false); // with header
+            csv = new CSVstring(response, true);  // with header
+        } else
+            csv = new CSVstring(response, false);  // with header
         if (csv->nrow() == 0) {
             Utils::debug("Array attribute '" + attribute + "' has no additional metadata, skipping.");
             delete csv;
@@ -2173,7 +2138,6 @@ namespace scidb4gdal {
         }
 
         delete csv;
-
 
         releaseSession(sessionID);
 
@@ -2206,16 +2170,16 @@ namespace scidb4gdal {
             // EXECUTE QUERY  ////////////////////////////
             stringstream afl;
             afl << "st_settrs(" << array.name << ",'" << array.tdim << "','"
-                    << array.getTPoint()->toStringISO() << "','"
-                    << array.getTInterval()->toStringISO() << "')";
+                << array.getTPoint()->toStringISO() << "','"
+                << array.getTInterval()->toStringISO() << "')";
             Utils::debug("Performing AFL Query: " + afl.str());
 
             stringstream ss;
             ss << _host << SHIMENDPOINT_EXECUTEQUERY << "?"
-                    << "id=" << sessionID
-                    << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
+               << "id=" << sessionID
+               << "&query=" << curl_easy_escape(_curl_handle, afl.str().c_str(), 0);
             if (_ssl && !_auth.empty())
-                ss << "&auth=" << _auth; // Add auth parameter if using ssl
+                ss << "&auth=" << _auth;  // Add auth parameter if using ssl
             curl_easy_setopt(_curl_handle, CURLOPT_URL, ss.str().c_str());
             curl_easy_setopt(_curl_handle, CURLOPT_HTTPGET, 1);
             curlPerform();
@@ -2232,36 +2196,32 @@ namespace scidb4gdal {
 
     /****************************************************************************************** */
 
+    CSVstring::CSVstring(const string& s) : _s(s),
+                                            _colsep(","),
+                                            _rowsep("\n"),
+                                            _header(false),
+                                            _cells(NULL),
+                                            _head(NULL),
+                                            _ncol(-1),
+                                            _nrow(-1) {}
 
-    CSVstring::CSVstring(const string& s) :
-    _s(s),
-    _colsep(","),
-    _rowsep("\n"),
-    _header(false),
-    _cells(NULL),
-    _head(NULL),
-    _ncol(-1),
-    _nrow(-1) { }
+    CSVstring::CSVstring(const string& s, bool header) : _s(s),
+                                                         _colsep(","),
+                                                         _rowsep("\n"),
+                                                         _header(header),
+                                                         _cells(NULL),
+                                                         _head(NULL),
+                                                         _ncol(-1),
+                                                         _nrow(-1) {}
 
-    CSVstring::CSVstring(const string& s, bool header) :
-    _s(s),
-    _colsep(","),
-    _rowsep("\n"),
-    _header(header),
-    _cells(NULL),
-    _head(NULL),
-    _ncol(-1),
-    _nrow(-1) { }
-
-    CSVstring::CSVstring(const string& s, const string& colsep, const string& rowsep, bool header) :
-    _s(s),
-    _colsep(colsep),
-    _rowsep(rowsep),
-    _header(header),
-    _cells(NULL),
-    _head(NULL),
-    _ncol(-1),
-    _nrow(-1) { }
+    CSVstring::CSVstring(const string& s, const string& colsep, const string& rowsep, bool header) : _s(s),
+                                                                                                     _colsep(colsep),
+                                                                                                     _rowsep(rowsep),
+                                                                                                     _header(header),
+                                                                                                     _cells(NULL),
+                                                                                                     _head(NULL),
+                                                                                                     _ncol(-1),
+                                                                                                     _nrow(-1) {}
 
     CSVstring::~CSVstring() {
         if (_cells != NULL) {
@@ -2274,7 +2234,8 @@ namespace scidb4gdal {
         }
     }
 
-    template<typename T> T CSVstring::get(int row, int col) {
+    template <typename T>
+    T CSVstring::get(int row, int col) {
         if (_cells == NULL) process();
 
         if (row >= _cells->size() || row < 0) {
@@ -2284,7 +2245,6 @@ namespace scidb4gdal {
             Utils::error("Invalid CSV col requested!");
         }
         return boost::lexical_cast<T>((*_cells)[row][col]);
-
     }
 
     int CSVstring::ncol() {
@@ -2306,18 +2266,15 @@ namespace scidb4gdal {
         _ncol = 0;
         _cells = new vector<vector<string> >;
 
-
         vector<string> rows = Utils::split(_s, _rowsep);
-
 
         size_t i = 0;
         if (_header) {
             while (rows[i].empty() && i < rows.size()) ++i;
-            vector <string> cols = Utils::split(rows[i], _colsep);
+            vector<string> cols = Utils::split(rows[i], _colsep);
             _head = new vector<string>(cols);
             ++i;
         }
-
 
         while (i < rows.size()) {
             if (rows[i].empty()) {
@@ -2325,7 +2282,7 @@ namespace scidb4gdal {
                 continue;
             }
 
-            vector <string> cols = Utils::split(rows[i], _colsep);
+            vector<string> cols = Utils::split(rows[i], _colsep);
             if (_ncol <= 0) _ncol = cols.size();
             if (_ncol != cols.size()) {
                 stringstream ss;
@@ -2338,12 +2295,4 @@ namespace scidb4gdal {
             ++i;
         }
     }
-
-
-
-
-
-
-
-
 }

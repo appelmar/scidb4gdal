@@ -26,20 +26,19 @@ SOFTWARE.
 #ifndef SHIM_CLIENT_H
 #define SHIM_CLIENT_H
 
-#include <string>
-#include <iostream>
-#include <vector>
 #include <curl/curl.h>
 #include <inttypes.h>
+#include <iostream>
+#include <map>
 #include <sstream>
 #include <stack>
-#include <map>
-#include "shim_client_structs.h"
+#include <string>
+#include <vector>
 #include "scidb_structs.h"
+#include "shim_client_structs.h"
 
 #include "affinetransform.h"
 #include "utils.h"
-
 
 #define SHIMENDPOINT_NEW_SESSION "/new_session"
 #define SHIMENDPOINT_EXECUTEQUERY "/execute_query"
@@ -54,13 +53,12 @@ SOFTWARE.
 #define CURL_RETRIES 3
 //#define CURL_VERBOSE  // Uncomment this line if you want to debug CURL
 // requests and responses
-#define CURL_ADDPORTTOURL // if defined, appends :PORT to the base URL. This is
+#define CURL_ADDPORTTOURL  // if defined, appends :PORT to the base URL. This is
 // a simple workaround to not use standard ports in
 // successive curl requests with digest
 // authentification
 
-namespace scidb4gdal
-{
+namespace scidb4gdal {
     using namespace std;
 
     /**
@@ -113,9 +111,8 @@ namespace scidb4gdal
      * @author Marius Appel, IfGI Muenster
      * @author Florian Lahn, IfGI Muenster
      */
-    class ShimClient
-    {
-    public:
+    class ShimClient {
+       public:
         friend class SciDBDataset;
         /**
          * @brief Basic constructor
@@ -235,13 +232,12 @@ namespace scidb4gdal
          */
         StatusCode testConnection();
 
-
         /**
          * @brief Tests whether a SciDB installation runs the scidb4geo plugin or not
          * @param ret return code to capture connection and query errors
          * @return true if scidb4geo is running,  false otherwise
          */
-        bool hasSCIDB4GEO(StatusCode &ret);
+        bool hasSCIDB4GEO(StatusCode& ret);
         bool hasSCIDB4GEO();
 
         /**
@@ -445,7 +441,7 @@ namespace scidb4gdal
          */
         StatusCode getType(const string& name, SciDBSpatialArray*& array);
 
-    protected:
+       protected:
         /**
          * @brief Fetches all attribute metadata of an array in SciDB
          *
@@ -528,7 +524,6 @@ namespace scidb4gdal
          */
         string getVersion();
 
-
         /**
          * @brief Convert a version string to integer major and minor versions
          *
@@ -568,11 +563,7 @@ namespace scidb4gdal
          */
         void logout();
 
-
-
-
-
-    private:
+       private:
         /** host url */
         string _host;
         /** port number */
@@ -606,22 +597,20 @@ namespace scidb4gdal
     /**
      * @brief A very simple class to interpret CSV strings as tables
      */
-    class CSVstring
-    {
-    public:
-
+    class CSVstring {
+       public:
         /**
          * Default constructor, assuming no header, commas as column separators, and newlines as row separators
          * @param s string with CSV formatted data
          */
-        CSVstring(const string & s);
+        CSVstring(const string& s);
 
         /**
          * Constructor assuming commas as column separators and newlines as row separators
          * @param s string with CSV formatted data
          * @param header true if the first row is a header with column names
          */
-        CSVstring(const string &s, bool header);
+        CSVstring(const string& s, bool header);
 
         /**
          * Constructor for custom CSV formats
@@ -630,7 +619,7 @@ namespace scidb4gdal
          * @param rowsep string that separates rows
          * @param header true if the first row is a header with column names
          */
-        CSVstring(const string &s, const string &colsep, const string &rowsep, bool header);
+        CSVstring(const string& s, const string& colsep, const string& rowsep, bool header);
 
         /**
          * Default desctructor
@@ -643,7 +632,8 @@ namespace scidb4gdal
          * @param col zero-based column index
          * @return the converted value of the cell, using string is safest
          */
-        template<typename T> T get(int row, int col);
+        template <typename T>
+        T get(int row, int col);
 
         /**
          * Returns the number of rows. Header and empty rows are ignored.
@@ -657,10 +647,7 @@ namespace scidb4gdal
          */
         int ncol();
 
-
-    private:
-
-
+       private:
         void process();
 
         const string _s;
@@ -674,7 +661,6 @@ namespace scidb4gdal
 
         int _ncol;
         int _nrow;
-
     };
 }
 

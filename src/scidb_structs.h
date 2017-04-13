@@ -1,11 +1,11 @@
 #ifndef SCIDB_STRUCTS_H
 #define SCIDB_STRUCTS_H
 
+#include <sstream>
+#include <vector>
+#include "TemporalReference.h"
 #include "affinetransform.h"
 #include "utils.h"
-#include <vector>
-#include <sstream>
-#include "TemporalReference.h"
 
 namespace scidb4gdal {
     using namespace std;
@@ -87,9 +87,8 @@ namespace scidb4gdal {
     * The attributes hold the information of the cell value in each band.
     */
     struct SciDBArray {
-        
-        virtual ~SciDBArray() {};
-        
+        virtual ~SciDBArray(){};
+
         /** the name of the array under which it is (or will be) stored in SciDB */
         string name;
         /** a list of scidb4gdal::Attribute that contain metadata about the attributes */
@@ -361,7 +360,7 @@ namespace scidb4gdal {
             return _t_idx;
         }
 
-    protected:
+       protected:
         /**
         * @brief initializes the temporal dimension
         *
@@ -400,7 +399,7 @@ namespace scidb4gdal {
                         break;
                     }
                 }
-            } else { // Try default dimension names
+            } else {  // Try default dimension names
                 for (size_t i = 0; i < dims.size(); ++i) {
                     if (dims[i].name == SCIDB4GDAL_DEFAULT_TDIMNAME) {
                         _t_idx = i;
@@ -420,7 +419,7 @@ namespace scidb4gdal {
     * If no SpatialReference is sepcified, then the SpatialArray will be a simple cartesian reference system.
     */
     struct SciDBSpatialArray : public virtual SciDBArray,
-                            public SciDBSpatialReference {
+                               public SciDBSpatialReference {
         /**
         * @brief Basic constructor
         *
@@ -518,7 +517,7 @@ namespace scidb4gdal {
             return _y_idx;
         }
 
-    protected:
+       protected:
         /**
         * @brief initializes the two spatial dimensions
         *
@@ -531,10 +530,10 @@ namespace scidb4gdal {
             SciDBDimension dimx;
             dimx.low = 0;
             dimx.start = 0;
-            dimx.high = 0; // adapted later
+            dimx.high = 0;  // adapted later
             dimx.name = SCIDB4GDAL_DEFAULT_XDIMNAME;
-            dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE; // should be adapted
-            dimx.typeId = "int64";                         // per default
+            dimx.chunksize = SCIDB4GDAL_DEFAULT_BLOCKSIZE;  // should be adapted
+            dimx.typeId = "int64";                          // per default
 
             SciDBDimension dimy;
             dimy.low = 0;
@@ -565,15 +564,15 @@ namespace scidb4gdal {
             _x_idx = 0;
             _y_idx = 1;
             if (xdim != "" && ydim != "") {
-                for (size_t i = 0; i < dims.size(); ++i) { // Assuming 2 dimensions!!!
+                for (size_t i = 0; i < dims.size(); ++i) {  // Assuming 2 dimensions!!!
                     if (dims[i].name == xdim)
                         _x_idx = i;
                     if (dims[i].name == ydim)
                         _y_idx = i;
                 }
                 // TODO: Assert x_idx != y_idx
-            } else {                                       // Try default dimension names
-                for (size_t i = 0; i < dims.size(); ++i) { // Assuming 2 dimensions!!!
+            } else {                                        // Try default dimension names
+                for (size_t i = 0; i < dims.size(); ++i) {  // Assuming 2 dimensions!!!
                     if (dims[i].name == SCIDB4GDAL_DEFAULT_XDIMNAME)
                         _x_idx = i;
                     if (dims[i].name == SCIDB4GDAL_DEFAULT_YDIMNAME)
@@ -592,7 +591,7 @@ namespace scidb4gdal {
     */
 
     struct SciDBSpatioTemporalArray : public SciDBSpatialArray,
-                                    public SciDBTemporalArray {
+                                      public SciDBTemporalArray {
         /**
         * @brief Basic constructor
         *

@@ -26,10 +26,10 @@ SOFTWARE.
 #define SCIDB_DRIVER_H
 
 #include <iostream>
-#include "utils.h"
+#include "TemporalReference.h"
 #include "shimclient.h"
 #include "tilecache.h"
-#include "TemporalReference.h"
+#include "utils.h"
 
 namespace scidb4gdal {
     using namespace scidb4geo;
@@ -51,24 +51,23 @@ namespace scidb4gdal {
     class SciDBDataset : public GDALDataset {
         friend class SciDBRasterBand;
 
-    private:
+       private:
         /**
         * Spatial array or a spatio-temporal array to store the meta data about the
         * SciDB representation of the array.
         */
         SciDBSpatialArray& _array;
-        
+
         /**
         * pointer to Shim client class that is used to interact with the SciDB
         */
         ShimClient* _client;
-        
+
         /**
         * the tile cache used for downloading chunked array data and to temporarily
         * storing it before writing to a file
         */
         TileCache _cache;
-        
 
         /**
         * The key-value pairs of the meta data retreived from the source (either a
@@ -76,7 +75,7 @@ namespace scidb4gdal {
         */
         char** papszMetadata;
 
-    public:
+       public:
         /**
         * @brief The constructor of a SciDBDataset
         *
@@ -161,9 +160,9 @@ namespace scidb4gdal {
         * @see GDALDriver::CreateCopy()
         */
         static GDALDataset* CreateCopy(const char* pszFilename, GDALDataset* poSrcDS,
-                                    int bStrict, char** papszOptions,
-                                    GDALProgressFunc pfnProgress,
-                                    void* pProgressData);
+                                       int bStrict, char** papszOptions,
+                                       GDALProgressFunc pfnProgress,
+                                       void* pProgressData);
 
         /**
         * @brief Delete named dataset.
@@ -174,7 +173,7 @@ namespace scidb4gdal {
         */
         static CPLErr Delete(const char* pszName);
 
-    protected:
+       protected:
         /**
         * @brief Converts a list of strings (key-value pairs) into a map of strings
         *
@@ -224,10 +223,10 @@ namespace scidb4gdal {
         * @return void
         */
         static void uploadImageIntoTempArray(ShimClient* client,
-                                            SciDBSpatialArray& array,
-                                            GDALDataset* poSrcDS,
-                                            GDALProgressFunc pfnProgress,
-                                            void* pProgressData);
+                                             SciDBSpatialArray& array,
+                                             GDALDataset* poSrcDS,
+                                             GDALProgressFunc pfnProgress,
+                                             void* pProgressData);
 
         /**
         * @brief Checks if an array can be inserted into another array
@@ -248,10 +247,10 @@ namespace scidb4gdal {
     class SciDBRasterBand : public GDALPamRasterBand {
         friend class SciDBDataset;
 
-        SciDBSpatialArray* _array; //!< associated array metadata object
+        SciDBSpatialArray* _array;  //!< associated array metadata object
         char** papszMetadata;
 
-    public:
+       public:
         /**
         * @brief Default constructor for SciDB attribute bands
         *
@@ -288,8 +287,8 @@ namespace scidb4gdal {
 
         /** @copydoc GDALRasterBand::GetStatistics */
         virtual CPLErr GetStatistics(int bApproxOK, int bForce, double* pdfMin,
-                                    double* pdfMax, double* pdfMean,
-                                    double* pdfStdDev);
+                                     double* pdfMax, double* pdfMean,
+                                     double* pdfStdDev);
 
         /** @copydoc GDALPamRasterBand::GetNoDataValue */
         virtual double GetNoDataValue(int* pbSuccess = NULL);

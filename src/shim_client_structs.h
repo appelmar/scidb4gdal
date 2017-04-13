@@ -2,10 +2,10 @@
 #ifndef SHIM_CLIENT_STRUCTS_H
 #define SHIM_CLIENT_STRUCTS_H
 
-#include "utils.h"
 #include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
+#include <boost/lexical_cast.hpp>
+#include "utils.h"
 
 using namespace boost::assign;
 
@@ -37,7 +37,7 @@ namespace scidb4gdal {
         /** the key for using SSL encryption */
         SSL,
         /** bool value whether SSL certificates should be checked or not */
-        SSLTRUST, 
+        SSLTRUST,
         /** the key to confirm the delete process */
         CONFIRM_DELETE
     };
@@ -78,8 +78,7 @@ namespace scidb4gdal {
     * Empty structure to create an semantical inheritance for parameter
     * structures.
     */
-    struct Parameters {
-    };
+    struct Parameters {};
 
     /**
     * @brief Structure to store the information of the user input
@@ -191,10 +190,10 @@ namespace scidb4gdal {
         string passwd;
         /** flag for using SSL encryption */
         bool ssl;
-         /** flag for using SSL verification */
+        /** flag for using SSL verification */
         bool ssltrust;
         /** error code if the connection parameters are invalid */
-        int error_code;
+        StatusCode status;
 
         /** Flag whether or not to delete the Array. This value is used to prevent
         * QuietDelete() */
@@ -204,7 +203,7 @@ namespace scidb4gdal {
         * Default constructor to create empty connection parameters
         */
         ConnectionParameters()
-            : arrayname(""), host(""), port(0), user(""), passwd(""), ssl(false), ssltrust(true),  deleteArray(false) {}
+            : arrayname(""), host(""), port(0), user(""), passwd(""), ssl(false), ssltrust(true), status(SUCCESS), deleteArray(false) {}
 
         /**
         * @brief Represents the connection parameter in string form
@@ -217,18 +216,22 @@ namespace scidb4gdal {
             stringstream s;
             stringstream pw_enc;
             // Do NOT print the password
-            for (unsigned int i = 0; i<passwd.length(); ++i) pw_enc << "x";
-            s << "array=" << arrayname << " host=" << host << " port=" << port << " user=" << user << " passwd=" << pw_enc.str() <<  " ssl=" <<  (ssl ? "true" : "false") <<  " trust=" <<  (ssltrust  ?  "true" : "false");
+            for (unsigned int i = 0; i < passwd.length(); ++i) pw_enc << "x";
+            s << "array=" << arrayname << " host=" << host << " port=" << port << " user=" << user << " passwd=" << pw_enc.str() << " ssl=" << (ssl ? "true" : "false") << " trust=" << (ssltrust ? "true" : "false");
             return s.str();
         };
 
         bool isValid() {
-            bool valid = true;
-            if (arrayname == "" || host == "") {
-                error_code = ERR_READ_ARRAYUNKNOWN;
-                valid = false;
+            bool valid = false;
+            if (arrayname == "") {
+                status = ERR_GLOBAL_MISSINGARRAYNAME;
+            } else if (host.empty()) {
+                status = ERR_GLOBAL_MISSINGHOST;
+            } else if (port == 0) {
+                status = ERR_GLOBAL_MISSINGPORT;
+            } else {
+                valid = true;
             }
-
             return valid;
         };
     };

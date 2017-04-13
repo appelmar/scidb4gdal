@@ -34,3 +34,6 @@
 /doc/*.xmi
 doc/html/*
 doc/html
+
+gdaldev/
+gdal*tar.gz

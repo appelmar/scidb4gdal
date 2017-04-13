@@ -26,10 +26,10 @@ SOFTWARE.
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include <sstream>
-#include <vector>
 #include <iomanip>
 #include <limits>
+#include <sstream>
+#include <vector>
 #include "utils.h"
 
 namespace scidb4gdal {
@@ -43,7 +43,7 @@ namespace scidb4gdal {
     AffineTransform::AffineTransform(double x0, double y0, double a11, double a22)
         : _x0(x0), _y0(y0), _a11(a11), _a22(a22), _a12(0), _a21(0), _inv(NULL) {}
     AffineTransform::AffineTransform(double x0, double y0, double a11, double a22,
-                                    double a12, double a21)
+                                     double a12, double a21)
         : _x0(x0), _y0(y0), _a11(a11), _a22(a22), _a12(a12), _a21(a21), _inv(NULL) {
     }
     AffineTransform::AffineTransform(const string& astr)
@@ -83,7 +83,7 @@ namespace scidb4gdal {
 
     AffineTransform::~AffineTransform() {
         if (_inv) {
-            _inv->_inv = NULL; // No recursive deletes!!!
+            _inv->_inv = NULL;  // No recursive deletes!!!
             delete _inv;
             _inv = NULL;
         }
@@ -92,17 +92,17 @@ namespace scidb4gdal {
     string AffineTransform::toString() {
         stringstream sstr;
         sstr << setprecision(numeric_limits<double>::digits10) << "x0"
-            << "=" << _x0 << " "
-            << "y0"
-            << "=" << _y0 << " "
-            << "a11"
-            << "=" << _a11 << " "
-            << "a22"
-            << "=" << _a22 << " "
-            << "a12"
-            << "=" << _a12 << " "
-            << "a21"
-            << "=" << _a21;
+             << "=" << _x0 << " "
+             << "y0"
+             << "=" << _y0 << " "
+             << "a11"
+             << "=" << _a11 << " "
+             << "a22"
+             << "=" << _a22 << " "
+             << "a12"
+             << "=" << _a12 << " "
+             << "a21"
+             << "=" << _a21;
         return sstr.str();
     }
 
@@ -146,14 +146,14 @@ namespace scidb4gdal {
 
             _inv =
                 new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
-            _inv->_inv = this; // Prevent repreated computations of f, f-1, f, f-1, ...
-                            // This is dangerous in destruction...
+            _inv->_inv = this;  // Prevent repreated computations of f, f-1, f, f-1, ...
+                                // This is dangerous in destruction...
         }
         return _inv->f(v);
     }
 
     void AffineTransform::fInv(const AffineTransform::double2& v_in,
-                            AffineTransform::double2& v_out) {
+                               AffineTransform::double2& v_out) {
         if (_inv == NULL) {
             double d = det();
             if (fabs(d) < DBL_EPSILON) {
@@ -169,8 +169,8 @@ namespace scidb4gdal {
 
             _inv =
                 new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
-            _inv->_inv = this; // Prevent repreated computations of f, f-1, f, f-1, ...
-                            // This is dangerous in destruction...
+            _inv->_inv = this;  // Prevent repreated computations of f, f-1, f, f-1, ...
+                                // This is dangerous in destruction...
         }
         _inv->f(v_in, v_out);
     }
@@ -190,7 +190,7 @@ namespace scidb4gdal {
             double inv_y0 = inv_a21 * _x0 - inv_a22 * _y0;
 
             _inv = new AffineTransform(inv_x0, inv_y0, inv_a11, inv_a22, inv_a12, inv_a21);
-            _inv->_inv = this; // Prevent recursive computations of f, f-1, f, f-1, ... This is dangerous in destruction...
+            _inv->_inv = this;  // Prevent recursive computations of f, f-1, f, f-1, ... This is dangerous in destruction...
         }
 
         _inv->f(v);

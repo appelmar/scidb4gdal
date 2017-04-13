@@ -3,19 +3,18 @@
 
 #include "shim_client_structs.h"
 
-namespace scidb4gdal
-{
+namespace scidb4gdal {
 
     /**
      * The type of operation that needs to be performed with SciDB. Currrently
      * querying and creating arrays in SciDB is
      * supported
      */
-    enum SciDBOperation
-    {
+    enum SciDBOperation {
         SCIDB_OPEN,
         SCIDB_CREATE,
-        SCIDB_DELETE
+        SCIDB_DELETE,
+        UNDEFINED
     };
 
     template <typename T>
@@ -28,12 +27,11 @@ namespace scidb4gdal
      * in order to provide enums to allow a switch-case statement to assign the values of an user input (options or connection string).
      *
      */
-    struct Resolver
-    {
+    struct Resolver {
         /** a map that maps a name (string) to a generic type T (intended to be an enum) */
         map<string, T> mapping;
 
-    public:
+       public:
         /**
          * @brief is the parameter name registered for the respective kind of parameters
          *
@@ -66,9 +64,8 @@ namespace scidb4gdal
      *
      * @author Florian Lahn, IfGI Muenster
      */
-    class ParameterParser
-    {
-    public:
+    class ParameterParser {
+       public:
         /**
          * @brief the class constructor
          *
@@ -78,6 +75,10 @@ namespace scidb4gdal
          */
         ParameterParser(string scidbFile, char** optionKVP,
                         SciDBOperation op = SCIDB_OPEN);
+
+        /** @brief  destructor **/
+        ~ParameterParser();
+
         /**
          * @brief checks whether the opening options or the connection string is complete
          *
@@ -90,23 +91,23 @@ namespace scidb4gdal
          *
          * @return scidb4gdal::ConnectionParameters&
          */
-        ConnectionParameters& getConnectionParameters();
+        ConnectionParameters* getConnectionParameters();
 
         /**
          * @brief Returns the query parameters
          *
          * @return scidb4gdal::QueryParameters&
          */
-        QueryParameters& getQueryParameters();
+        QueryParameters* getQueryParameters();
 
         /**
          * @brief Returns the creation parameters
          *
          * @return scidb4gdal::CreationParameters&
          */
-        CreationParameters& getCreationParameters();
+        CreationParameters* getCreationParameters();
 
-    protected:
+       protected:
         /**
          * @brief initiates the parameter parser
          *
@@ -115,17 +116,7 @@ namespace scidb4gdal
          *
          * @return bool Whether or not the initiation was successful
          */
-        bool init();
-
-
-        /**
-         * @brief validates the connection string
-         *
-         * It validates the filename that the correct Protocol ("SCIDB:") was specified.
-         *
-         * @return void
-         */
-        void validate();
+        bool parseAll();
 
         /**
          * @brief parses the opening options
@@ -177,8 +168,6 @@ namespace scidb4gdal
          */
         void parseSlicedArrayName();
 
-
-
         /**
          * @brief loads the connection string from a .scidbpass file
          * Tries to find a configuration file in the user's home directory and read
@@ -188,7 +177,6 @@ namespace scidb4gdal
          * @return void
          */
         static void loadParsFromFile(ConnectionParameters* con);
-
 
         /**
          * @brief loads the connection string from environment parameters
@@ -201,7 +189,7 @@ namespace scidb4gdal
          */
         static void loadParsFromEnv(ConnectionParameters* con);
 
-    private:
+       private:
         /**
          * pointer to the connection parameters
          */

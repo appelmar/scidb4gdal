@@ -65,15 +65,16 @@ namespace scidb4gdal {
         // Check whether enough memory, if not, delete front (oldest) element
         while (freeSpace() < c.size) {
             if (_q.empty()) {
-                Utils::warn("Local array tile cache to small to store a single chunk, "
-                            "please consider either increasing local cache size or "
-                            "reducing gdal block size");
+                Utils::warn(
+                    "Local array tile cache to small to store a single chunk, "
+                    "please consider either increasing local cache size or "
+                    "reducing gdal block size");
                 return;
             }
             remove(_q.front());
         }
         _cache[c.id] = c;
-        _q.push_back(c.id); //
+        _q.push_back(c.id);  //
         _totalSize += c.size;
     }
 

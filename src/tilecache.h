@@ -26,9 +26,9 @@ SOFTWARE.
 #define TILECACHE_H
 
 #include <iostream>
-#include <sstream>
 #include <list>
 #include <map>
+#include <sstream>
 #include "utils.h"
 
 #define SCIDB4GEO_MAXCHUNKCACHE_MB 256
@@ -60,7 +60,7 @@ namespace scidb4gdal {
     * in order to run efficiently.
     */
     class TileCache {
-    public:
+       public:
         /**
         * @brief Default constructor
         */
@@ -122,7 +122,7 @@ namespace scidb4gdal {
         * @return unique id
         */
         static inline uint32_t getBlockId(int bx, int by, int band, int nx, int ny,
-                                        int nband) {
+                                          int nband) {
             return (band * nx * ny) + (by * nx) + (bx);
         }
 
@@ -132,13 +132,13 @@ namespace scidb4gdal {
         */
         inline size_t freeSpace() { return _maxSize - _totalSize; }
 
-    private:
+       private:
         /** the total size of the cached image */
         size_t _totalSize;
         /** the maximum size that is reserved */
         size_t _maxSize;
         /** a look up table to relate unique ids and the array tile that is referred to */
-        map<uint32_t, ArrayTile>  _cache;  // TODO: unordered_map would be more efficient but C++11
+        map<uint32_t, ArrayTile> _cache;  // TODO: unordered_map would be more efficient but C++11
         /** order of insertions for removing oldes first */
         list<uint32_t> _q;
     };

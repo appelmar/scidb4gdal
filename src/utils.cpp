@@ -23,11 +23,11 @@ SOFTWARE.
 -----------------------------------------------------------------------------*/
 
 #include "utils.h"
-#include <ctime>
-#include <sstream>
-#include <cctype>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <cctype>
+#include <ctime>
+#include <sstream>
 
 namespace scidb4gdal {
     using namespace std;
@@ -70,7 +70,7 @@ namespace scidb4gdal {
         GDALDataType scidbTypeIdToGDALType(const string& typeId) {
             // see src/query/TypeSystem.h of SciDB for definitions
             if (typeId == "int8")
-                return GDT_Byte; // signed vs unsigned might lead to conflicts
+                return GDT_Byte;  // signed vs unsigned might lead to conflicts
             else if (typeId == "int16")
                 return GDT_Int16;
             else if (typeId == "int32")
@@ -85,7 +85,7 @@ namespace scidb4gdal {
                 return GDT_Float32;
             else if (typeId == "double")
                 return GDT_Float64;
-            return GDT_Unknown; // No GDAL support for int64, uint64, string
+            return GDT_Unknown;  // No GDAL support for int64, uint64, string
         }
 
         string gdalTypeToSciDBTypeId(GDALDataType type) {
@@ -172,11 +172,11 @@ namespace scidb4gdal {
         }
 
         void sleep(long int ms) {
-        #ifdef WIN32
+#ifdef WIN32
             Sleep(ms);
-        #else
+#else
             usleep(ms * 1000);
-        #endif
+#endif
         }
 
         uint32_t nextPow2(uint32_t x) {
@@ -191,7 +191,6 @@ namespace scidb4gdal {
         }
 
         bool validateTimestampString(string& in) {
-
             bool isValid = true;
             boost::algorithm::trim(in);
             // check date String
@@ -260,24 +259,21 @@ namespace scidb4gdal {
             }
             return result.str();
         }
-        
-        
-        vector< string > split(const string& s, const string& sep)
-        {
-            vector <string > out;
-            
-            size_t n=sep.length();
+
+        vector<string> split(const string& s, const string& sep) {
+            vector<string> out;
+
+            size_t n = sep.length();
             size_t a = 0;
             size_t b = 0;
-           
+
             while (b != s.length()) {
-                b = s.find(sep,a);
-                if (b == string::npos) b=s.length();
-                out.push_back(s.substr(a,b-a));
-                a = b + n;             
+                b = s.find(sep, a);
+                if (b == string::npos) b = s.length();
+                out.push_back(s.substr(a, b - a));
+                a = b + n;
             }
             return out;
         }
-
     }
 }

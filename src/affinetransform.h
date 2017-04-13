@@ -43,7 +43,7 @@ namespace scidb4gdal {
     * @see GDAL data model specification http://www.gdal.org/gdal_datamodel.html
     */
     class AffineTransform {
-    public:
+       public:
         /**
         * @brief A nested structure to represent a 2 dimensional point
         * This structure represents a spatial point with a x and a y axis.

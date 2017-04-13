@@ -19,12 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef TEMPORAL_REFERENCE_H
 #define TEMPORAL_REFERENCE_H
 
-#include <sstream>
-#include <string>
 #include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/lexical_cast.hpp>
+#include <sstream>
+#include <string>
 
 namespace scidb4geo {
 
@@ -73,7 +73,7 @@ namespace scidb4geo {
 
         friend class TReference;
 
-    public:
+       public:
         /**
         * @brief Basic constructor
         *
@@ -109,7 +109,7 @@ namespace scidb4geo {
         **/
         TResolution _resolution;
 
-    protected:
+       protected:
         /** year value */
         int _year;
         /** month value */
@@ -136,7 +136,7 @@ namespace scidb4geo {
         /** time zone minute value */
         int _tz_minute;
 
-    private:
+       private:
         /**
         * @brief initiate the temporal point values
         *
@@ -162,7 +162,7 @@ namespace scidb4geo {
         friend TInterval operator*(const TInterval& l, const int& r);
         friend TInterval operator*(const int& l, const TInterval& r);
 
-    public:
+       public:
         /**
         * @brief Basic constructor
         * Default constructor creates a time interval that equals 0.
@@ -213,7 +213,7 @@ namespace scidb4geo {
         */
         std::string toStringISO();
 
-    private:
+       private:
         void init();
     };
 
@@ -222,7 +222,7 @@ namespace scidb4geo {
     * Methods to derive the (integer) dimension value for a given date / time and to get the date / time at a specific index are provided.
     **/
     class TReference {
-    public:
+       public:
         /**
         * @brief Representation of a Temporal Reference
         *
@@ -279,7 +279,7 @@ namespace scidb4geo {
         */
         int indexAtDatetime(TPoint& t);
 
-    protected:
+       protected:
         /** the temporal datum */
         TPoint* _t0;
         /** the temporal resolution (technically)*/

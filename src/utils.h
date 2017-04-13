@@ -25,13 +25,13 @@ SOFTWARE.
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <cmath>
 #include <cfloat>
+#include <cmath>
 
 #define SCIDB4GDAL_DEFAULT_XDIMNAME "x"
 #define SCIDB4GDAL_DEFAULT_YDIMNAME "y"
-#define SCIDB4GDAL_DEFAULT_ZDIMNAME "z" // not used by gdal
-#define SCIDB4GDAL_DEFAULT_TDIMNAME "t" 
+#define SCIDB4GDAL_DEFAULT_ZDIMNAME "z"  // not used by gdal
+#define SCIDB4GDAL_DEFAULT_TDIMNAME "t"
 
 //#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_X 512
 //#define SCIDB4GDAL_DEFAULT_BLOCKSIZE_Y 512
@@ -49,7 +49,7 @@ SOFTWARE.
 
 #define SCIDB4GDAL_MAINMEM_HARD_LIMIT_MB 1024
 
-#define SCIDB_MAX_DIM_INDEX 4611686018427387903             //  same as 1 << 62 - 1
+#define SCIDB_MAX_DIM_INDEX 4611686018427387903  //  same as 1 << 62 - 1
 
 #define SCIDB4GDAL_DEFAULTNODATA_INT8 -pow(2, 7)
 #define SCIDB4GDAL_DEFAULTNODATA_INT16 -pow(2, 15)
@@ -62,20 +62,19 @@ SOFTWARE.
 #define SCIDB4GDAL_DEFAULTNODATA_FLOAT nan("")
 #define SCIDB4GDAL_DEFAULTNODATA_DOUBLE nanf("")
 
+#define SCIDB4GDAL_DEFAULTMDFIELD_NODATA "NODATA"
+#define SCIDB4GDAL_DEFAULTMDFIELD_UNIT "UNIT"
+#define SCIDB4GDAL_DEFAULTMDFIELD_SCALE "SCALE"
+#define SCIDB4GDAL_DEFAULTMDFIELD_OFFSET "OFFSET"
+#define SCIDB4GDAL_DEFAULTMDFIELD_MAX "MAX"
+#define SCIDB4GDAL_DEFAULTMDFIELD_MIN "MIN"
 
-#define SCIDB4GDAL_DEFAULTMDFIELD_NODATA  "NODATA"
-#define SCIDB4GDAL_DEFAULTMDFIELD_UNIT    "UNIT"
-#define SCIDB4GDAL_DEFAULTMDFIELD_SCALE   "SCALE"
-#define SCIDB4GDAL_DEFAULTMDFIELD_OFFSET  "OFFSET"
-#define SCIDB4GDAL_DEFAULTMDFIELD_MAX     "MAX"
-#define SCIDB4GDAL_DEFAULTMDFIELD_MIN     "MIN"
-
-#include <string>
-#include <iostream>
-#include <vector>
-#include <string>
 #include <inttypes.h>
 #include <exception>
+#include <iostream>
+#include <string>
+#include <string>
+#include <vector>
 
 #include "gdal.h"
 #include "gdal_pam.h"
@@ -84,7 +83,7 @@ SOFTWARE.
 
 // Sleep function
 #ifdef WIN32
-#include <windows.h> // TODO: Should we define WIN32_LEAN_AND_MEAN?
+#include <windows.h>  // TODO: Should we define WIN32_LEAN_AND_MEAN?
 #define WIN32_LEAN_AND_MEAN
 #else
 #include <unistd.h>
@@ -107,6 +106,7 @@ namespace scidb4gdal {
         /** Error code if a bounding box was stated, but there was no spatial
         reference to interprete the coordinates */
         ERR_READ_BBOX_SRS_MISSING = 100 + 4,
+
         /** Error code for a unspecified */
         ERR_READ_UNKNOWN = 100 + 99,
         /** Error while creating a new SciDB Array, because the array already exists
@@ -145,9 +145,12 @@ namespace scidb4gdal {
         ERR_GLOBAL_INVALIDCONNECTIONSTRING = 300 + 4,
         /** Error while parsing information from the user input */
         ERR_GLOBAL_PARSE = 300 + 5,
-        /** Error stating that no spatial or temporal queries can be executed in SciDB
-        */
-        ERR_GLOBAL_NO_SCIDB4GEO = 300 + 6,
+        ERR_GLOBAL_MISSINGHOST = 300 + 6,
+        ERR_GLOBAL_MISSINGARRAYNAME = 300 + 7,
+        ERR_GLOBAL_MISSINGPORT = 300 + 8,
+        ERR_GLOBAL_AUTHFAILED = 300 + 9,
+        /** Error stating that no spatial or temporal queries can be executed in SciDB*/
+        ERR_GLOBAL_NO_SCIDB4GEO = 300 + 10,
         /** Default error if something went wrong */
         ERR_GLOBAL_UNKNOWN = 300 + 99,
         /** Error when no spatial reference can be found for a bounding box */
@@ -163,75 +166,74 @@ namespace scidb4gdal {
     };
 
     namespace Utils {
-    /**
+        /**
     * @brief Maps SciDB string type identifiers to GDAL data type enumeration items.
     * @param typeId SciDB type identifier string e.g. "int32"
     * @return A GDALDataType item
     */
-    GDALDataType scidbTypeIdToGDALType(const string& typeId);
+        GDALDataType scidbTypeIdToGDALType(const string& typeId);
 
-    /**
+        /**
     * @brief Maps GDAL data type to SciDB string type identifiers.
     * @param type value of GDALDataType enumeration
     * @return SciDB type identifier string e.g. "int32"
     */
-    string gdalTypeToSciDBTypeId(GDALDataType type);
+        string gdalTypeToSciDBTypeId(GDALDataType type);
 
+        string getCurDatetime(void);
 
-    string getCurDatetime(void); 
-
-    /**
+        /**
     * @brief Gets the size in bytes of given a SciDB type.
     * @param typeId SciDB type identifier string e.g. "int32"
     * @return Size in bytes
     */
-    size_t scidbTypeIdBytes(const string& typeId);
+        size_t scidbTypeIdBytes(const string& typeId);
 
-    /**
+        /**
     * @brief Checks whether a SciDB data type is an integer
     * @param typeId SciDB type identifier string e.g. "int32"
     * @return true if typeId is integer, false otherwise
     */
-    inline bool scidbTypeIdIsInteger(const string& typeId) {
-        return (typeId.compare("int32") == 0) || (typeId.compare("int8") == 0) ||
-            (typeId.compare("int16") == 0) || (typeId.compare("int64") == 0) ||
-            (typeId.compare("uint32") == 0) || (typeId.compare("uint8") == 0) ||
-            (typeId.compare("uint16") == 0) || (typeId.compare("uint64") == 0);
-    }
+        inline bool scidbTypeIdIsInteger(const string& typeId) {
+            return (typeId.compare("int32") == 0) || (typeId.compare("int8") == 0) ||
+                   (typeId.compare("int16") == 0) || (typeId.compare("int64") == 0) ||
+                   (typeId.compare("uint32") == 0) || (typeId.compare("uint8") == 0) ||
+                   (typeId.compare("uint16") == 0) || (typeId.compare("uint64") == 0);
+        }
 
-    /**
+        /**
     * @brief Checks whether a SciDB data type is a floating point number
     * @param typeId SciDB type identifier string e.g. "int32"
     * @return true if typeId is a floating point number, false otherwise
     */
-    inline bool scidbTypeIdIsFloatingPoint(const string& typeId) {
-        return (typeId.compare("float") == 0) || (typeId.compare("double") == 0);
-    }
+        inline bool scidbTypeIdIsFloatingPoint(const string& typeId) {
+            return (typeId.compare("float") == 0) || (typeId.compare("double") == 0);
+        }
 
-    /**
+        /**
     * @brief Gets the size in bytes of given a GDAL type.
     * @param typeId SciDB type identifier string e.g. "int32"
     * @return Size in bytes
     */
-    size_t gdalTypeBytes(GDALDataType type);
+        size_t gdalTypeBytes(GDALDataType type);
 
-    /**
+        /**
     * @brief Returns the default no data value for a GDAL data type.
     *
     * @param type one of the type definitions of GDAL
     * @return double
     */
-    double defaultNoDataGDAL(GDALDataType type);
+        double defaultNoDataGDAL(GDALDataType type);
 
-    /**
+        /**
     * @brief Returns the default no data value for a SciDB data type
     *
     * @param typeId a string representation of a SciDB data type
     * @return double
     */
-    double defaultNoDataSciDB(const string& typeId);
+        double defaultNoDataSciDB(const string& typeId);
 
-    /**
+        /**
     * @brief makes an error output
     *
     * Error handling function, calls CPLError() and aborts the running process
@@ -239,9 +241,9 @@ namespace scidb4gdal {
     * @param msg the message to print
     * @return void
     */
-    void error(const string& msg, bool kill = false);
+        void error(const string& msg, bool kill = false);
 
-    /**
+        /**
     * @brief makes an warn output
     *
     * Error handling function, calls CPLWarn()
@@ -249,9 +251,9 @@ namespace scidb4gdal {
     * @param msg the message to print
     * @return void
     */
-    void warn(const string& msg);
+        void warn(const string& msg);
 
-    /**
+        /**
     * @brief makes a debugging output to console
     *
     * Error handling function, calls CPLDebug()
@@ -259,9 +261,9 @@ namespace scidb4gdal {
     * @param msg the message to print
     * @return void
     */
-    void debug(const string& msg);
+        void debug(const string& msg);
 
-    /**
+        /**
     * @brief time out function
     *
     * Utility function for sleeping after connection retries
@@ -269,42 +271,40 @@ namespace scidb4gdal {
     * @param ms the amount of milliseconds to wait
     * @return void
     */
-    void sleep(long ms);
+        void sleep(long ms);
 
-    /**
+        /**
     * @brief Rounds up to the next power of two.
     *
     * @param x integer number
     * @return uint32_t the next higher power of two value
     */
-    uint32_t nextPow2(uint32_t x);
+        uint32_t nextPow2(uint32_t x);
 
-    /**
+        /**
     * @brief Function to validate the time string that is passed
     *
     * @param in the date/time string that needs to be evaluated
     * @return bool whether or not the passed string is valid
     */
-    bool validateTimestampString(string& in);
+        bool validateTimestampString(string& in);
 
-    /**
+        /**
     * @brief Converts key value metadata to a string
     *
     * @param kv map of strings that represent key-value pairs
     * @return std::string The merged string of all key-value entries
     */
-    std::string mdMapToString(std::map<string, string>& kv);
-    
-    /**
+        std::string mdMapToString(std::map<string, string>& kv);
+
+        /**
     * @brief Splits a string to a string vector based on a pattern string
     *
     * @param s string to be splitted
     * @param sep separator or pattern used for splitting
     * @return string parts between the found separator 
     */
-    std::vector<std::string> split(const std::string& s, const std::string& sep);
-    
-        
+        std::vector<std::string> split(const std::string& s, const std::string& sep);
     }
 }
 

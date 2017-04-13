@@ -1,11 +1,11 @@
 #include "parameter_parser.h"
 
-#include "utils.h"
-#include <fstream>
 #include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
+#include <boost/lexical_cast.hpp>
+#include <fstream>
 #include <string>
+#include "utils.h"
 
 namespace scidb4gdal {
 
@@ -21,8 +21,24 @@ namespace scidb4gdal {
         return mapping[s];
     }
 
-    ParameterParser::ParameterParser(string scidbFile, char** optionKVP, SciDBOperation op)
-    : _operation(op) {
+    ParameterParser::~ParameterParser() {
+        if (_create != NULL) delete _create;
+        if (_query != NULL) delete _query;
+        if (_con != NULL) delete _con;
+    }
+
+    ParameterParser::ParameterParser(string scidbFile, char** optionKVP, SciDBOperation op) : _con(NULL),
+                                                                                              _query(NULL),
+                                                                                              _create(NULL),
+                                                                                              _options(NULL),
+                                                                                              _scidb_filename(""),
+                                                                                              _connection_string(""),
+                                                                                              _properties_string(""),
+                                                                                              _isValid(false),
+                                                                                              _operation(UNDEFINED),
+                                                                                              _conKeyResolver(),
+                                                                                              _propKeyResolver(),
+                                                                                              _creationTypeResolver() {
         // 2016-11-17: VC++ 2013 complains about ambigous = operator with map_list_of()
         // set the resolver a.k.a the key value pairs in the connection / property
         // string or the create / opening options
@@ -36,7 +52,6 @@ namespace scidb4gdal {
         //    "t", TIMESTAMP)("type", TYPE)("i", T_INDEX)("bbox", BBOX)("srs", SRS)(
         //    "CHUNKSIZE_SP", CHUNKSIZE_SPATIAL)("chunksize_sp", CHUNKSIZE_SPATIAL)(
         //    "CHUNKSIZE_T", CHUNKSIZE_TEMPORAL)("chunksize_t", CHUNKSIZE_TEMPORAL);
-
         _propKeyResolver.mapping.insert(std::pair<string, Properties>("dt", TRS));
         _propKeyResolver.mapping.insert(std::pair<string, Properties>("timestamp", TIMESTAMP));
         _propKeyResolver.mapping.insert(std::pair<string, Properties>("t", TIMESTAMP));
@@ -53,7 +68,6 @@ namespace scidb4gdal {
         //_conKeyResolver.mapping = map_list_of("host", HOST)("port", PORT)(
         //    "user", USER)("password", PASSWORD)("ssl", SSL)("trust", SSLTRUST)("array", ARRAY)(
         //    "confirmDelete", CONFIRM_DELETE);
-
         _conKeyResolver.mapping.insert(std::pair<string, ConnectionStringKey>("host", HOST));
         _conKeyResolver.mapping.insert(std::pair<string, ConnectionStringKey>("port", PORT));
         _conKeyResolver.mapping.insert(std::pair<string, ConnectionStringKey>("user", USER));
@@ -63,9 +77,21 @@ namespace scidb4gdal {
         _conKeyResolver.mapping.insert(std::pair<string, ConnectionStringKey>("array", ARRAY));
         _conKeyResolver.mapping.insert(std::pair<string, ConnectionStringKey>("confirmDelete", CONFIRM_DELETE));
 
+        _operation = op;
         _scidb_filename = scidbFile;
+
+        // Check if connection string starts with prefix "SCIDB:"
+
+        if (_scidb_filename.empty() ||
+            _scidb_filename.length() < 7 ||
+            _scidb_filename.substr(0, 6).compare("SCIDB:") != 0) {
+            Utils::error("Given dataset name is not a valid SciDB connection string. Make sure it starts with \"SCIDB:\".");
+            throw ERR_GLOBAL_INVALIDCONNECTIONSTRING;
+        }
+        // remove prefix "SCIDB:"
+        _scidb_filename = _scidb_filename.substr(6, _scidb_filename.length() - 6);
         _options = optionKVP;
-        if (!init()) {
+        if (!parseAll()) {
             throw ERR_GLOBAL_PARSE;
         }
     }
@@ -155,7 +181,7 @@ namespace scidb4gdal {
         // std::map<string,Properties> propResolver = map_list_of ("t",T_INDEX);
 
         vector<string> parts;
-        boost::split(parts, _properties_string, boost::is_any_of(";")); // Split at semicolon and comma for refering to a whole KVP
+        boost::split(parts, _properties_string, boost::is_any_of(";"));  // Split at semicolon and comma for refering to a whole KVP
         // example for filename with properties variable    "src_win:0 0 50 50;..."
         for (vector<string>::iterator it = parts.begin(); it != parts.end(); ++it) {
             vector<string> kv, c;
@@ -192,7 +218,6 @@ namespace scidb4gdal {
                 con->passwd = parts[4];
             }
         }
-
     }
 
     void ParameterParser::loadParsFromEnv(ConnectionParameters* con) {
@@ -230,7 +255,7 @@ namespace scidb4gdal {
         // extract temporal string
         if ((length - 1) == t_end) {
             string t_expression =
-                    _con->arrayname.substr(t_start + 1, (t_end - t_start) - 1);
+                _con->arrayname.substr(t_start + 1, (t_end - t_start) - 1);
             // remove the temporal part of the array name otherwise it messes up the
             // concrete array name in scidb
             string temp = _con->arrayname.substr(0, t_start);
@@ -239,8 +264,9 @@ namespace scidb4gdal {
 
             boost::split(kv, t_expression, boost::is_any_of(","));
             if (kv.size() < 2) {
-                Utils::error("Temporal query not complete. Please state the dimension "
-                             "name and the temporal index / interval");
+                Utils::error(
+                    "Temporal query not complete. Please state the dimension "
+                    "name and the temporal index / interval");
                 return;
             }
             // first part is the dimension identifier
@@ -276,8 +302,9 @@ namespace scidb4gdal {
                         _query->upper_bound = boost::lexical_cast<int>(attr[1]);
                         // TODO for now we parse it correctly, but we will just use the
                         // lower_bound... change this later
-                        Utils::debug("Currently interval query is not supported. Using the "
-                                     "lower bound instead");
+                        Utils::debug(
+                            "Currently interval query is not supported. Using the "
+                            "lower bound instead");
                         _query->temp_index = _query->lower_bound;
                     } else {
                         // temporal index
@@ -294,39 +321,19 @@ namespace scidb4gdal {
         }
     }
 
-    ConnectionParameters& ParameterParser::getConnectionParameters() {
-        return *_con;
+    ConnectionParameters* ParameterParser::getConnectionParameters() {
+        return _con;
     }
 
-    QueryParameters& ParameterParser::getQueryParameters() {
-        return *_query;
+    QueryParameters* ParameterParser::getQueryParameters() {
+        return _query;
     }
 
-    CreationParameters& ParameterParser::getCreationParameters() {
-        return *_create;
+    CreationParameters* ParameterParser::getCreationParameters() {
+        return _create;
     }
 
-    void ParameterParser::validate() {
-        if (_scidb_filename == "" ||
-            _scidb_filename.substr(0, 6).compare("SCIDB:") != 0) {
-            _isValid = false;
-            _con->error_code = ERR_GLOBAL_INVALIDCONNECTIONSTRING;
-            return;
-        }
-
-        _scidb_filename = _scidb_filename.substr(
-                                                 6, _scidb_filename.length() - 6); // Remove SCIDB: from connection string
-        _isValid = true;
-    }
-
-    bool ParameterParser::init() {
-        _isValid = false;
-        validate();
-
-        // create the parameter objects
-        if (!isValid())
-            return false;
-
+    bool ParameterParser::parseAll() {
         _con = new ConnectionParameters();
         if (_operation == SCIDB_OPEN) {
             _query = new QueryParameters();
@@ -341,7 +348,7 @@ namespace scidb4gdal {
         }
 
         // first extract information from connection string and afterwards check for
-        // the opening options and overwrite values if double
+        // the opening options and overwrite values if redundant
         parseConnectionString();
 
         // TODO check if connection parameter are set. if not then try to parse
@@ -354,17 +361,14 @@ namespace scidb4gdal {
         }
         if (!_con->isValid()) {
             stringstream s;
-            s << "Failed to extract connection information. host: " << _con->host
-                    << ", array: " << _con->arrayname;
+            s << "Failed to extract connection information.";
             Utils::error(s.str());
+            throw _con->status;
         }
-        //       if (!_con->isValid()) {
-        // 	throw ERR_GLOBAL_INVALIDCONNECTIONSTRING;
-        //       }
 
         if (_operation == SCIDB_OPEN) {
             parseOpeningOptions();
-            parseSlicedArrayName(); // array name will be modified if a temporal query is
+            parseSlicedArrayName();  // array name will be modified if a temporal query is
             // detected (for the ConnectionPars)
         }
         if (_operation == SCIDB_CREATE) {
@@ -383,8 +387,10 @@ namespace scidb4gdal {
             case HOST:
                 _con->host = value;
                 //  Explicitly set ssl from URL only if http or https is given
-                if (value.substr(0, 8).compare("https://") == 0) _con->ssl = true;
-                else if (value.substr(0, 7).compare("http://") == 0) _con->ssl = false;
+                if (value.substr(0, 8).compare("https://") == 0)
+                    _con->ssl = true;
+                else if (value.substr(0, 7).compare("http://") == 0)
+                    _con->ssl = false;
                 break;
             case USER:
                 _con->user = value;
@@ -420,18 +426,15 @@ namespace scidb4gdal {
     void ParameterParser::assignCreateParameter(string key, string value) {
         Properties enumKey = _propKeyResolver.getKey(key);
         switch (enumKey) {
-            case TRS:
-            {
+            case TRS: {
                 _create->dt = value;
                 break;
             }
-            case TIMESTAMP:
-            {
+            case TIMESTAMP: {
                 _create->timestamp = value;
                 break;
             }
-            case TYPE:
-            {
+            case TYPE: {
                 if (_creationTypeResolver.contains(value)) {
                     _create->type = _creationTypeResolver.getKey(value);
                 } else {
@@ -439,8 +442,7 @@ namespace scidb4gdal {
                 }
                 break;
             }
-            case SRS:
-            {
+            case SRS: {
                 vector<string> code;
                 boost::split(code, value, boost::is_any_of(":"));
 
@@ -448,8 +450,7 @@ namespace scidb4gdal {
                 _create->srid = boost::lexical_cast<int32_t>(code.at(1));
                 break;
             }
-            case BBOX:
-            {
+            case BBOX: {
                 vector<string> coords;
                 Utils::debug("Got a bbox statement.");
                 boost::split(coords, value, boost::is_any_of(" "));

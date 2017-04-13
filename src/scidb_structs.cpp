@@ -29,63 +29,64 @@ namespace scidb4gdal {
 
     string SciDBArray::toString() {
         return getSchemaString();
-//         stringstream s;
-//         s << "'" << name << "'"
-//         << ":";
-//         for (uint32_t i = 0; i < dims.size(); ++i)
-//             s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high
-//             << "," << dims[i].typeId << ">";
-//         for (uint32_t i = 0; i < attrs.size(); ++i)
-//             s << "['" << attrs[i].name << "'," << attrs[i].typeId << ","
-//             << attrs[i].nullable << "]";
-//         s << "\n";
-//         return s.str();
+        //         stringstream s;
+        //         s << "'" << name << "'"
+        //         << ":";
+        //         for (uint32_t i = 0; i < dims.size(); ++i)
+        //             s << "<'" << dims[i].name << "'," << dims[i].low << ":" << dims[i].high
+        //             << "," << dims[i].typeId << ">";
+        //         for (uint32_t i = 0; i < attrs.size(); ++i)
+        //             s << "['" << attrs[i].name << "'," << attrs[i].typeId << ","
+        //             << attrs[i].nullable << "]";
+        //         s << "\n";
+        //         return s.str();
     }
 
     string SciDBArray::getFormatString() {
         stringstream s;
         s << "(";
         for (uint32_t i = 0; i < attrs.size() - 1; ++i) {
-            s << attrs[i].typeId << ","; // TODO: Add nullable
+            s << attrs[i].typeId << ",";  // TODO: Add nullable
         }
-        s << attrs[attrs.size() - 1].typeId; // TODO: Add nullable
+        s << attrs[attrs.size() - 1].typeId;  // TODO: Add nullable
         s << ")";
         return s.str();
     }
 
     string SciDBArray::getSchemaString() {
         stringstream s;
-       
+
         s << "<";
         for (uint32_t i = 0; i < attrs.size(); ++i) {
             s << attrs[i].name << ":" << attrs[i].typeId;
-            if (attrs[i].nullable)  s << " NULL";
-            else s << " NOT NULL"; 
+            if (attrs[i].nullable)
+                s << " NULL";
+            else
+                s << " NOT NULL";
             if (i < (attrs.size() - 1)) s << ",";
         }
         s << ">";
         s << "[";
         for (uint32_t i = 0; i < dims.size(); ++i) {
-            int64_t endmax = (dims[i].start + dims[i].length - 1); 
-            s << dims[i].name << "=" << dims[i].start << ":" << ((endmax >= SCIDB_MAX_DIM_INDEX)?  "*" : boost::lexical_cast<string>(endmax));
+            int64_t endmax = (dims[i].start + dims[i].length - 1);
+            s << dims[i].name << "=" << dims[i].start << ":" << ((endmax >= SCIDB_MAX_DIM_INDEX) ? "*" : boost::lexical_cast<string>(endmax));
             s << "," << dims[i].chunksize << ","
-            << "0"; // TODO: Add overlap
-//             stringstream sdebug;
-//             sdebug <<  "Dim (" <<  i+1 <<  "):" 
-//               <<  " name=" <<  dims[i].name 
-//               <<  " start=" <<  dims[i].start
-//               <<  " length=" <<  dims[i].length
-//               <<  " low=" <<  dims[i].low
-//               <<  " high=" <<  dims[i].high
-//               <<  " chunksize=" <<  dims[i].chunksize;
-//             Utils::debug(sdebug.str());  
-              
+              << "0";  // TODO: Add overlap
+                       //             stringstream sdebug;
+                       //             sdebug <<  "Dim (" <<  i+1 <<  "):"
+                       //               <<  " name=" <<  dims[i].name
+                       //               <<  " start=" <<  dims[i].start
+                       //               <<  " length=" <<  dims[i].length
+                       //               <<  " low=" <<  dims[i].low
+                       //               <<  " high=" <<  dims[i].high
+                       //               <<  " chunksize=" <<  dims[i].chunksize;
+                       //             Utils::debug(sdebug.str());
+
             if (i < (dims.size() - 1))
                 s << ",";
-                
         }
         s << "]";
-        
+
         return s.str();
     }
 }
