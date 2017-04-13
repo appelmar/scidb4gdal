@@ -114,6 +114,7 @@ namespace scidb4gdal {
         * This function is intended to be called on constructing this structure and it initializes some attributes with default values
         */
         void _init() {
+            type = S_ARRAY;
             chunksize_spatial = -1;
             chunksize_temporal = -1;
             timestamp = "";
